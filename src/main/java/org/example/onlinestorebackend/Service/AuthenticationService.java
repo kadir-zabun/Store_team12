@@ -55,7 +55,6 @@ public class AuthenticationService {
                     HttpStatus.FORBIDDEN,
                     "username already taken"
             );
-            // (doğrusu 409 Conflict olurdu ama frontend şu an 403 bekliyor)
         }
 
         if (userRepository.findByEmail(input.getEmail()).isPresent()) {
