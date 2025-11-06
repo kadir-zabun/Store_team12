@@ -1,22 +1,44 @@
 package org.example.onlinestorebackend.Service;
 
+import org.example.onlinestorebackend.Dto.AuthenticationResponse;
+import org.example.onlinestorebackend.Dto.LoginDto;
 import org.example.onlinestorebackend.Dto.RegisterDto;
 import org.example.onlinestorebackend.Entity.User;
 import org.example.onlinestorebackend.Repository.UserRepository;
+import org.example.onlinestorebackend.Util.JwtUtil;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
 public class AuthenticationService {
 
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final AuthenticationManager authenticationManager;
+    private final JwtUtil jwtUtil;
+    private final UserDetailsServiceImpl userDetailsService;
 
-    private PasswordEncoder passwordEncoder;
+    public AuthenticationService(
+            UserRepository userRepository,
+            AuthenticationManager authenticationManager,
+            PasswordEncoder passwordEncoder,
+            JwtUtil jwtUtil,
+            UserDetailsServiceImpl userDetailsService) {
+        this.userRepository = userRepository;
+        this.authenticationManager = authenticationManager;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtUtil = jwtUtil;
+        this.userDetailsService = userDetailsService;
+    }
 
 
     public User register(RegisterDto input) {
@@ -54,5 +76,28 @@ public class AuthenticationService {
         return userRepository.save(user);
     }
 
+    public AuthenticationResponse authenticate(LoginDto request) {
+        Optional<User> optionalUser = userRepository.findByEmail(request.getUsernameOrEmail());
 
+        if (optionalUser.isEmpty()) {
+            optionalUser = userRepository.findByUsername(request.getUsernameOrEmail());
+        }
+
+        if (optionalUser.isPresent()) {
+            User user = optionalUser.get();
+
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(user.getUsername(), request.getPassword())
+            );
+
+            UserDetails userDetails = userDetailsService.loadUserByUsername(user.getUsername());
+            String accessToken = jwtUtil.generateAccessToken(userDetails);
+            String refreshToken = jwtUtil.generateRefreshToken(userDetails);
+            refreshTokenService.saveRefreshToken(user.getUsername(), refreshToken);
+
+            return new AuthenticationResponse(accessToken, refreshToken, "USER");
+        }
+
+        throw new RuntimeException("Kullanıcı bulunamadı.");
+    }
 }
