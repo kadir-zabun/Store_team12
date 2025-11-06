@@ -14,15 +14,15 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.ArrayList;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 public class AuthenticationService {
 
     private final UserRepository userRepository;
+
     private final PasswordEncoder passwordEncoder;
+
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
     private final UserDetailsServiceImpl userDetailsService;
@@ -40,7 +40,6 @@ public class AuthenticationService {
         this.userDetailsService = userDetailsService;
     }
 
-
     public User register(RegisterDto input) {
         if (!input.getPassword().equals(input.getConfirmPassword())) {
             throw new ResponseStatusException(
@@ -50,7 +49,6 @@ public class AuthenticationService {
         }
 
         if (userRepository.findByUsername(input.getUsername()).isPresent()) {
-            // 403 (frontend'in beklentisini bozmayalım)
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
                     "username already taken"
@@ -77,7 +75,6 @@ public class AuthenticationService {
 
     public AuthenticationResponse authenticate(LoginDto request) {
         Optional<User> optionalUser = userRepository.findByEmail(request.getUsernameOrEmail());
-
         if (optionalUser.isEmpty()) {
             optionalUser = userRepository.findByUsername(request.getUsernameOrEmail());
         }
@@ -85,18 +82,19 @@ public class AuthenticationService {
         if (optionalUser.isPresent()) {
             User user = optionalUser.get();
 
+            // şifre doğrulama
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(user.getUsername(), request.getPassword())
             );
 
+            // token üret
             UserDetails userDetails = userDetailsService.loadUserByUsername(user.getUsername());
-            String accessToken = jwtUtil.generateAccessToken(userDetails);
-            String refreshToken = jwtUtil.generateRefreshToken(userDetails);
-            refreshTokenService.saveRefreshToken(user.getUsername(), refreshToken);
+            String token = jwtUtil.generateToken(userDetails); // süresiz tek token
 
-            return new AuthenticationResponse(accessToken, refreshToken, "USER");
+            // refreshTokenService ve benzeri akışlar kaldırıldı
+            return new AuthenticationResponse(token, "USER");
         }
 
-        throw new RuntimeException("Kullanıcı bulunamadı.");
+        throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Kullanıcı bulunamadı.");
     }
 }

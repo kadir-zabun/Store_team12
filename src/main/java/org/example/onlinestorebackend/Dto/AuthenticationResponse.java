@@ -10,6 +10,5 @@ import java.io.Serializable;
 @NoArgsConstructor
 public class AuthenticationResponse implements Serializable {
     private String token;
-    private String refreshToken;
     private String role;
 }
