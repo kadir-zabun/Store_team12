@@ -1,34 +1,14 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import authApi from "../api/authApi";
 
-export default function LoginPage() {
+import { useState } from "react";
+import { Link } from "react-router-dom";
+
+export default function RegisterPage() {
     const [usernameOrEmail, setUsernameOrEmail] = useState("");
     const [password, setPassword] = useState("");
-    const [error, setError] = useState("");
-    const navigate = useNavigate();
 
-    const handleSubmit = async (e) => {
+    const handleSubmit = (e) => {
         e.preventDefault();
-        setError("");
-
-        try {
-            const res = await authApi.login(usernameOrEmail, password);
-
-            const data = res.data;
-
-            if (data.token) {
-                localStorage.setItem("access_token", data.token);
-            }
-            if (data.user) {
-                localStorage.setItem("user", JSON.stringify(data.user));
-            }
-
-            navigate("/"); // başarılıysa HomePage'e
-        } catch (err) {
-            console.error(err);
-            setError("username/password invalid");
-        }
+        console.log("Register attempt:", usernameOrEmail, password);
     };
 
     return (
@@ -58,12 +38,12 @@ export default function LoginPage() {
                     style={{
                         textAlign: "center",
                         color: "white",
-                        fontSize: "28px",
+                        fontSize: "26px",
                         margin: 0,
                         marginBottom: "10px",
                     }}
                 >
-                    Login
+                    Sign Up
                 </h2>
 
                 <input
@@ -96,31 +76,41 @@ export default function LoginPage() {
                     }}
                 />
 
-                {error && (
-                    <span
+                <div
+                    style={{
+                        marginTop: "5px",
+                        marginBottom: "5px",
+                        fontSize: "14px",
+                        color: "#cccccc",
+                    }}
+                >
+                    You already have an account?{" "}
+                    <Link
+                        to="/login"
                         style={{
-                            color: "#ff4d4f",
-                            fontSize: "14px",
+                            color: "#4da3ff",
+                            textDecoration: "none",
+                            fontWeight: "500",
                         }}
                     >
-            {error}
-          </span>
-                )}
+                        Login
+                    </Link>
+                </div>
 
                 <button
                     type="submit"
                     style={{
                         padding: "12px",
                         fontSize: "16px",
-                        backgroundColor: "#007bff",
+                        backgroundColor: "#2ecc71",
                         color: "white",
                         border: "none",
                         borderRadius: "5px",
                         cursor: "pointer",
-                        marginTop: "10px",
+                        marginTop: "5px",
                     }}
                 >
-                    Login
+                    Sign Up
                 </button>
             </form>
         </div>
