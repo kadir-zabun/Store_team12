@@ -31,4 +31,6 @@ public class Product {
     private List<String> images;
 
     private Boolean inStock;
+
+    private String categoryId; // Category ile ilişki
 }
