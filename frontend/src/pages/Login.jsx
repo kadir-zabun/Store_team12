@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import authApi from "../api/authApi";
 
 export default function LoginPage() {
@@ -103,9 +103,30 @@ export default function LoginPage() {
                             fontSize: "14px",
                         }}
                     >
-            {error}
-          </span>
+                        {error}
+                    </span>
                 )}
+
+                <div
+                    style={{
+                        marginTop: "5px",
+                        marginBottom: "5px",
+                        fontSize: "14px",
+                        color: "#cccccc",
+                    }}
+                >
+                    You don't have an account?{" "}
+                    <Link
+                        to="/register"
+                        style={{
+                            color: "#4da3ff",
+                            textDecoration: "none",
+                            fontWeight: "500",
+                        }}
+                    >
+                        Sign up
+                    </Link>
+                </div>
 
                 <button
                     type="submit"
