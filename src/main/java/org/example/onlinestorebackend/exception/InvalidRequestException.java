@@ -1,4 +1,4 @@
-package org.example.onlinestorebackend.Exception;
+package org.example.onlinestorebackend.exception;
 
 public class InvalidRequestException extends RuntimeException {
     public InvalidRequestException(String message) {
