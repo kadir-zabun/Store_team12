@@ -1,0 +1,165 @@
+package org.example.onlinestorebackend.Service;
+
+import lombok.RequiredArgsConstructor;
+import org.example.onlinestorebackend.Dto.CreateOrderRequest;
+import org.example.onlinestorebackend.Entity.Cart;
+import org.example.onlinestorebackend.Entity.CartItem;
+import org.example.onlinestorebackend.Entity.Order;
+import org.example.onlinestorebackend.Entity.OrderItem;
+import org.example.onlinestorebackend.Entity.Product;
+import org.example.onlinestorebackend.Repository.CartRepository;
+import org.example.onlinestorebackend.Repository.OrderRepository;
+import org.example.onlinestorebackend.Repository.ProductRepository;
+import org.example.onlinestorebackend.exception.InsufficientStockException;
+import org.example.onlinestorebackend.exception.InvalidRequestException;
+import org.example.onlinestorebackend.exception.ResourceNotFoundException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class OrderService {
+
+    private final OrderRepository orderRepository;
+    private final ProductRepository productRepository;
+    private final CartRepository cartRepository;
+
+    @Transactional
+    public Order createOrder(CreateOrderRequest request) {
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            throw new InvalidRequestException("Order must contain at least one item");
+        }
+
+        List<OrderItem> orderItems = new ArrayList<>();
+        BigDecimal totalPrice = BigDecimal.ZERO;
+
+        for (CreateOrderRequest.OrderItemRequest itemRequest : request.getItems()) {
+            Product product = productRepository.findById(itemRequest.getProductId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + itemRequest.getProductId()));
+
+            validateStock(product, itemRequest.getQuantity());
+            decreaseStock(product, itemRequest.getQuantity());
+
+            OrderItem orderItem = new OrderItem();
+            orderItem.setProductId(product.getProductId());
+            orderItem.setQuantity(itemRequest.getQuantity());
+            orderItem.setPriceAtPurchase(product.getPrice());
+
+            orderItems.add(orderItem);
+
+            BigDecimal itemTotal = product.getPrice().multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
+            totalPrice = totalPrice.add(itemTotal);
+        }
+
+        Order order = new Order();
+        order.setCustomerId(request.getCustomerId());
+        order.setItems(orderItems);
+        order.setOrderDate(LocalDateTime.now());
+        order.setStatus("PROCESSING");
+        order.setTotalPrice(totalPrice.doubleValue());
+
+        return orderRepository.save(order);
+    }
+
+    @Transactional
+    public Order createOrderFromCart(String customerId) {
+        Cart cart = cartRepository.findByUserId(customerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Cart not found for user: " + customerId));
+
+        if (cart.getItems() == null || cart.getItems().isEmpty()) {
+            throw new InvalidRequestException("Cart is empty, cannot create order");
+        }
+
+        List<OrderItem> orderItems = new ArrayList<>();
+        BigDecimal totalPrice = BigDecimal.ZERO;
+
+        for (CartItem cartItem : cart.getItems()) {
+            Product product = productRepository.findById(cartItem.getProductId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + cartItem.getProductId()));
+
+            validateStock(product, cartItem.getQuantity());
+            decreaseStock(product, cartItem.getQuantity());
+
+            OrderItem orderItem = new OrderItem();
+            orderItem.setProductId(cartItem.getProductId());
+            orderItem.setQuantity(cartItem.getQuantity());
+            orderItem.setPriceAtPurchase(cartItem.getPrice());
+
+            orderItems.add(orderItem);
+
+            if (cartItem.getSubtotal() != null) {
+                totalPrice = totalPrice.add(cartItem.getSubtotal());
+            } else if (cartItem.getPrice() != null && cartItem.getQuantity() != null) {
+                totalPrice = totalPrice.add(cartItem.getPrice().multiply(BigDecimal.valueOf(cartItem.getQuantity())));
+            }
+        }
+
+        Order order = new Order();
+        order.setCustomerId(customerId);
+        order.setItems(orderItems);
+        order.setOrderDate(LocalDateTime.now());
+        order.setStatus("PROCESSING");
+        order.setTotalPrice(totalPrice.doubleValue());
+
+        Order savedOrder = orderRepository.save(order);
+
+        cart.getItems().clear();
+        cart.setTotalPrice(BigDecimal.ZERO);
+        cart.setUpdatedAt(LocalDateTime.now());
+        cartRepository.save(cart);
+
+        return savedOrder;
+    }
+
+    public Order getOrderById(String orderId) {
+        return orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
+    }
+
+    public List<Order> getOrdersByCustomer(String customerId) {
+        return orderRepository.findByCustomerId(customerId);
+    }
+
+    public List<Order> getAllOrders() {
+        return orderRepository.findAll();
+    }
+
+    public List<Order> getOrdersByStatus(String status) {
+        return orderRepository.findByStatus(status);
+    }
+
+    @Transactional
+    public Order updateOrderStatus(String orderId, String status) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
+        order.setStatus(status);
+        return orderRepository.save(order);
+    }
+
+    private void validateStock(Product product, Integer requestedQuantity) {
+        if (requestedQuantity == null || requestedQuantity <= 0) {
+            throw new InvalidRequestException("Quantity must be greater than zero");
+        }
+
+        if (product.getQuantity() == null || product.getQuantity() < requestedQuantity) {
+            throw new InsufficientStockException("Insufficient stock for product: " + product.getProductName());
+        }
+
+        if (!Boolean.TRUE.equals(product.getInStock())) {
+            throw new InsufficientStockException("Product is not available: " + product.getProductName());
+        }
+    }
+
+    private void decreaseStock(Product product, Integer quantity) {
+        product.setQuantity(product.getQuantity() - quantity);
+        product.setInStock(product.getQuantity() > 0);
+        productRepository.save(product);
+    }
+}
+
+
