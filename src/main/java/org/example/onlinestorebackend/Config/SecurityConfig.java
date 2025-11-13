@@ -38,11 +38,13 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(); // ⬅️ GEREKLİ BEAN
+        return new BCryptPasswordEncoder();
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(org.springframework.security.config.annotation.web.builders.HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+            org.springframework.security.config.annotation.web.builders.HttpSecurity http
+    ) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(c -> c.configurationSource(corsConfigurationSource()))
@@ -50,8 +52,13 @@ public class SecurityConfig {
                 .userDetailsService(userDetailsService)
                 .authorizeHttpRequests(auth -> auth
                         // Public
-                        .requestMatchers("/api/auth/login", "/api/auth/register", "/api/auth/refresh").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/avatars/**").permitAll()   // avatarları GET ile public yap
+                        .requestMatchers(
+                                "/api/auth/login",
+                                "/api/auth/register",
+                                "/api/auth/refresh",
+                                "/api/auth/password-reset"   // <-- BUNU EKLE
+                        ).permitAll()
+                        .requestMatchers(HttpMethod.GET, "/avatars/**").permitAll()
                         .requestMatchers("/ws/**").permitAll()
                         // Diğer her şey JWT ister
                         .anyRequest().authenticated()
@@ -61,10 +68,6 @@ public class SecurityConfig {
         return http.build();
     }
 
-    /**
-     * Statik avatar dosyalarını TÜM güvenlik zincirinin dışına çıkar.
-     * (JWT filtresi bile çalışmaz.)
-     */
     @Bean
     public WebSecurityCustomizer webSecurityCustomizer() {
         return web -> web.ignoring()
@@ -74,7 +77,6 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration cfg = new CorsConfiguration();
-        // Geliştirme için serbest; prod'da kendi domain(ler)ini yaz.
         cfg.setAllowedOriginPatterns(List.of("*"));
         cfg.setAllowedMethods(List.of("GET","POST","PUT","DELETE","OPTIONS"));
         cfg.setAllowedHeaders(List.of("*"));
@@ -85,7 +87,6 @@ public class SecurityConfig {
         return source;
     }
 
-    // DİKKAT: Başka bir sınıfta (AppConfig vs.) AuthenticationManager BEAN tanımlıysa onu kaldırın.
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration ac) throws Exception {
         return ac.getAuthenticationManager();
