@@ -54,6 +54,9 @@ public class SecurityConfig {
                         // Public
                         .requestMatchers(
                                 "/api/auth/login",
+                                "/api/products",
+                                "/api/products/search",
+                                "/api/payment/mock",
                                 "/api/auth/register",
                                 "/api/auth/refresh",
                                 "/api/auth/password-reset"   // <-- BUNU EKLE
