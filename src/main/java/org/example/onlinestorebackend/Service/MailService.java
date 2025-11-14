@@ -13,7 +13,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
 @Slf4j
-@Service
+//@Service  simdilik aktif değil buildde sorun çıkarıyor
 @RequiredArgsConstructor
 public class MailService {
 

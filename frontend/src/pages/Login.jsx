@@ -20,14 +20,15 @@ export default function LoginPage() {
             if (data.token) {
                 localStorage.setItem("access_token", data.token);
             }
-            if (data.user) {
-                localStorage.setItem("user", JSON.stringify(data.user));
-            }
 
             navigate("/"); // başarılıysa HomePage'e
         } catch (err) {
-            console.error(err);
-            setError("username/password invalid");
+            console.error("LOGIN ERROR:", err);
+            const message =
+                err.response?.data?.message ||
+                err.response?.data?.error ||
+                "username/password invalid";
+            setError(message);
         }
     };
 

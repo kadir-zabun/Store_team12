@@ -7,7 +7,7 @@ import org.example.onlinestorebackend.Service.PasswordResetService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-@RestController
+//@RestController simdilik aktif değil buildde sorun çıkarıyor
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class PasswordResetController {

@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
-@Service
+//@Service simdilik aktif değil buildde sorun çıkarıyor
 @RequiredArgsConstructor
 public class PasswordResetService {
 
