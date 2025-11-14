@@ -51,19 +51,33 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .userDetailsService(userDetailsService)
                 .authorizeHttpRequests(auth -> auth
-                        // Public
+                        // Public endpoints
                         .requestMatchers(
                                 "/api/auth/login",
-                                "/api/products",
-                                "/api/products/search",
-                                "/api/payment/mock",
                                 "/api/auth/register",
                                 "/api/auth/refresh",
-                                "/api/auth/password-reset"   // <-- BUNU EKLE
+                                "/api/auth/password-reset",
+                                "/api/payment/mock"
                         ).permitAll()
+                        // Product endpoints (public - herkes görebilir)
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/products",
+                                "/api/products/**",
+                                "/api/products/search",
+                                "/api/products/category/**",
+                                "/api/products/price-range",
+                                "/api/products/in-stock"
+                        ).permitAll()
+                        // Category endpoints (public - herkes görebilir)
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/categories",
+                                "/api/categories/**",
+                                "/api/categories/search"
+                        ).permitAll()
+                        // Avatar ve WebSocket
                         .requestMatchers(HttpMethod.GET, "/avatars/**").permitAll()
                         .requestMatchers("/ws/**").permitAll()
-                        // Diğer her şey JWT ister
+                        // Diğer her şey JWT ister (Cart, Product POST, vb.)
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
