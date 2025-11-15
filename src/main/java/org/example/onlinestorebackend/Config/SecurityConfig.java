@@ -57,6 +57,7 @@ public class SecurityConfig {
                                 "/api/auth/register",
                                 "/api/auth/refresh",
                                 "/api/auth/password-reset",
+                                "/api/auth/reset-password",
                                 "/api/payment/mock"
                         ).permitAll()
                         // Product endpoints (public - herkes görebilir)

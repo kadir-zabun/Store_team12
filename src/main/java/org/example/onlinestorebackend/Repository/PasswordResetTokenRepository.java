@@ -1,4 +1,3 @@
-// src/main/java/.../Repository/PasswordResetTokenRepository.java
 package org.example.onlinestorebackend.Repository;
 
 import org.example.onlinestorebackend.Entity.PasswordResetToken;

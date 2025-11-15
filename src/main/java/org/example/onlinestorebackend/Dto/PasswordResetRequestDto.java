@@ -1,4 +1,3 @@
-// src/main/java/.../Dto/PasswordResetRequestDto.java
 package org.example.onlinestorebackend.Dto;
 
 import jakarta.validation.constraints.Email;

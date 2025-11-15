@@ -325,20 +325,20 @@ export default function LoginPage() {
                 </div>
             </nav>
 
-            <div
-                style={{
+        <div
+            style={{
                     minHeight: "calc(100vh - 80px)",
-                    display: "flex",
-                    justifyContent: "center",
-                    alignItems: "center",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
                     padding: "2rem",
-                }}
-            >
-                <form
-                    onSubmit={handleSubmit}
-                    style={{
-                        display: "flex",
-                        flexDirection: "column",
+            }}
+        >
+            <form
+                onSubmit={handleSubmit}
+                style={{
+                    display: "flex",
+                    flexDirection: "column",
                         gap: "1.2rem",
                         background: "rgba(255, 255, 255, 0.95)",
                         backdropFilter: "blur(10px)",
@@ -347,30 +347,30 @@ export default function LoginPage() {
                         boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)",
                         minWidth: "400px",
                         maxWidth: "450px",
-                    }}
-                >
-                    <h2
-                        style={{
-                            textAlign: "center",
+                }}
+            >
+                <h2
+                    style={{
+                        textAlign: "center",
                             color: "#2d3748",
                             fontSize: "2rem",
                             fontWeight: 700,
-                            margin: 0,
+                        margin: 0,
                             marginBottom: "0.5rem",
-                        }}
-                    >
+                    }}
+                >
                         Welcome Back
-                    </h2>
+                </h2>
                     <p style={{ textAlign: "center", color: "#718096", marginBottom: "1rem" }}>
                         Sign in to your account
                     </p>
 
-                    <input
-                        type="text"
-                        placeholder="Username or Email"
-                        value={usernameOrEmail}
-                        onChange={(e) => setUsernameOrEmail(e.target.value)}
-                        style={{
+                <input
+                    type="text"
+                    placeholder="Username or Email"
+                    value={usernameOrEmail}
+                    onChange={(e) => setUsernameOrEmail(e.target.value)}
+                    style={{
                             padding: "1rem",
                             fontSize: "1rem",
                             borderRadius: "12px",
@@ -386,15 +386,15 @@ export default function LoginPage() {
                         onBlur={(e) => {
                             e.currentTarget.style.borderColor = "#e2e8f0";
                             e.currentTarget.style.boxShadow = "none";
-                        }}
-                    />
+                    }}
+                />
 
-                    <input
-                        type="password"
-                        placeholder="Password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        style={{
+                <input
+                    type="password"
+                    placeholder="Password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    style={{
                             padding: "1rem",
                             fontSize: "1rem",
                             borderRadius: "12px",
@@ -410,10 +410,10 @@ export default function LoginPage() {
                         onBlur={(e) => {
                             e.currentTarget.style.borderColor = "#e2e8f0";
                             e.currentTarget.style.boxShadow = "none";
-                        }}
-                    />
+                    }}
+                />
 
-                    {error && (
+                {error && (
                         <div
                             style={{
                                 padding: "0.75rem 1rem",
@@ -454,27 +454,39 @@ export default function LoginPage() {
                         Sign In
                     </button>
 
-                    <div
-                        style={{
+                <div
+                    style={{
                             textAlign: "center",
                             marginTop: "0.5rem",
                             fontSize: "0.95rem",
                             color: "#718096",
                         }}
                     >
-                        Don't have an account?{" "}
                         <Link
-                            to="/register"
+                            to="/forgot-password"
                             style={{
                                 color: "#667eea",
                                 textDecoration: "none",
                                 fontWeight: 600,
-                            }}
-                        >
-                            Sign up
+                                display: "block",
+                                marginBottom: "0.5rem",
+                    }}
+                >
+                            Forgot Password?
                         </Link>
-                    </div>
-                </form>
+                        Don't have an account?{" "}
+                    <Link
+                        to="/register"
+                        style={{
+                                color: "#667eea",
+                            textDecoration: "none",
+                                fontWeight: 600,
+                        }}
+                    >
+                        Sign up
+                    </Link>
+                </div>
+            </form>
             </div>
         </div>
     );

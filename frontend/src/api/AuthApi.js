@@ -1,4 +1,3 @@
-
 import axiosClient from "./axiosClient";
 
 const authApi = {
@@ -8,7 +7,6 @@ const authApi = {
             password,
         }),
 
-    // RegisterDto: name, username, email, password, confirmPassword
     register: (name, username, email, password, confirmPassword) =>
         axiosClient.post("/api/auth/register", {
             name,
@@ -17,6 +15,12 @@ const authApi = {
             password,
             confirmPassword,
         }),
+
+    requestPasswordReset: (email) =>
+        axiosClient.post("/api/auth/password-reset", { email }),
+
+    resetPassword: (token, newPassword) =>
+        axiosClient.post("/api/auth/reset-password", { token, newPassword }),
 };
 
 export default authApi;
