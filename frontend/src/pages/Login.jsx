@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import authApi from "../api/authApi";
+import cartApi from "../api/cartApi";
+import { cartStorage } from "../utils/cartStorage";
 
 export default function LoginPage() {
     const [usernameOrEmail, setUsernameOrEmail] = useState("");
@@ -87,6 +89,19 @@ export default function LoginPage() {
 
             if (authResponse && authResponse.token) {
                 localStorage.setItem("access_token", authResponse.token);
+                
+                const guestCart = cartStorage.getCart();
+                if (guestCart.items.length > 0) {
+                    try {
+                        for (const item of guestCart.items) {
+                            await cartApi.addToCart(item.productId, item.quantity);
+                        }
+                        cartStorage.clearCart();
+                    } catch (err) {
+                        console.error("Error merging cart:", err);
+                    }
+                }
+                
                 window.dispatchEvent(new Event("storage"));
                 window.dispatchEvent(new CustomEvent("tokenSet"));
                 setTimeout(() => {
