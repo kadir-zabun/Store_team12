@@ -2,6 +2,8 @@ import { Link } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import productApi from "../api/productApi";
+import cartApi from "../api/cartApi";
+import { cartStorage } from "../utils/cartStorage";
 import { formatProductForDisplay } from "../utils/productAdapter";
 
 export default function ProductsPage() {
@@ -9,6 +11,7 @@ export default function ProductsPage() {
     const [showDropdown, setShowDropdown] = useState(false);
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [addingToCart, setAddingToCart] = useState({});
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
     const location = useLocation();
@@ -115,6 +118,43 @@ export default function ProductsPage() {
 
     const toggleDropdown = () => {
         setShowDropdown(!showDropdown);
+    };
+
+    const handleAddToCart = async (productId) => {
+        const token = localStorage.getItem("access_token");
+        const product = products.find(p => p.productId === productId);
+        
+        if (!product) {
+            alert("Product not found");
+            return;
+        }
+
+        setAddingToCart({ ...addingToCart, [productId]: true });
+        
+        try {
+            if (token) {
+                await cartApi.addToCart(productId, 1);
+                alert("Product added to cart successfully!");
+            } else {
+                cartStorage.addItem(
+                    productId,
+                    product.productName,
+                    product.price,
+                    1
+                );
+                window.dispatchEvent(new Event("cartUpdated"));
+                alert("Product added to cart! Login to sync with your account.");
+            }
+        } catch (err) {
+            console.error("Error adding to cart:", err);
+            const message =
+                err.response?.data?.error?.message ||
+                err.response?.data?.message ||
+                "Failed to add product to cart. Please try again.";
+            alert(message);
+        } finally {
+            setAddingToCart({ ...addingToCart, [productId]: false });
+        }
     };
 
     return (
@@ -516,25 +556,34 @@ export default function ProductsPage() {
                                             {product.inStock ? `✓ In Stock (${product.quantity})` : "✗ Out of Stock"}
                                         </div>
                                         <button
+                                            onClick={() => handleAddToCart(product.productId)}
+                                            disabled={!product.inStock || addingToCart[product.productId]}
                                             style={{
                                                 width: "100%",
                                                 padding: "0.75rem",
-                                                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                                background: product.inStock && !addingToCart[product.productId]
+                                                    ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+                                                    : "#cbd5e0",
                                                 color: "#fff",
                                                 border: "none",
                                                 borderRadius: "10px",
                                                 fontWeight: 600,
-                                                cursor: "pointer",
+                                                cursor: product.inStock && !addingToCart[product.productId] ? "pointer" : "not-allowed",
                                                 transition: "all 0.2s",
+                                                opacity: product.inStock && !addingToCart[product.productId] ? 1 : 0.6,
                                             }}
                                             onMouseEnter={(e) => {
-                                                e.currentTarget.style.transform = "scale(1.02)";
+                                                if (product.inStock && !addingToCart[product.productId]) {
+                                                    e.currentTarget.style.transform = "scale(1.02)";
+                                                }
                                             }}
                                             onMouseLeave={(e) => {
-                                                e.currentTarget.style.transform = "scale(1)";
+                                                if (product.inStock && !addingToCart[product.productId]) {
+                                                    e.currentTarget.style.transform = "scale(1)";
+                                                }
                                             }}
                                         >
-                                            Add to Cart
+                                            {addingToCart[product.productId] ? "Adding..." : product.inStock ? "Add to Cart" : "Out of Stock"}
                                         </button>
                                     </div>
                                 </div>
