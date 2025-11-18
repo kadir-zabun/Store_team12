@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import cartApi from "../api/cartApi";
 import { cartStorage } from "../utils/cartStorage";
+import { useCartCount } from "../hooks/useCartCount";
 
 export default function CartPage() {
     const [userName, setUserName] = useState(null);
@@ -14,6 +15,7 @@ export default function CartPage() {
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
     const location = useLocation();
+    const { cartCount, refreshCartCount } = useCartCount();
 
     const extractUsernameFromToken = () => {
         const token = localStorage.getItem("access_token");
@@ -176,6 +178,8 @@ export default function CartPage() {
                 } else if (apiResponse) {
                     setCart(apiResponse);
                 }
+                // Refresh cart count after updating
+                refreshCartCount();
             } else {
                 const updatedCart = cartStorage.updateItemQuantity(productId, newQuantity);
                 setCart({
@@ -220,6 +224,8 @@ export default function CartPage() {
                 } else if (apiResponse) {
                     setCart(apiResponse);
                 }
+                // Refresh cart count after removing
+                refreshCartCount();
             } else {
                 const updatedCart = cartStorage.removeItem(productId);
                 setCart({
@@ -256,6 +262,8 @@ export default function CartPage() {
         try {
             if (token) {
                 await cartApi.clearCart();
+                // Refresh cart count after clearing
+                refreshCartCount();
             } else {
                 cartStorage.clearCart();
                 window.dispatchEvent(new Event("cartUpdated"));
@@ -378,9 +386,32 @@ export default function CartPage() {
                                 fontWeight: 600,
                                 background: "#f7fafc",
                                 transition: "all 0.2s",
+                                position: "relative",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "0.5rem",
                             }}
                         >
-                            Cart
+                            <span>Cart</span>
+                            {cartCount > 0 && (
+                                <span
+                                    style={{
+                                        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                        color: "#fff",
+                                        borderRadius: "50%",
+                                        minWidth: "20px",
+                                        height: "20px",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontSize: "0.75rem",
+                                        fontWeight: 700,
+                                        padding: "0 0.25rem",
+                                    }}
+                                >
+                                    {cartCount > 99 ? "99+" : cartCount}
+                                </span>
+                            )}
                         </Link>
                     </div>
                 </div>

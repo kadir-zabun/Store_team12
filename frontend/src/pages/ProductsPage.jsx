@@ -5,6 +5,7 @@ import productApi from "../api/productApi";
 import cartApi from "../api/cartApi";
 import { cartStorage } from "../utils/cartStorage";
 import { formatProductForDisplay } from "../utils/productAdapter";
+import { useCartCount } from "../hooks/useCartCount";
 
 export default function ProductsPage() {
     const [userName, setUserName] = useState(null);
@@ -15,6 +16,7 @@ export default function ProductsPage() {
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
     const location = useLocation();
+    const { cartCount, refreshCartCount } = useCartCount();
 
     const extractUsernameFromToken = () => {
         const token = localStorage.getItem("access_token");
@@ -134,6 +136,8 @@ export default function ProductsPage() {
         try {
             if (token) {
                 await cartApi.addToCart(productId, 1);
+                // Refresh cart count after adding to cart
+                refreshCartCount();
                 alert("Product added to cart successfully!");
             } else {
                 cartStorage.addItem(
@@ -232,6 +236,10 @@ export default function ProductsPage() {
                                 borderRadius: "8px",
                                 fontWeight: 500,
                                 transition: "all 0.2s",
+                                position: "relative",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "0.5rem",
                             }}
                             onMouseEnter={(e) => {
                                 e.currentTarget.style.background = "#f7fafc";
@@ -242,7 +250,26 @@ export default function ProductsPage() {
                                 e.currentTarget.style.color = "#4a5568";
                             }}
                         >
-                            Cart
+                            <span>Cart</span>
+                            {cartCount > 0 && (
+                                <span
+                                    style={{
+                                        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                        color: "#fff",
+                                        borderRadius: "50%",
+                                        minWidth: "20px",
+                                        height: "20px",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontSize: "0.75rem",
+                                        fontWeight: 700,
+                                        padding: "0 0.25rem",
+                                    }}
+                                >
+                                    {cartCount > 99 ? "99+" : cartCount}
+                                </span>
+                            )}
                         </Link>
                     </div>
                 </div>

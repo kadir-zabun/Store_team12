@@ -1,5 +1,6 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
+import { useCartCount } from "../hooks/useCartCount";
 
 export default function HomePage() {
     const [userName, setUserName] = useState(null);
@@ -7,6 +8,7 @@ export default function HomePage() {
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
     const location = useLocation();
+    const { cartCount } = useCartCount();
 
     const extractUsernameFromToken = () => {
         const token = localStorage.getItem("access_token");
@@ -211,6 +213,10 @@ export default function HomePage() {
                                 borderRadius: "8px",
                                 fontWeight: 500,
                                 transition: "all 0.2s",
+                                position: "relative",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "0.5rem",
                             }}
                             onMouseEnter={(e) => {
                                 e.currentTarget.style.background = "#f7fafc";
@@ -221,7 +227,26 @@ export default function HomePage() {
                                 e.currentTarget.style.color = "#4a5568";
                             }}
                         >
-                            Cart
+                            <span>Cart</span>
+                            {cartCount > 0 && (
+                                <span
+                                    style={{
+                                        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                        color: "#fff",
+                                        borderRadius: "50%",
+                                        minWidth: "20px",
+                                        height: "20px",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontSize: "0.75rem",
+                                        fontWeight: 700,
+                                        padding: "0 0.25rem",
+                                    }}
+                                >
+                                    {cartCount > 99 ? "99+" : cartCount}
+                                </span>
+                            )}
                         </Link>
                     </div>
                 </div>
