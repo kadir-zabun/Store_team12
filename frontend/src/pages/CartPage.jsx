@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import cartApi from "../api/cartApi";
 import { cartStorage } from "../utils/cartStorage";
 import { useCartCount } from "../hooks/useCartCount";
+import { useToast } from "../contexts/ToastContext";
 
 export default function CartPage() {
     const [userName, setUserName] = useState(null);
@@ -16,6 +17,7 @@ export default function CartPage() {
     const navigate = useNavigate();
     const location = useLocation();
     const { cartCount, refreshCartCount } = useCartCount();
+    const { success: showSuccess, error: showError, info: showInfo } = useToast();
 
     const extractUsernameFromToken = () => {
         const token = localStorage.getItem("access_token");
@@ -200,7 +202,7 @@ export default function CartPage() {
                 err.response?.data?.error?.message ||
                 err.response?.data?.message ||
                 "Failed to update quantity. Please try again.";
-            alert(message);
+            showError(message);
         } finally {
             setUpdating({ ...updating, [productId]: false });
         }
@@ -246,7 +248,7 @@ export default function CartPage() {
                 err.response?.data?.error?.message ||
                 err.response?.data?.message ||
                 "Failed to remove item. Please try again.";
-            alert(message);
+            showError(message);
         } finally {
             setUpdating({ ...updating, [productId]: false });
         }
@@ -275,7 +277,7 @@ export default function CartPage() {
                 err.response?.data?.error?.message ||
                 err.response?.data?.message ||
                 "Failed to clear cart. Please try again.";
-            alert(message);
+            showError(message);
         }
     };
 
@@ -476,7 +478,7 @@ export default function CartPage() {
                                     <button
                                         onClick={() => {
                                             setShowDropdown(false);
-                                            alert("Order History feature coming soon!");
+                                            showInfo("Order History feature coming soon!");
                                         }}
                                         style={{
                                             width: "100%",
@@ -818,7 +820,7 @@ export default function CartPage() {
                                                 navigate("/login");
                                             }
                                         } else {
-                                            alert("Checkout feature coming soon!");
+                                            showInfo("Checkout feature coming soon!");
                                         }
                                     }}
                                     style={{

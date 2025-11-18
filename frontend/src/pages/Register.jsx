@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import authApi from "../api/authApi";
+import { useToast } from "../contexts/ToastContext";
 
 export default function RegisterPage() {
     const [name, setName] = useState("");
@@ -14,6 +15,7 @@ export default function RegisterPage() {
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
     const location = useLocation();
+    const { success: showSuccess, error: showError, info: showInfo } = useToast();
 
     const extractUsernameFromToken = () => {
         const token = localStorage.getItem("access_token");
@@ -95,7 +97,10 @@ export default function RegisterPage() {
 
         try {
             const res = await authApi.register(name, username, email, password, confirmPassword);
-            navigate("/login");
+            showSuccess("Registration successful! Redirecting to login...");
+            setTimeout(() => {
+                navigate("/login");
+            }, 1500);
         } catch (err) {
             console.error("REGISTER ERROR:", err);
             const message =
@@ -104,6 +109,7 @@ export default function RegisterPage() {
                 err.response?.data?.message ||
                 "An error occurred during registration.";
             setError(message);
+            showError(message);
         }
     };
 
@@ -264,7 +270,7 @@ export default function RegisterPage() {
                                     <button
                                         onClick={() => {
                                             setShowDropdown(false);
-                                            alert("Order History feature coming soon!");
+                                            showInfo("Order History feature coming soon!");
                                         }}
                                         style={{
                                             width: "100%",

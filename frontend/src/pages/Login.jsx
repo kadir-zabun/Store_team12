@@ -3,6 +3,7 @@ import { useNavigate, Link, useLocation } from "react-router-dom";
 import authApi from "../api/authApi";
 import cartApi from "../api/cartApi";
 import { cartStorage } from "../utils/cartStorage";
+import { useToast } from "../contexts/ToastContext";
 
 export default function LoginPage() {
     const [usernameOrEmail, setUsernameOrEmail] = useState("");
@@ -13,6 +14,7 @@ export default function LoginPage() {
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
     const location = useLocation();
+    const { success: showSuccess, error: showError, info: showInfo } = useToast();
 
     const extractUsernameFromToken = () => {
         const token = localStorage.getItem("access_token");
@@ -97,27 +99,50 @@ export default function LoginPage() {
                             await cartApi.addToCart(item.productId, item.quantity);
                         }
                         cartStorage.clearCart();
+                        showSuccess("Cart items merged successfully!");
                     } catch (err) {
                         console.error("Error merging cart:", err);
+                        showError("Some cart items could not be merged. Please check your cart.");
                     }
                 }
                 
+                showSuccess("Login successful! Redirecting...");
                 window.dispatchEvent(new Event("storage"));
                 window.dispatchEvent(new CustomEvent("tokenSet"));
                 setTimeout(() => {
                     window.location.href = "/";
                 }, 150);
             } else {
-                setError("Login failed. Please try again.");
+                const errorMsg = "Login failed. Please try again.";
+                setError(errorMsg);
+                showError(errorMsg);
             }
         } catch (err) {
             console.error("LOGIN ERROR:", err);
-            const message =
+            
+            // Check if it's an authentication error (401, 403) or unexpected error
+            const status = err.response?.status;
+            const errorMessage = 
                 err.response?.data?.data?.message ||
                 err.response?.data?.error?.message ||
                 err.response?.data?.message ||
-                "username/password invalid";
-            setError(message);
+                "";
+            
+            // If it's an auth error or unexpected error, show user-friendly message
+            if (status === 401 || status === 403 || errorMessage.includes("Unexpected error") || errorMessage.includes("Kullanıcı bulunamadı")) {
+                const friendlyMessage = "Email or password is incorrect";
+                setError(friendlyMessage);
+                showError(friendlyMessage);
+            } else if (errorMessage) {
+                // Use the actual error message if it's something else
+                setError(errorMessage);
+                showError(errorMessage);
+            } else {
+                // Fallback
+                const fallbackMessage = "Email or password is incorrect";
+                setError(fallbackMessage);
+                showError(fallbackMessage);
+            }
         }
     };
 
@@ -278,7 +303,7 @@ export default function LoginPage() {
                                     <button
                                         onClick={() => {
                                             setShowDropdown(false);
-                                            alert("Order History feature coming soon!");
+                                            showInfo("Order History feature coming soon!");
                                         }}
                                         style={{
                                             width: "100%",

@@ -6,6 +6,7 @@ import cartApi from "../api/cartApi";
 import { cartStorage } from "../utils/cartStorage";
 import { formatProductForDisplay } from "../utils/productAdapter";
 import { useCartCount } from "../hooks/useCartCount";
+import { useToast } from "../contexts/ToastContext";
 
 export default function ProductsPage() {
     const [userName, setUserName] = useState(null);
@@ -17,6 +18,7 @@ export default function ProductsPage() {
     const navigate = useNavigate();
     const location = useLocation();
     const { cartCount, refreshCartCount } = useCartCount();
+    const { success: showSuccess, error: showError, info: showInfo } = useToast();
 
     const extractUsernameFromToken = () => {
         const token = localStorage.getItem("access_token");
@@ -127,7 +129,7 @@ export default function ProductsPage() {
         const product = products.find(p => p.productId === productId);
         
         if (!product) {
-            alert("Product not found");
+            showError("Product not found");
             return;
         }
 
@@ -138,7 +140,7 @@ export default function ProductsPage() {
                 await cartApi.addToCart(productId, 1);
                 // Refresh cart count after adding to cart
                 refreshCartCount();
-                alert("Product added to cart successfully!");
+                showSuccess("Product added to cart successfully!");
             } else {
                 cartStorage.addItem(
                     productId,
@@ -147,7 +149,7 @@ export default function ProductsPage() {
                     1
                 );
                 window.dispatchEvent(new Event("cartUpdated"));
-                alert("Product added to cart! Login to sync with your account.");
+                showSuccess("Product added to cart! Login to sync with your account.");
             }
         } catch (err) {
             console.error("Error adding to cart:", err);
@@ -155,7 +157,7 @@ export default function ProductsPage() {
                 err.response?.data?.error?.message ||
                 err.response?.data?.message ||
                 "Failed to add product to cart. Please try again.";
-            alert(message);
+            showError(message);
         } finally {
             setAddingToCart({ ...addingToCart, [productId]: false });
         }
@@ -334,7 +336,7 @@ export default function ProductsPage() {
                                     <button
                                         onClick={() => {
                                             setShowDropdown(false);
-                                            alert("Order History feature coming soon!");
+                                            showInfo("Order History feature coming soon!");
                                         }}
                                         style={{
                                             width: "100%",

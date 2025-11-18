@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import authApi from "../api/authApi";
+import { useToast } from "../contexts/ToastContext";
 
 export default function ForgotPasswordPage() {
     const [email, setEmail] = useState("");
     const [error, setError] = useState("");
     const [success, setSuccess] = useState(false);
     const [loading, setLoading] = useState(false);
+    const { success: showSuccess, error: showError } = useToast();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -21,8 +23,11 @@ export default function ForgotPasswordPage() {
 
             if (responseData?.resetLink || responseData?.message) {
                 setSuccess(true);
+                showSuccess("If an account with this email exists, a password reset link has been sent to your email.");
             } else {
-                setError("Failed to generate reset link. Please try again.");
+                const errorMsg = "Failed to generate reset link. Please try again.";
+                setError(errorMsg);
+                showError(errorMsg);
             }
         } catch (err) {
             const message =
@@ -31,6 +36,7 @@ export default function ForgotPasswordPage() {
                 err.response?.data?.message ||
                 "Failed to send reset email. Please try again.";
             setError(message);
+            showError(message);
         } finally {
             setLoading(false);
         }
@@ -134,7 +140,7 @@ export default function ForgotPasswordPage() {
                                 ✅ Password reset link sent!
                             </p>
                             <p style={{ margin: "0.5rem 0", fontSize: "0.9rem" }}>
-                                Please check your email inbox for the password reset link.
+                                If an account with this email exists, a password reset link has been sent to your email.
                             </p>
                             <p style={{ margin: "0.75rem 0 0 0", fontSize: "0.8rem", opacity: 0.8 }}>
                                 The link will expire in 1 hour.

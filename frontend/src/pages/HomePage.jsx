@@ -1,6 +1,7 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import { useCartCount } from "../hooks/useCartCount";
+import { useToast } from "../contexts/ToastContext";
 
 export default function HomePage() {
     const [userName, setUserName] = useState(null);
@@ -9,6 +10,7 @@ export default function HomePage() {
     const navigate = useNavigate();
     const location = useLocation();
     const { cartCount } = useCartCount();
+    const { info: showInfo } = useToast();
 
     const extractUsernameFromToken = () => {
         const token = localStorage.getItem("access_token");
@@ -338,7 +340,7 @@ export default function HomePage() {
                                     <button
                                         onClick={() => {
                                             setShowDropdown(false);
-                                            alert("Order History feature coming soon!");
+                                            showInfo("Order History feature coming soon!");
                                         }}
                                         style={{
                                             width: "100%",

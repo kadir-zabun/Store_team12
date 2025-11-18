@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import authApi from "../api/authApi";
+import { useToast } from "../contexts/ToastContext";
 
 export default function ResetPasswordPage() {
     const [searchParams] = useSearchParams();
@@ -11,6 +12,7 @@ export default function ResetPasswordPage() {
     const [success, setSuccess] = useState(false);
     const [loading, setLoading] = useState(false);
     const token = searchParams.get("token");
+    const { success: showSuccess, error: showError } = useToast();
 
     useEffect(() => {
         if (!token) {
@@ -42,6 +44,7 @@ export default function ResetPasswordPage() {
         try {
             await authApi.resetPassword(token, newPassword);
             setSuccess(true);
+            showSuccess("Password reset successfully! Redirecting to login...");
             setTimeout(() => {
                 navigate("/login");
             }, 2000);
@@ -52,6 +55,7 @@ export default function ResetPasswordPage() {
                 err.response?.data?.message ||
                 "Failed to reset password. The link may be invalid or expired.";
             setError(message);
+            showError(message);
         } finally {
             setLoading(false);
         }
