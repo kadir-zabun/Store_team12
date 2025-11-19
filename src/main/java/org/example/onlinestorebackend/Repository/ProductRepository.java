@@ -19,6 +19,13 @@ public interface ProductRepository extends MongoRepository<Product, String> {
     // stokta olan ürünler
     List<Product> findByInStockTrue();
 
-    // kategori eklenirse ona göre filtreleme
-    // List<Product> findByCategoryId(String categoryId);
+    // isim VEYA açıklama içinde geçenler
+    List<Product> findByProductNameContainingIgnoreCaseOrDescriptionContainingIgnoreCase(
+            String name,
+            String description
+    );
+
+
+    // Kategori ID'ye göre ürünleri getir
+    List<Product> findByCategoryId(String categoryId);
 }
