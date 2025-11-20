@@ -32,5 +32,5 @@ public class Product {
 
     private Boolean inStock;
 
-    private String categoryId; // Category ile ilişki
+    private List<String> categoryIds; // Ürünün ait olduğu kategoriler
 }

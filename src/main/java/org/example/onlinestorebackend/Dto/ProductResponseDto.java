@@ -22,6 +22,6 @@ public class ProductResponseDto {
     private String description;
     private List<String> images;
     private Boolean inStock;
-    private String categoryId;
-    private String categoryName; // Category bilgisi için
+    private List<String> categoryIds;
+    private List<String> categoryNames;
 }

@@ -8,10 +8,14 @@ import org.example.onlinestorebackend.Repository.CategoryRepository;
 import org.example.onlinestorebackend.Repository.ProductRepository;
 import org.example.onlinestorebackend.exception.ResourceNotFoundException;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -21,6 +25,7 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final ProductCategoryRelationService productCategoryRelationService;
 
     // Tüm ürünleri getir (pagination ile)
     public Page<ProductResponseDto> getAllProducts(Pageable pageable) {
@@ -42,21 +47,25 @@ public class ProductService {
                 .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + categoryId));
 
         // CategoryId'ye göre filtrele
-        List<Product> allProducts = productRepository.findByCategoryId(categoryId);
+        List<String> productIds = productCategoryRelationService.getProductIdsForCategory(categoryId);
+        if (productIds.isEmpty()) {
+            return Page.empty(pageable);
+        }
 
-        // Manual pagination uygula
+        List<Product> allProducts = new ArrayList<>();
+        productRepository.findAllById(productIds).forEach(allProducts::add);
+
         int start = (int) pageable.getOffset();
         int end = Math.min((start + pageable.getPageSize()), allProducts.size());
+        if (start >= end) {
+            return new PageImpl<>(Collections.emptyList(), pageable, allProducts.size());
+        }
 
         List<ProductResponseDto> dtos = allProducts.subList(start, end).stream()
                 .map(this::convertToDto)
                 .collect(Collectors.toList());
 
-        return new org.springframework.data.domain.PageImpl<>(
-                dtos,
-                pageable,
-                allProducts.size()
-        );
+        return new PageImpl<>(dtos, pageable, allProducts.size());
     }
 
     // Ürün arama (isim veya açıklama)
@@ -86,18 +95,22 @@ public class ProductService {
 
     // Ürün oluştur
     public ProductResponseDto createProduct(Product product) {
-        // CategoryId varsa kategori kontrolü yap
-        if (product.getCategoryId() != null) {
-            categoryRepository.findById(product.getCategoryId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + product.getCategoryId()));
-        }
+        List<String> normalizedCategoryIds = normalizeCategoryIds(product);
+        validateCategories(normalizedCategoryIds);
+        product.setCategoryIds(normalizedCategoryIds);
 
         Product savedProduct = productRepository.save(product);
+        productCategoryRelationService.syncProductCategories(savedProduct.getProductId(), normalizedCategoryIds);
         return convertToDto(savedProduct);
     }
 
     // Entity -> DTO dönüşümü
     private ProductResponseDto convertToDto(Product product) {
+        List<String> categoryIds = productCategoryRelationService.getCategoryIdsForProduct(product.getProductId());
+        List<Category> categories = categoryIds.isEmpty()
+                ? Collections.emptyList()
+                : categoryRepository.findAllById(categoryIds);
+
         ProductResponseDto dto = ProductResponseDto.builder()
                 .productId(product.getProductId())
                 .productName(product.getProductName())
@@ -107,15 +120,32 @@ public class ProductService {
                 .description(product.getDescription())
                 .images(product.getImages())
                 .inStock(product.getInStock())
-                .categoryId(product.getCategoryId())
+                .categoryIds(categoryIds)
+                .categoryNames(categories.stream().map(Category::getCategoryName).toList())
                 .build();
 
-        // Category adını da ekleyelim
-        if (product.getCategoryId() != null) {
-            categoryRepository.findById(product.getCategoryId())
-                    .ifPresent(category -> dto.setCategoryName(category.getCategoryName()));
+        return dto;
+    }
+
+    private List<String> normalizeCategoryIds(Product product) {
+        if (CollectionUtils.isEmpty(product.getCategoryIds())) {
+            return Collections.emptyList();
         }
 
-        return dto;
+        return product.getCategoryIds().stream()
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .toList();
+    }
+
+    private void validateCategories(List<String> categoryIds) {
+        if (CollectionUtils.isEmpty(categoryIds)) {
+            return;
+        }
+
+        List<Category> categories = categoryRepository.findAllById(categoryIds);
+        if (categories.size() != categoryIds.size()) {
+            throw new ResourceNotFoundException("One or more categories were not found.");
+        }
     }
 }

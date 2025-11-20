@@ -19,8 +19,8 @@ export const adaptFakeStoreToBackend = (fakeStoreProduct, categoryMap = {}) => {
         description: fakeStoreProduct.description,
         images: [fakeStoreProduct.image],
         inStock: true,
-        categoryId: category.id,
-        categoryName: category.name,
+        categoryIds: [category.id],
+        categoryNames: [category.name],
     };
 };
 
@@ -83,8 +83,8 @@ export const adaptDummyJsonToBackend = (dummyJsonProduct) => {
         description: dummyJsonProduct.description || "",
         images: images,
         inStock: (dummyJsonProduct.stock || 0) > 0,
-        categoryId: category.id,
-        categoryName: category.name,
+        categoryIds: [category.id],
+        categoryNames: [category.name],
     };
 };
 

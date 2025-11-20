@@ -26,6 +26,4 @@ public interface ProductRepository extends MongoRepository<Product, String> {
     );
 
 
-    // Kategori ID'ye göre ürünleri getir
-    List<Product> findByCategoryId(String categoryId);
 }

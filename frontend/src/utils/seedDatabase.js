@@ -70,7 +70,11 @@ export const seedAllProductsToDatabase = async () => {
         console.log(`✅ Adapted ${adaptedProducts.length} products`);
 
         const productsForBackend = adaptedProducts.map(product => {
-            const { productId, categoryName, ...productData } = product;
+            const { productId, categoryNames, ...productData } = product;
+            const resolvedCategoryIds = Array.isArray(productData.categoryIds) && productData.categoryIds.length > 0
+                ? productData.categoryIds
+                : ["cat0"];
+
             return {
                 productName: productData.productName || "Unnamed Product",
                 quantity: productData.quantity || 0,
@@ -79,7 +83,7 @@ export const seedAllProductsToDatabase = async () => {
                 description: productData.description || "",
                 images: productData.images && productData.images.length > 0 ? productData.images : ["https://via.placeholder.com/300x250?text=No+Image"],
                 inStock: productData.inStock !== undefined ? productData.inStock : true,
-                categoryId: productData.categoryId || "cat0",
+                categoryIds: resolvedCategoryIds,
             };
         });
 

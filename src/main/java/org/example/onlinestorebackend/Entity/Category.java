@@ -12,7 +12,7 @@ public class Category {
     @Id
     private String categoryId;
 
-    @Indexed            // kategori adına göre aramayı hızlandırır
+    @Indexed(unique = true)            // kategori adına göre aramayı hızlandırır ve benzersiz kılar
     private String categoryName;
 
     private String description;

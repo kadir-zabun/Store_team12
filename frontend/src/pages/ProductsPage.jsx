@@ -516,7 +516,9 @@ export default function ProductsPage() {
                                                 marginBottom: "0.5rem",
                                             }}
                                         >
-                                            {product.categoryName}
+                                            {(product.categoryNames && product.categoryNames.length > 0)
+                                                ? product.categoryNames[0]
+                                                : "Uncategorized"}
                                         </div>
                                         <h3
                                             style={{
