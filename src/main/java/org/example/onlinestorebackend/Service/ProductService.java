@@ -153,7 +153,7 @@ public class ProductService {
     }
 
     public List<String> getReviewCommentsByProductId(String productId) {
-        Product product = productRepository.findById(productId)
+        Product product = productRepository.findByProductId(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product with id: " + productId));
 
         List<String> reviewIds = product.getReviewIds();
@@ -163,14 +163,16 @@ public class ProductService {
             Review review = reviewRepository.findByReviewId(reviewId)
                     .orElseThrow(() -> new ResourceNotFoundException("Review with id: " + reviewId));
 
-            reviewComments.add(review.getComment());
+            if (review.getApproved()) {
+                reviewComments.add(review.getComment());
+            }
         }
 
         return reviewComments;
     }
 
     public List<Integer> getReviewRatingsByProductId(String productId) {
-        Product product = productRepository.findById(productId)
+        Product product = productRepository.findByProductId(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product with id: " + productId));
 
         List<String> reviewIds = product.getReviewIds();

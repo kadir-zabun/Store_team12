@@ -1,11 +1,14 @@
 package org.example.onlinestorebackend.Repository;
 
 import org.example.onlinestorebackend.Entity.Product;
+import org.example.onlinestorebackend.Entity.User;
 import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface ProductRepository extends MongoRepository<Product, String> {
@@ -25,5 +28,6 @@ public interface ProductRepository extends MongoRepository<Product, String> {
             String description
     );
 
-
+    @Query("{ 'productId' : ?0 }")
+    Optional<Product> findByProductId(String productId);
 }

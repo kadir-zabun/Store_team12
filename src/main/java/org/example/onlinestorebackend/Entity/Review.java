@@ -21,7 +21,5 @@ public class Review {
 
     private String comment;
 
-    private Boolean approved;
-
-    private LocalDateTime createdAt;
+    private Boolean approved = false;
 }
