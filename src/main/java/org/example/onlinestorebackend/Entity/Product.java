@@ -6,6 +6,7 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 
 @Data
@@ -33,4 +34,6 @@ public class Product {
     private Boolean inStock;
 
     private List<String> categoryIds; // Ürünün ait olduğu kategoriler
+
+    private List<String> reviewIds =  new ArrayList<String>();
 }

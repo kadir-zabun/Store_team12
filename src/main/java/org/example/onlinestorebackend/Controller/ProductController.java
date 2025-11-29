@@ -100,4 +100,18 @@ public class ProductController {
         ProductResponseDto createdProduct = productService.createProduct(product);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdProduct);
     }
+
+    @GetMapping("/product-comments")
+    public ResponseEntity<List<String>> getProductComments(@RequestParam String productId) {
+        List<String> result = productService.getReviewCommentsByProductId(productId);
+
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/product-ratings")
+    public ResponseEntity<List<Integer>> getProductRatings(@RequestParam String productId) {
+        List<Integer> result = productService.getReviewRatingsByProductId(productId);
+
+        return ResponseEntity.ok(result);
+    }
 }

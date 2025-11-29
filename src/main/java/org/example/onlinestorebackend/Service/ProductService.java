@@ -4,8 +4,10 @@ import lombok.RequiredArgsConstructor;
 import org.example.onlinestorebackend.Dto.ProductResponseDto;
 import org.example.onlinestorebackend.Entity.Category;
 import org.example.onlinestorebackend.Entity.Product;
+import org.example.onlinestorebackend.Entity.Review;
 import org.example.onlinestorebackend.Repository.CategoryRepository;
 import org.example.onlinestorebackend.Repository.ProductRepository;
+import org.example.onlinestorebackend.Repository.ReviewRepository;
 import org.example.onlinestorebackend.exception.ResourceNotFoundException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -26,6 +28,7 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final ProductCategoryRelationService productCategoryRelationService;
+    private final ReviewRepository reviewRepository;
 
     // Tüm ürünleri getir (pagination ile)
     public Page<ProductResponseDto> getAllProducts(Pageable pageable) {
@@ -147,5 +150,39 @@ public class ProductService {
         if (categories.size() != categoryIds.size()) {
             throw new ResourceNotFoundException("One or more categories were not found.");
         }
+    }
+
+    public List<String> getReviewCommentsByProductId(String productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product with id: " + productId));
+
+        List<String> reviewIds = product.getReviewIds();
+
+        List<String> reviewComments = new ArrayList<>();
+        for (String reviewId : reviewIds) {
+            Review review = reviewRepository.findByReviewId(reviewId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Review with id: " + reviewId));
+
+            reviewComments.add(review.getComment());
+        }
+
+        return reviewComments;
+    }
+
+    public List<Integer> getReviewRatingsByProductId(String productId) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product with id: " + productId));
+
+        List<String> reviewIds = product.getReviewIds();
+
+        List<Integer> reviewRatings = new ArrayList<>();
+        for (String reviewId : reviewIds) {
+            Review review = reviewRepository.findByReviewId(reviewId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Review with id: " + reviewId));
+
+            reviewRatings.add(review.getRating());
+        }
+
+        return reviewRatings;
     }
 }
