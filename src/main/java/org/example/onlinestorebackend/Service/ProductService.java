@@ -137,6 +137,7 @@ public class ProductService {
                 .inStock(product.getInStock())
                 .categoryIds(categoryIds)
                 .categoryNames(categories.stream().map(Category::getCategoryName).toList())
+                .popularity(product.getPopularity())
                 .build();
 
         return dto;

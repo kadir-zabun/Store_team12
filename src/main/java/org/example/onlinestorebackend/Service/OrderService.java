@@ -158,6 +158,11 @@ public class OrderService {
     private void decreaseStock(Product product, Integer quantity) {
         product.setQuantity(product.getQuantity() - quantity);
         product.setInStock(product.getQuantity() > 0);
+
+        // Popülariteyi arttır (satılan adet kadar)
+        Integer currentPopularity = product.getPopularity() != null ? product.getPopularity() : 0;
+        product.setPopularity(currentPopularity + (quantity != null ? quantity : 0));
+
         productRepository.save(product);
     }
 }

@@ -24,4 +24,5 @@ public class ProductResponseDto {
     private Boolean inStock;
     private List<String> categoryIds;
     private List<String> categoryNames;
+    private Integer popularity;
 }

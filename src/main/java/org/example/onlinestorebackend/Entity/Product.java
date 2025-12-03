@@ -42,4 +42,10 @@ public class Product {
      * Normal müşteriler bu id üzerinden filtrelenerek kendi ürünlerini görebilir.
      */
     private String ownerId;
+
+    /**
+     * Ürünün popülaritesi (satılan adetlere göre arttırılır).
+     * Sıralama için kullanılabilir.
+     */
+    private Integer popularity = 0;
 }
