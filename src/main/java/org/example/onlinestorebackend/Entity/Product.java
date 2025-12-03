@@ -36,4 +36,10 @@ public class Product {
     private List<String> categoryIds; // Ürünün ait olduğu kategoriler
 
     private List<String> reviewIds =  new ArrayList<String>();
+
+    /**
+     * Ürünü oluşturan sahibi (PRODUCT_OWNER kullanıcı id'si).
+     * Normal müşteriler bu id üzerinden filtrelenerek kendi ürünlerini görebilir.
+     */
+    private String ownerId;
 }
