@@ -21,6 +21,14 @@ public class Product {
 
     private Integer quantity;
 
+    private String model;
+
+    private String serialNumber;
+
+    private String warrantyStatus;
+
+    private String distributionInfo;
+
     @Indexed
     private BigDecimal price;
 
