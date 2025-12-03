@@ -8,7 +8,6 @@ import LoginPage from "./pages/Login";
 import RegisterPage from "./pages/Register";
 import ForgotPasswordPage from "./pages/ForgotPassword";
 import ResetPasswordPage from "./pages/ResetPassword";
-import OwnerDashboard from "./pages/OwnerDashboard";
 
 function App() {
     return (
@@ -22,7 +21,6 @@ function App() {
                     <Route path="/register" element={<RegisterPage />} />
                     <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                     <Route path="/reset-password" element={<ResetPasswordPage />} />
-                    <Route path="/owner-dashboard" element={<OwnerDashboard />} />
                 </Routes>
                 <Toast />
             </BrowserRouter>
