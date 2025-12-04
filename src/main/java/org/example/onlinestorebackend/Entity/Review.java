@@ -17,9 +17,11 @@ public class Review {
 
     private String productId;
 
-    private Integer rating; // 1–5
-
+    private String orderId;
+    private Integer rating;
     private String comment;
-
     private Boolean approved = false;
+
+    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime updatedAt = LocalDateTime.now();
 }

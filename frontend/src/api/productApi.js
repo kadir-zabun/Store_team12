@@ -49,6 +49,24 @@ const productApi = {
 
     rejectReview: (reviewId) =>
         axiosClient.delete(`/api/products/reviews/${reviewId}`),
+
+    // Search and filter endpoints
+    searchProducts: (query) =>
+        axiosClient.get("/api/products/search", {
+            params: { query },
+        }),
+
+    getProductsByPriceRange: (minPrice, maxPrice) =>
+        axiosClient.get("/api/products/price-range", {
+            params: { minPrice, maxPrice },
+        }),
+
+    getInStockProducts: () =>
+        axiosClient.get("/api/products/in-stock"),
+
+    // Get approved reviews for a product (public endpoint)
+    getApprovedReviewsForProduct: (productId) =>
+        axiosClient.get(`/api/products/${productId}/reviews`),
 };
 
 export default productApi;

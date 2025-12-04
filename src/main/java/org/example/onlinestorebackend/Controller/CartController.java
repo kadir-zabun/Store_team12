@@ -20,64 +20,69 @@ public class CartController {
 
     private final CartService cartService;
 
-    // Kullanıcının cart'ını getir (JWT'den userId alınır)
+    // Kullanıcının cart'ını getir (JWT'den username alınır, userId'ye çevrilir)
     @GetMapping
     public ResponseEntity<CartResponseDto> getMyCart(
             @AuthenticationPrincipal UserDetails userDetails) {
 
-        String userId = userDetails.getUsername(); // JWT'den username = userId
+        String username = userDetails.getUsername();
+        String userId = cartService.getUserIdByUsername(username);
         Cart cart = cartService.getUserCart(userId);
         CartResponseDto response = convertToDto(cart);
 
         return ResponseEntity.ok(response);
     }
 
-    // Cart'a ürün ekle (JWT'den userId alınır)
+    // Cart'a ürün ekle (JWT'den username alınır, userId'ye çevrilir)
     @PostMapping("/add")
     public ResponseEntity<CartResponseDto> addToCart(
             @Valid @RequestBody AddToCartRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
 
-        String userId = userDetails.getUsername();
+        String username = userDetails.getUsername();
+        String userId = cartService.getUserIdByUsername(username);
         Cart cart = cartService.addToCart(userId, request.getProductId(), request.getQuantity());
         CartResponseDto response = convertToDto(cart);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    // Cart item'ı güncelle (JWT'den userId alınır)
+    // Cart item'ı güncelle (JWT'den username alınır, userId'ye çevrilir)
     @PutMapping("/update/{productId}")
     public ResponseEntity<CartResponseDto> updateCartItem(
             @PathVariable String productId,
             @Valid @RequestBody UpdateCartItemRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
 
-        String userId = userDetails.getUsername();
+        String username = userDetails.getUsername();
+        String userId = cartService.getUserIdByUsername(username);
         Cart cart = cartService.updateCartItem(userId, productId, request.getQuantity());
         CartResponseDto response = convertToDto(cart);
 
         return ResponseEntity.ok(response);
     }
 
-    // Cart'tan ürün çıkar (JWT'den userId alınır)
+    // Cart'tan ürün çıkar (JWT'den username alınır, userId'ye çevrilir)
     @DeleteMapping("/remove/{productId}")
     public ResponseEntity<CartResponseDto> removeFromCart(
             @PathVariable String productId,
             @AuthenticationPrincipal UserDetails userDetails) {
 
-        String userId = userDetails.getUsername();
+        String username = userDetails.getUsername();
+        String userId = cartService.getUserIdByUsername(username);
         Cart cart = cartService.removeFromCart(userId, productId);
         CartResponseDto response = convertToDto(cart);
 
         return ResponseEntity.ok(response);
     }
 
-    // Cart'ı temizle (JWT'den userId alınır)
+    // Cart'ı temizle (JWT'den username alınır, userId'ye çevrilir)
     @DeleteMapping("/clear")
     public ResponseEntity<Void> clearCart(
             @AuthenticationPrincipal UserDetails userDetails) {
 
-        String userId = userDetails.getUsername();
+        String username = userDetails.getUsername();
+        String userId = cartService.getUserIdByUsername(username);
         cartService.clearCart(userId);
 
         return ResponseEntity.noContent().build();

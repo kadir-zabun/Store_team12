@@ -166,7 +166,15 @@ public class ProductController {
     @GetMapping("/product-ratings")
     public ResponseEntity<List<Integer>> getProductRatings(@RequestParam String productId) {
         List<Integer> result = productService.getReviewRatingsByProductId(productId);
-
         return ResponseEntity.ok(result);
+    }
+
+    // Get approved reviews for a product (public endpoint)
+    @GetMapping("/{productId}/reviews")
+    public ResponseEntity<List<org.example.onlinestorebackend.Dto.ReviewDto>> getProductReviews(
+            @PathVariable String productId) {
+        List<org.example.onlinestorebackend.Dto.ReviewDto> reviews = 
+                productService.getApprovedReviewsForProduct(productId);
+        return ResponseEntity.ok(reviews);
     }
 }

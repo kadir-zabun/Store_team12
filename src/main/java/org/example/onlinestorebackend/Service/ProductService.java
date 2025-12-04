@@ -100,8 +100,13 @@ public class ProductService {
                 .collect(Collectors.toList());
     }
 
-    // Ürün oluştur (owner bilgisi ile)
-    public ProductResponseDto createProductForOwner(Product product, String ownerId) {
+    // Ürün oluştur (owner bilgisi ile - username'den userId'ye çevirir)
+    public ProductResponseDto createProductForOwner(Product product, String ownerUsername) {
+        // Username'den userId'ye çevir
+        User owner = userRepository.findByUsername(ownerUsername)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + ownerUsername));
+        String ownerId = owner.getUserId();
+
         List<String> normalizedCategoryIds = normalizeCategoryIds(product);
         validateCategories(normalizedCategoryIds);
         product.setCategoryIds(normalizedCategoryIds);
@@ -112,7 +117,13 @@ public class ProductService {
         return convertToDto(savedProduct);
     }
 
-    public List<ProductResponseDto> getProductsByOwner(String ownerId) {
+    // Owner'ın ürünlerini getir (username'den userId'ye çevirir)
+    public List<ProductResponseDto> getProductsByOwner(String ownerUsername) {
+        // Username'den userId'ye çevir
+        User owner = userRepository.findByUsername(ownerUsername)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + ownerUsername));
+        String ownerId = owner.getUserId();
+
         List<Product> products = productRepository.findByOwnerId(ownerId);
         return products.stream()
                 .map(this::convertToDto)
@@ -185,20 +196,31 @@ public class ProductService {
     }
 
     public List<Integer> getReviewRatingsByProductId(String productId) {
-        Product product = productRepository.findByProductId(productId)
-                .orElseThrow(() -> new ResourceNotFoundException("Product with id: " + productId));
+        // Ratings are always visible (no approval needed)
+        List<Review> reviews = reviewRepository.findByProductId(productId);
+        return reviews.stream()
+                .map(Review::getRating)
+                .filter(rating -> rating != null)
+                .collect(Collectors.toList());
+    }
 
-        List<String> reviewIds = product.getReviewIds();
-
-        List<Integer> reviewRatings = new ArrayList<>();
-        for (String reviewId : reviewIds) {
-            Review review = reviewRepository.findByReviewId(reviewId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Review with id: " + reviewId));
-
-            reviewRatings.add(review.getRating());
-        }
-
-        return reviewRatings;
+    public List<ReviewDto> getApprovedReviewsForProduct(String productId) {
+        List<Review> reviews = reviewRepository.findByProductId(productId);
+        return reviews.stream()
+                .filter(review -> review.getRating() != null || 
+                           (review.getComment() != null && Boolean.TRUE.equals(review.getApproved())))
+                .map(review -> {
+                    ReviewDto dto = new ReviewDto();
+                    dto.setReviewId(review.getReviewId());
+                    dto.setProductId(review.getProductId());
+                    dto.setUserId(review.getUserId());
+                    dto.setOrderId(review.getOrderId());
+                    dto.setRating(review.getRating() != null ? review.getRating() : 0);
+                    dto.setComment(Boolean.TRUE.equals(review.getApproved()) ? review.getComment() : null);
+                    dto.setApproved(review.getApproved());
+                    return dto;
+                })
+                .collect(Collectors.toList());
     }
 
     // Owner'ın kendi ürününü silmesi
