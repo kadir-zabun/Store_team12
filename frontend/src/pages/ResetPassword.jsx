@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import authApi from "../api/authApi";
 import { useToast } from "../contexts/ToastContext";
+import { getErrorMessage } from "../utils/errorHandler";
 
 export default function ResetPasswordPage() {
     const [searchParams] = useSearchParams();
@@ -49,13 +50,9 @@ export default function ResetPasswordPage() {
                 navigate("/login");
             }, 2000);
         } catch (err) {
-            const message =
-                err.response?.data?.data?.message ||
-                err.response?.data?.error?.message ||
-                err.response?.data?.message ||
-                "Failed to reset password. The link may be invalid or expired.";
-            setError(message);
-            showError(message);
+            const errorMessage = getErrorMessage(err, "Failed to reset password. The reset link may be invalid or expired. Please request a new password reset link.");
+            setError(errorMessage);
+            showError(errorMessage);
         } finally {
             setLoading(false);
         }

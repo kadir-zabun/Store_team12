@@ -9,4 +9,12 @@ public class RegisterDto {
     private String confirmPassword;
     private String email;
     private String username;
+
+    /**
+     * İsteğe bağlı kullanıcı tipi:
+     * - "CUSTOMER" (varsayılan)
+     * - "PRODUCT_OWNER"
+     * Frontend giriş ekranında seçilecektir.
+     */
+    private String role;
 }

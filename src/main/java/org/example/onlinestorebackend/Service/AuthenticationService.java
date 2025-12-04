@@ -70,6 +70,13 @@ public class AuthenticationService {
         user.setName(input.getName());
         user.setOrderNo(new ArrayList<>());
 
+        // Rol bilgisi gelmemişse varsayılan CUSTOMER olsun
+        String role = input.getRole();
+        if (role == null || role.isBlank()) {
+            role = "CUSTOMER";
+        }
+        user.setRole(role.toUpperCase());
+
         return userRepository.save(user);
     }
 
@@ -87,12 +94,12 @@ public class AuthenticationService {
                     new UsernamePasswordAuthenticationToken(user.getUsername(), request.getPassword())
             );
 
-            // token üret
+            // token üret (şimdilik JWT sadece username içeriyor; rol bilgisi ayrı field olarak döndürülüyor)
             UserDetails userDetails = userDetailsService.loadUserByUsername(user.getUsername());
             String token = jwtUtil.generateToken(userDetails); // süresiz tek token
 
             // refreshTokenService ve benzeri akışlar kaldırıldı
-            return new AuthenticationResponse(token, "USER");
+            return new AuthenticationResponse(token, user.getRole() != null ? user.getRole() : "CUSTOMER");
         }
 
         throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Kullanıcı bulunamadı.");

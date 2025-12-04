@@ -7,13 +7,14 @@ const authApi = {
             password,
         }),
 
-    register: (name, username, email, password, confirmPassword) =>
+    register: (name, username, email, password, confirmPassword, role) =>
         axiosClient.post("/api/auth/register", {
             name,
             username,
             email,
             password,
             confirmPassword,
+            role,
         }),
 
     requestPasswordReset: (email) =>

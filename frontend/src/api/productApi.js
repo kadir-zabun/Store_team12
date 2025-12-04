@@ -33,6 +33,22 @@ const productApi = {
 
     getCategoryById: (categoryId) =>
         axiosClient.get(`/api/categories/${categoryId}`),
+
+    // Owner endpoints
+    getMyProducts: () =>
+        axiosClient.get("/api/products/my-products"),
+
+    deleteProduct: (productId) =>
+        axiosClient.delete(`/api/products/${productId}`),
+
+    getProductReviews: (productId) =>
+        axiosClient.get(`/api/products/my-products/${productId}/reviews`),
+
+    approveReview: (reviewId) =>
+        axiosClient.put(`/api/products/reviews/${reviewId}/approve`),
+
+    rejectReview: (reviewId) =>
+        axiosClient.delete(`/api/products/reviews/${reviewId}`),
 };
 
 export default productApi;

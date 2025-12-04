@@ -25,10 +25,13 @@ public class UserDetailsServiceImpl implements UserDetailsService {
                 .or(() -> userRepository.findByEmail(usernameOrEmail))
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with username or email: " + usernameOrEmail));
 
-        return new org.springframework.security.core.userdetails.User(
-                usernameOrEmail,
-                user.getPassword(),
-                Collections.emptyList()
-        );
+        // Basit rol bazlı yetki: CUSTOMER / PRODUCT_OWNER
+        String role = user.getRole() != null ? user.getRole() : "CUSTOMER";
+
+        return org.springframework.security.core.userdetails.User
+                .withUsername(usernameOrEmail)
+                .password(user.getPassword())
+                .authorities("ROLE_" + role.toUpperCase())
+                .build();
     }
 }

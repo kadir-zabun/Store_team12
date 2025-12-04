@@ -4,6 +4,8 @@ import authApi from "../api/authApi";
 import cartApi from "../api/cartApi";
 import { cartStorage } from "../utils/cartStorage";
 import { useToast } from "../contexts/ToastContext";
+import { useUserRole } from "../hooks/useUserRole";
+import { getLoginErrorMessage } from "../utils/errorHandler";
 
 export default function LoginPage() {
     const [usernameOrEmail, setUsernameOrEmail] = useState("");
@@ -15,6 +17,7 @@ export default function LoginPage() {
     const navigate = useNavigate();
     const location = useLocation();
     const { success: showSuccess, error: showError, info: showInfo } = useToast();
+    const userRole = useUserRole();
 
     const extractUsernameFromToken = () => {
         const token = localStorage.getItem("access_token");
@@ -71,6 +74,7 @@ export default function LoginPage() {
 
     const handleLogout = () => {
         localStorage.removeItem("access_token");
+        localStorage.removeItem("user_role");
         setUserName(null);
         setShowDropdown(false);
         navigate("/login");
@@ -91,26 +95,36 @@ export default function LoginPage() {
 
             if (authResponse && authResponse.token) {
                 localStorage.setItem("access_token", authResponse.token);
+                localStorage.setItem("user_role", authResponse.role || "CUSTOMER");
                 
                 const guestCart = cartStorage.getCart();
-                if (guestCart.items.length > 0) {
+                // Sadece CUSTOMER için cart merge yap
+                if (authResponse.role === "CUSTOMER" && guestCart.items.length > 0) {
                     try {
                         for (const item of guestCart.items) {
                             await cartApi.addToCart(item.productId, item.quantity);
                         }
                         cartStorage.clearCart();
                         showSuccess("Cart items merged successfully!");
-                    } catch (err) {
-                        console.error("Error merging cart:", err);
-                        showError("Some cart items could not be merged. Please check your cart.");
-                    }
+                } catch (err) {
+                    console.error("Error merging cart:", err);
+                    const errorMessage = err.response?.data?.error?.message || 
+                                        err.response?.data?.message || 
+                                        "Some cart items could not be merged. Please check your cart.";
+                    showError(errorMessage);
+                }
                 }
                 
                 showSuccess("Login successful! Redirecting...");
                 window.dispatchEvent(new Event("storage"));
                 window.dispatchEvent(new CustomEvent("tokenSet"));
                 setTimeout(() => {
-                    window.location.href = "/";
+                    // Role göre yönlendirme
+                    if (authResponse.role === "PRODUCT_OWNER") {
+                        navigate("/owner-dashboard");
+                    } else {
+                        navigate("/");
+                    }
                 }, 150);
             } else {
                 const errorMsg = "Login failed. Please try again.";
@@ -119,30 +133,9 @@ export default function LoginPage() {
             }
         } catch (err) {
             console.error("LOGIN ERROR:", err);
-            
-            // Check if it's an authentication error (401, 403) or unexpected error
-            const status = err.response?.status;
-            const errorMessage = 
-                err.response?.data?.data?.message ||
-                err.response?.data?.error?.message ||
-                err.response?.data?.message ||
-                "";
-            
-            // If it's an auth error or unexpected error, show user-friendly message
-            if (status === 401 || status === 403 || errorMessage.includes("Unexpected error") || errorMessage.includes("Kullanıcı bulunamadı")) {
-                const friendlyMessage = "Email or password is incorrect";
-                setError(friendlyMessage);
-                showError(friendlyMessage);
-            } else if (errorMessage) {
-                // Use the actual error message if it's something else
-                setError(errorMessage);
-                showError(errorMessage);
-            } else {
-                // Fallback
-                const fallbackMessage = "Email or password is incorrect";
-                setError(fallbackMessage);
-                showError(fallbackMessage);
-            }
+            const errorMessage = getLoginErrorMessage(err);
+            setError(errorMessage);
+            showError(errorMessage);
         }
     };
 
@@ -219,27 +212,52 @@ export default function LoginPage() {
                         >
                             Products
                         </Link>
-                        <Link
-                            to="/cart"
-                            style={{
-                                color: "#4a5568",
-                                textDecoration: "none",
-                                padding: "0.5rem 1rem",
-                                borderRadius: "8px",
-                                fontWeight: 500,
-                                transition: "all 0.2s",
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.background = "#f7fafc";
-                                e.currentTarget.style.color = "#667eea";
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.background = "transparent";
-                                e.currentTarget.style.color = "#4a5568";
-                            }}
-                        >
-                            Cart
-                        </Link>
+                        {userRole === "CUSTOMER" && (
+                            <Link
+                                to="/cart"
+                                style={{
+                                    color: "#4a5568",
+                                    textDecoration: "none",
+                                    padding: "0.5rem 1rem",
+                                    borderRadius: "8px",
+                                    fontWeight: 500,
+                                    transition: "all 0.2s",
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = "#f7fafc";
+                                    e.currentTarget.style.color = "#667eea";
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = "transparent";
+                                    e.currentTarget.style.color = "#4a5568";
+                                }}
+                            >
+                                Cart
+                            </Link>
+                        )}
+                        {userRole === "PRODUCT_OWNER" && (
+                            <Link
+                                to="/owner-dashboard"
+                                style={{
+                                    color: "#4a5568",
+                                    textDecoration: "none",
+                                    padding: "0.5rem 1rem",
+                                    borderRadius: "8px",
+                                    fontWeight: 500,
+                                    transition: "all 0.2s",
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = "#f7fafc";
+                                    e.currentTarget.style.color = "#667eea";
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = "transparent";
+                                    e.currentTarget.style.color = "#4a5568";
+                                }}
+                            >
+                                Dashboard
+                            </Link>
+                        )}
                     </div>
                 </div>
 
@@ -283,23 +301,44 @@ export default function LoginPage() {
                                         zIndex: 1000,
                                     }}
                                 >
-                                    <Link
-                                        to="/cart"
-                                        onClick={() => setShowDropdown(false)}
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "0.8rem",
-                                            padding: "0.9rem 1.2rem",
-                                            color: "#2d3748",
-                                            textDecoration: "none",
-                                            fontSize: "0.95rem",
-                                            borderBottom: "1px solid #f1f5f9",
-                                        }}
-                                    >
-                                        <span>🛒</span>
-                                        <span>My Cart</span>
-                                    </Link>
+                                    {userRole === "CUSTOMER" && (
+                                        <Link
+                                            to="/cart"
+                                            onClick={() => setShowDropdown(false)}
+                                            style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "0.8rem",
+                                                padding: "0.9rem 1.2rem",
+                                                color: "#2d3748",
+                                                textDecoration: "none",
+                                                fontSize: "0.95rem",
+                                                borderBottom: "1px solid #f1f5f9",
+                                            }}
+                                        >
+                                            <span>🛒</span>
+                                            <span>My Cart</span>
+                                        </Link>
+                                    )}
+                                    {userRole === "PRODUCT_OWNER" && (
+                                        <Link
+                                            to="/owner-dashboard"
+                                            onClick={() => setShowDropdown(false)}
+                                            style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "0.8rem",
+                                                padding: "0.9rem 1.2rem",
+                                                color: "#2d3748",
+                                                textDecoration: "none",
+                                                fontSize: "0.95rem",
+                                                borderBottom: "1px solid #f1f5f9",
+                                            }}
+                                        >
+                                            <span>📊</span>
+                                            <span>Dashboard</span>
+                                        </Link>
+                                    )}
                                     <button
                                         onClick={() => {
                                             setShowDropdown(false);

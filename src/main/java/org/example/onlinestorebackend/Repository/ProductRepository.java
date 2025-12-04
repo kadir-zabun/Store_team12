@@ -30,4 +30,7 @@ public interface ProductRepository extends MongoRepository<Product, String> {
 
     @Query("{ 'productId' : ?0 }")
     Optional<Product> findByProductId(String productId);
+
+    // Belirli bir owner'a ait ürünler
+    List<Product> findByOwnerId(String ownerId);
 }
