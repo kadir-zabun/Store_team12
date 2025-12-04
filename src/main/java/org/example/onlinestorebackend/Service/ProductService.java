@@ -2,12 +2,15 @@ package org.example.onlinestorebackend.Service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.onlinestorebackend.Dto.ProductResponseDto;
+import org.example.onlinestorebackend.Dto.ReviewDto;
 import org.example.onlinestorebackend.Entity.Category;
 import org.example.onlinestorebackend.Entity.Product;
 import org.example.onlinestorebackend.Entity.Review;
+import org.example.onlinestorebackend.Entity.User;
 import org.example.onlinestorebackend.Repository.CategoryRepository;
 import org.example.onlinestorebackend.Repository.ProductRepository;
 import org.example.onlinestorebackend.Repository.ReviewRepository;
+import org.example.onlinestorebackend.Repository.UserRepository;
 import org.example.onlinestorebackend.exception.ResourceNotFoundException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -29,6 +32,7 @@ public class ProductService {
     private final CategoryRepository categoryRepository;
     private final ProductCategoryRelationService productCategoryRelationService;
     private final ReviewRepository reviewRepository;
+    private final UserRepository userRepository;
 
     // Tüm ürünleri getir (pagination ile)
     public Page<ProductResponseDto> getAllProducts(Pageable pageable) {
@@ -96,15 +100,23 @@ public class ProductService {
                 .collect(Collectors.toList());
     }
 
-    // Ürün oluştur
-    public ProductResponseDto createProduct(Product product) {
+    // Ürün oluştur (owner bilgisi ile)
+    public ProductResponseDto createProductForOwner(Product product, String ownerId) {
         List<String> normalizedCategoryIds = normalizeCategoryIds(product);
         validateCategories(normalizedCategoryIds);
         product.setCategoryIds(normalizedCategoryIds);
+        product.setOwnerId(ownerId);
 
         Product savedProduct = productRepository.save(product);
         productCategoryRelationService.syncProductCategories(savedProduct.getProductId(), normalizedCategoryIds);
         return convertToDto(savedProduct);
+    }
+
+    public List<ProductResponseDto> getProductsByOwner(String ownerId) {
+        List<Product> products = productRepository.findByOwnerId(ownerId);
+        return products.stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
     }
 
     // Entity -> DTO dönüşümü
@@ -125,6 +137,7 @@ public class ProductService {
                 .inStock(product.getInStock())
                 .categoryIds(categoryIds)
                 .categoryNames(categories.stream().map(Category::getCategoryName).toList())
+                .popularity(product.getPopularity())
                 .build();
 
         return dto;
@@ -186,5 +199,98 @@ public class ProductService {
         }
 
         return reviewRatings;
+    }
+
+    // Owner'ın kendi ürününü silmesi
+    public void deleteProductByOwner(String productId, String ownerUsername) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
+
+        User owner = userRepository.findByUsername(ownerUsername)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + ownerUsername));
+
+        if (!product.getOwnerId().equals(owner.getUserId())) {
+            throw new org.example.onlinestorebackend.exception.InvalidRequestException(
+                    "You can only delete your own products");
+        }
+
+        productRepository.delete(product);
+    }
+
+    // Owner'ın kendi ürününün yorumlarını listeleme
+    public List<ReviewDto> getProductReviewsForOwner(String productId, String ownerUsername) {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
+
+        User owner = userRepository.findByUsername(ownerUsername)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + ownerUsername));
+
+        if (!product.getOwnerId().equals(owner.getUserId())) {
+            throw new org.example.onlinestorebackend.exception.InvalidRequestException(
+                    "You can only view reviews for your own products");
+        }
+
+        List<Review> reviews = reviewRepository.findByProductId(productId);
+        return reviews.stream()
+                .map(review -> new ReviewDto(
+                        null, // orderId bu akışta dönmüyor
+                        review.getProductId(),
+                        review.getComment(),
+                        review.getRating(),
+                        review.getReviewId(),
+                        review.getUserId(),
+                        review.getApproved()
+                ))
+                .collect(Collectors.toList());
+    }
+
+    // Yorum onaylama
+    public void approveReview(String reviewId, String ownerUsername) {
+        Review review = reviewRepository.findByReviewId(reviewId)
+                .orElseThrow(() -> new ResourceNotFoundException("Review not found with id: " + reviewId));
+
+        Product product = productRepository.findById(review.getProductId())
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
+
+        User owner = userRepository.findByUsername(ownerUsername)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + ownerUsername));
+
+        if (!product.getOwnerId().equals(owner.getUserId())) {
+            throw new org.example.onlinestorebackend.exception.InvalidRequestException(
+                    "You can only approve reviews for your own products");
+        }
+
+        review.setApproved(true);
+        reviewRepository.save(review);
+
+        // Product'ın reviewIds listesine ekle (eğer yoksa)
+        if (!product.getReviewIds().contains(reviewId)) {
+            product.getReviewIds().add(reviewId);
+            productRepository.save(product);
+        }
+    }
+
+    // Yorum reddetme (silme)
+    public void rejectReview(String reviewId, String ownerUsername) {
+        Review review = reviewRepository.findByReviewId(reviewId)
+                .orElseThrow(() -> new ResourceNotFoundException("Review not found with id: " + reviewId));
+
+        Product product = productRepository.findById(review.getProductId())
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
+
+        User owner = userRepository.findByUsername(ownerUsername)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + ownerUsername));
+
+        if (!product.getOwnerId().equals(owner.getUserId())) {
+            throw new org.example.onlinestorebackend.exception.InvalidRequestException(
+                    "You can only reject reviews for your own products");
+        }
+
+        // Product'ın reviewIds listesinden çıkar
+        product.getReviewIds().remove(reviewId);
+        productRepository.save(product);
+
+        // Review'i sil
+        reviewRepository.delete(review);
     }
 }

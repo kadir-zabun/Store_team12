@@ -10,6 +10,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -94,11 +97,63 @@ public class ProductController {
         return ResponseEntity.ok(products);
     }
 
-    // Yeni ürün oluştur (Admin için - şimdilik public)
+    // Yeni ürün oluştur (sadece PRODUCT_OWNER rolü)
     @PostMapping
-    public ResponseEntity<ProductResponseDto> createProduct(@RequestBody Product product) {
-        ProductResponseDto createdProduct = productService.createProduct(product);
+    @PreAuthorize("hasRole('PRODUCT_OWNER')")
+    public ResponseEntity<ProductResponseDto> createProduct(
+            @RequestBody Product product,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        ProductResponseDto createdProduct = productService.createProductForOwner(product, userDetails.getUsername());
         return ResponseEntity.status(HttpStatus.CREATED).body(createdProduct);
+    }
+
+    // Giriş yapmış owner'ın kendi ürünlerini getir
+    @GetMapping("/my-products")
+    @PreAuthorize("hasRole('PRODUCT_OWNER')")
+    public ResponseEntity<List<ProductResponseDto>> getMyProducts(@AuthenticationPrincipal UserDetails userDetails) {
+        List<ProductResponseDto> products = productService.getProductsByOwner(userDetails.getUsername());
+        return ResponseEntity.ok(products);
+    }
+
+    // Owner'ın kendi ürününü silmesi
+    @DeleteMapping("/{productId}")
+    @PreAuthorize("hasRole('PRODUCT_OWNER')")
+    public ResponseEntity<Void> deleteProduct(
+            @PathVariable String productId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        productService.deleteProductByOwner(productId, userDetails.getUsername());
+        return ResponseEntity.noContent().build();
+    }
+
+    // Owner'ın kendi ürünlerinin yorumlarını listeleme (onay bekleyenler dahil)
+    @GetMapping("/my-products/{productId}/reviews")
+    @PreAuthorize("hasRole('PRODUCT_OWNER')")
+    public ResponseEntity<List<org.example.onlinestorebackend.Dto.ReviewDto>> getProductReviewsForOwner(
+            @PathVariable String productId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        List<org.example.onlinestorebackend.Dto.ReviewDto> reviews =
+                productService.getProductReviewsForOwner(productId, userDetails.getUsername());
+        return ResponseEntity.ok(reviews);
+    }
+
+    // Yorum onaylama (sadece owner)
+    @PutMapping("/reviews/{reviewId}/approve")
+    @PreAuthorize("hasRole('PRODUCT_OWNER')")
+    public ResponseEntity<String> approveReview(
+            @PathVariable String reviewId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        productService.approveReview(reviewId, userDetails.getUsername());
+        return ResponseEntity.ok("Review approved successfully");
+    }
+
+    // Yorum reddetme (sadece owner)
+    @DeleteMapping("/reviews/{reviewId}")
+    @PreAuthorize("hasRole('PRODUCT_OWNER')")
+    public ResponseEntity<String> rejectReview(
+            @PathVariable String reviewId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        productService.rejectReview(reviewId, userDetails.getUsername());
+        return ResponseEntity.ok("Review rejected and deleted");
     }
 
     @GetMapping("/product-comments")

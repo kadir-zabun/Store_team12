@@ -33,4 +33,11 @@ public class User {
     private String email;
 
     private List<String> orderNo = new ArrayList<>();
+
+    /**
+     * Kullanıcı rolü:
+     * - CUSTOMER: normal müşteri
+     * - PRODUCT_OWNER: ürün yöneten / yorum onaylayan kullanıcı
+     */
+    private String role = "CUSTOMER";
 }

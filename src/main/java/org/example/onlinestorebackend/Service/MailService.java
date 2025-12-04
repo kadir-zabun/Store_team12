@@ -93,4 +93,58 @@ public class MailService {
         
         return link;
     }
+
+    /**
+     * Mock fatura maili gönderir. Gerçek PDF yerine basit bir metin içerir.
+     */
+    public void sendInvoiceEmail(String email,
+                                 String invoiceId,
+                                 java.math.BigDecimal amount,
+                                 java.time.LocalDateTime invoiceDate) {
+        if (mailSender == null) {
+            log.warn("JavaMailSender not configured. Invoice for {} -> id={}, amount={}", email, invoiceId, amount);
+            return;
+        }
+
+        try {
+            log.info("Attempting to send invoice email to: {}", email);
+
+            Class<?> simpleMailMessageClass = Class.forName("org.springframework.mail.SimpleMailMessage");
+            Object msg = simpleMailMessageClass.getDeclaredConstructor().newInstance();
+
+            Method setFrom = simpleMailMessageClass.getMethod("setFrom", String.class);
+            Method setTo = simpleMailMessageClass.getMethod("setTo", String.class);
+            Method setSubject = simpleMailMessageClass.getMethod("setSubject", String.class);
+            Method setText = simpleMailMessageClass.getMethod("setText", String.class);
+
+            String fromEmail = mailFrom != null && !mailFrom.isEmpty() ? mailFrom : "noreply@store.com";
+            setFrom.invoke(msg, fromEmail);
+            setTo.invoke(msg, email);
+            setSubject.invoke(msg, "Your Invoice - Store");
+
+            StringBuilder body = new StringBuilder();
+            body.append("Hello,\n\n")
+                .append("Thank you for your payment. Here is your invoice information:\n\n")
+                .append("Invoice ID: ").append(invoiceId).append("\n")
+                .append("Amount: ").append(amount != null ? amount.toPlainString() : "0").append("\n");
+            if (invoiceDate != null) {
+                body.append("Date: ").append(invoiceDate).append("\n");
+            }
+            body.append("\n")
+                .append("This is a mock invoice. In a real system, a PDF attachment or link would be provided.\n\n")
+                .append("Best regards,\nStore Team");
+
+            setText.invoke(msg, body.toString());
+
+            log.info("Sending invoice email via JavaMailSender...");
+            Class<?> mailSenderInterface = Class.forName("org.springframework.mail.javamail.JavaMailSender");
+            Method sendMethod = mailSenderInterface.getMethod("send", simpleMailMessageClass);
+            sendMethod.invoke(mailSender, msg);
+
+            log.info("Invoice email sent successfully to: {}", email);
+        } catch (Exception e) {
+            log.error("Failed to send invoice email to {}: {}", email, e.getMessage());
+            log.error("Exception details: ", e);
+        }
+    }
 }

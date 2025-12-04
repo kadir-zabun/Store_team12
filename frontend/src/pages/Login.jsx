@@ -91,9 +91,11 @@ export default function LoginPage() {
 
             if (authResponse && authResponse.token) {
                 localStorage.setItem("access_token", authResponse.token);
+                localStorage.setItem("user_role", authResponse.role || "CUSTOMER");
                 
                 const guestCart = cartStorage.getCart();
-                if (guestCart.items.length > 0) {
+                // Sadece CUSTOMER için cart merge yap
+                if (authResponse.role === "CUSTOMER" && guestCart.items.length > 0) {
                     try {
                         for (const item of guestCart.items) {
                             await cartApi.addToCart(item.productId, item.quantity);
@@ -110,7 +112,12 @@ export default function LoginPage() {
                 window.dispatchEvent(new Event("storage"));
                 window.dispatchEvent(new CustomEvent("tokenSet"));
                 setTimeout(() => {
-                    window.location.href = "/";
+                    // Role göre yönlendirme
+                    if (authResponse.role === "PRODUCT_OWNER") {
+                        window.location.href = "/owner-dashboard";
+                    } else {
+                        window.location.href = "/";
+                    }
                 }, 150);
             } else {
                 const errorMsg = "Login failed. Please try again.";
