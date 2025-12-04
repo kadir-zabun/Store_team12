@@ -5,6 +5,8 @@ import cartApi from "../api/cartApi";
 import { cartStorage } from "../utils/cartStorage";
 import { useCartCount } from "../hooks/useCartCount";
 import { useToast } from "../contexts/ToastContext";
+import { useUserRole } from "../hooks/useUserRole";
+import { getErrorMessage } from "../utils/errorHandler";
 
 export default function CartPage() {
     const [userName, setUserName] = useState(null);
@@ -18,6 +20,14 @@ export default function CartPage() {
     const location = useLocation();
     const { cartCount, refreshCartCount } = useCartCount();
     const { success: showSuccess, error: showError, info: showInfo } = useToast();
+    const userRole = useUserRole();
+
+    // Redirect PRODUCT_OWNER to dashboard
+    useEffect(() => {
+        if (userRole === "PRODUCT_OWNER") {
+            navigate("/owner-dashboard");
+        }
+    }, [userRole, navigate]);
 
     const extractUsernameFromToken = () => {
         const token = localStorage.getItem("access_token");
@@ -139,6 +149,7 @@ export default function CartPage() {
             console.error("Error loading cart:", err);
             if (err.response?.status === 401) {
                 localStorage.removeItem("access_token");
+                localStorage.removeItem("user_role");
                 const guestCart = cartStorage.getCart();
                 setCart({
                     items: guestCart.items.map(item => ({
@@ -150,12 +161,12 @@ export default function CartPage() {
                     })),
                     totalPrice: guestCart.totalPrice,
                 });
+                setError("Your session has expired. Please login again.");
+                showError("Your session has expired. Please login again.");
             } else {
-                const message =
-                    err.response?.data?.error?.message ||
-                    err.response?.data?.message ||
-                    "Failed to load cart. Please try again.";
-                setError(message);
+                const errorMessage = getErrorMessage(err, "Failed to load your cart. Please try again.");
+                setError(errorMessage);
+                showError(errorMessage);
             }
         } finally {
             setLoading(false);
@@ -198,11 +209,8 @@ export default function CartPage() {
             }
         } catch (err) {
             console.error("Error updating cart:", err);
-            const message =
-                err.response?.data?.error?.message ||
-                err.response?.data?.message ||
-                "Failed to update quantity. Please try again.";
-            showError(message);
+            const errorMessage = getErrorMessage(err, "Failed to update item quantity. Please try again.");
+            showError(errorMessage);
         } finally {
             setUpdating({ ...updating, [productId]: false });
         }
@@ -244,11 +252,8 @@ export default function CartPage() {
             }
         } catch (err) {
             console.error("Error removing item:", err);
-            const message =
-                err.response?.data?.error?.message ||
-                err.response?.data?.message ||
-                "Failed to remove item. Please try again.";
-            showError(message);
+            const errorMessage = getErrorMessage(err, "Failed to remove item from cart. Please try again.");
+            showError(errorMessage);
         } finally {
             setUpdating({ ...updating, [productId]: false });
         }
@@ -273,16 +278,14 @@ export default function CartPage() {
             setCart({ items: [], totalPrice: 0 });
         } catch (err) {
             console.error("Error clearing cart:", err);
-            const message =
-                err.response?.data?.error?.message ||
-                err.response?.data?.message ||
-                "Failed to clear cart. Please try again.";
-            showError(message);
+            const errorMessage = getErrorMessage(err, "Failed to clear your cart. Please try again.");
+            showError(errorMessage);
         }
     };
 
     const handleLogout = () => {
         localStorage.removeItem("access_token");
+        localStorage.removeItem("user_role");
         setUserName(null);
         setShowDropdown(false);
         navigate("/login");

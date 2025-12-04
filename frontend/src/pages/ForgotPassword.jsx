@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import authApi from "../api/authApi";
 import { useToast } from "../contexts/ToastContext";
+import { getErrorMessage } from "../utils/errorHandler";
 
 export default function ForgotPasswordPage() {
     const [email, setEmail] = useState("");
@@ -30,13 +31,9 @@ export default function ForgotPasswordPage() {
                 showError(errorMsg);
             }
         } catch (err) {
-            const message =
-                err.response?.data?.data?.message ||
-                err.response?.data?.error?.message ||
-                err.response?.data?.message ||
-                "Failed to send reset email. Please try again.";
-            setError(message);
-            showError(message);
+            const errorMessage = getErrorMessage(err, "Failed to send password reset email. Please check your email address and try again.");
+            setError(errorMessage);
+            showError(errorMessage);
         } finally {
             setLoading(false);
         }
