@@ -112,7 +112,7 @@ export default function OwnerDashboard() {
                             textDecoration: "none",
                         }}
                     >
-                        🛍️ Store
+                        🛍️ TeknoSU
                     </Link>
                     <div style={{ display: "flex", alignItems: "center", gap: "2rem" }}>
                         <Link
@@ -214,11 +214,9 @@ export default function OwnerDashboard() {
                                         zIndex: 1000,
                                     }}
                                 >
-                                    <button
-                                        onClick={() => {
-                                            setShowDropdown(false);
-                                            showInfo("Order Management feature coming soon!");
-                                        }}
+                                    <Link
+                                        to="/owner/orders"
+                                        onClick={() => setShowDropdown(false)}
                                         style={{
                                             width: "100%",
                                             display: "flex",
@@ -228,20 +226,16 @@ export default function OwnerDashboard() {
                                             padding: "0.9rem 1.2rem",
                                             color: "#2d3748",
                                             fontSize: "0.95rem",
-                                            border: "none",
-                                            background: "transparent",
-                                            cursor: "pointer",
+                                            textDecoration: "none",
                                             borderBottom: "1px solid #f1f5f9",
                                         }}
                                     >
                                         <span>📋</span>
                                         <span>Order Management</span>
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            setShowDropdown(false);
-                                            showInfo("Product Management feature coming soon!");
-                                        }}
+                                    </Link>
+                                    <Link
+                                        to="/owner/products"
+                                        onClick={() => setShowDropdown(false)}
                                         style={{
                                             width: "100%",
                                             display: "flex",
@@ -251,15 +245,32 @@ export default function OwnerDashboard() {
                                             padding: "0.9rem 1.2rem",
                                             color: "#2d3748",
                                             fontSize: "0.95rem",
-                                            border: "none",
-                                            background: "transparent",
-                                            cursor: "pointer",
+                                            textDecoration: "none",
                                             borderBottom: "1px solid #f1f5f9",
                                         }}
                                     >
                                         <span>📦</span>
                                         <span>Product Management</span>
-                                    </button>
+                                    </Link>
+                                    <Link
+                                        to="/owner/reviews"
+                                        onClick={() => setShowDropdown(false)}
+                                        style={{
+                                            width: "100%",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "0.8rem",
+                                            textAlign: "left",
+                                            padding: "0.9rem 1.2rem",
+                                            color: "#2d3748",
+                                            fontSize: "0.95rem",
+                                            textDecoration: "none",
+                                            borderBottom: "1px solid #f1f5f9",
+                                        }}
+                                    >
+                                        <span>⭐</span>
+                                        <span>Review Management</span>
+                                    </Link>
                                     <button
                                         onClick={handleLogout}
                                         style={{
@@ -344,7 +355,8 @@ export default function OwnerDashboard() {
                             marginTop: "2rem",
                         }}
                     >
-                        <div
+                        <Link
+                            to="/owner/products"
                             style={{
                                 background: "#f7fafc",
                                 padding: "2rem",
@@ -352,6 +364,9 @@ export default function OwnerDashboard() {
                                 border: "1px solid #e2e8f0",
                                 cursor: "pointer",
                                 transition: "all 0.3s",
+                                textDecoration: "none",
+                                color: "inherit",
+                                display: "block",
                             }}
                             onMouseEnter={(e) => {
                                 e.currentTarget.style.transform = "translateY(-4px)";
@@ -361,7 +376,6 @@ export default function OwnerDashboard() {
                                 e.currentTarget.style.transform = "translateY(0)";
                                 e.currentTarget.style.boxShadow = "none";
                             }}
-                            onClick={() => showInfo("Product Management feature coming soon!")}
                         >
                             <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>📦</div>
                             <h3 style={{ fontSize: "1.5rem", fontWeight: 600, color: "#2d3748", marginBottom: "0.5rem" }}>
@@ -370,9 +384,10 @@ export default function OwnerDashboard() {
                             <p style={{ color: "#718096" }}>
                                 Add, edit, and manage your products. Update inventory and pricing.
                             </p>
-                        </div>
+                        </Link>
 
-                        <div
+                        <Link
+                            to="/owner/orders"
                             style={{
                                 background: "#f7fafc",
                                 padding: "2rem",
@@ -380,6 +395,9 @@ export default function OwnerDashboard() {
                                 border: "1px solid #e2e8f0",
                                 cursor: "pointer",
                                 transition: "all 0.3s",
+                                textDecoration: "none",
+                                color: "inherit",
+                                display: "block",
                             }}
                             onMouseEnter={(e) => {
                                 e.currentTarget.style.transform = "translateY(-4px)";
@@ -389,7 +407,6 @@ export default function OwnerDashboard() {
                                 e.currentTarget.style.transform = "translateY(0)";
                                 e.currentTarget.style.boxShadow = "none";
                             }}
-                            onClick={() => showInfo("Order Management feature coming soon!")}
                         >
                             <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>📋</div>
                             <h3 style={{ fontSize: "1.5rem", fontWeight: 600, color: "#2d3748", marginBottom: "0.5rem" }}>
@@ -398,9 +415,10 @@ export default function OwnerDashboard() {
                             <p style={{ color: "#718096" }}>
                                 View and manage customer orders. Update order status and track shipments.
                             </p>
-                        </div>
+                        </Link>
 
-                        <div
+                        <Link
+                            to="/owner/reviews"
                             style={{
                                 background: "#f7fafc",
                                 padding: "2rem",
@@ -408,6 +426,9 @@ export default function OwnerDashboard() {
                                 border: "1px solid #e2e8f0",
                                 cursor: "pointer",
                                 transition: "all 0.3s",
+                                textDecoration: "none",
+                                color: "inherit",
+                                display: "block",
                             }}
                             onMouseEnter={(e) => {
                                 e.currentTarget.style.transform = "translateY(-4px)";
@@ -417,7 +438,6 @@ export default function OwnerDashboard() {
                                 e.currentTarget.style.transform = "translateY(0)";
                                 e.currentTarget.style.boxShadow = "none";
                             }}
-                            onClick={() => showInfo("Review Management feature coming soon!")}
                         >
                             <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>⭐</div>
                             <h3 style={{ fontSize: "1.5rem", fontWeight: 600, color: "#2d3748", marginBottom: "0.5rem" }}>
@@ -426,7 +446,7 @@ export default function OwnerDashboard() {
                             <p style={{ color: "#718096" }}>
                                 Approve or reject product reviews from customers.
                             </p>
-                        </div>
+                        </Link>
                     </div>
                 </div>
             </div>

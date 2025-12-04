@@ -1,7 +1,6 @@
 package org.example.onlinestorebackend.Controller;
 
 import org.example.onlinestorebackend.Dto.ReviewDto;
-import org.example.onlinestorebackend.Entity.Review;
 import org.example.onlinestorebackend.Entity.User;
 import org.example.onlinestorebackend.Service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -78,5 +77,14 @@ public class UserController {
         String result = userService.createReview(authentication.getName(), reviewDto);
 
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/my-reviews")
+    public ResponseEntity<List<ReviewDto>> getMyReviews(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null)
+            throw new IllegalArgumentException("Auth missing");
+
+        List<ReviewDto> reviews = userService.getUserReviews(authentication.getName());
+        return ResponseEntity.ok(reviews);
     }
 }

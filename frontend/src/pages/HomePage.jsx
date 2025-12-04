@@ -164,7 +164,7 @@ export default function HomePage() {
                             textDecoration: "none",
                         }}
                     >
-                        🛍️ Store
+                        🛍️ TeknoSU
                     </Link>
                     <div style={{ display: "flex", alignItems: "center", gap: "2rem" }}>
                         <Link
@@ -210,50 +210,50 @@ export default function HomePage() {
                             Products
                         </Link>
                         {userRole === "CUSTOMER" && (
-                            <Link
-                                to="/cart"
-                                style={{
-                                    color: "#4a5568",
-                                    textDecoration: "none",
-                                    padding: "0.5rem 1rem",
-                                    borderRadius: "8px",
-                                    fontWeight: 500,
-                                    transition: "all 0.2s",
-                                    position: "relative",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "0.5rem",
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = "#f7fafc";
-                                    e.currentTarget.style.color = "#667eea";
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = "transparent";
-                                    e.currentTarget.style.color = "#4a5568";
-                                }}
-                            >
-                                <span>Cart</span>
-                                {cartCount > 0 && (
-                                    <span
-                                        style={{
-                                            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                                            color: "#fff",
-                                            borderRadius: "50%",
-                                            minWidth: "20px",
-                                            height: "20px",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            fontSize: "0.75rem",
-                                            fontWeight: 700,
-                                            padding: "0 0.25rem",
-                                        }}
-                                    >
-                                        {cartCount > 99 ? "99+" : cartCount}
-                                    </span>
-                                )}
-                            </Link>
+                        <Link
+                            to="/cart"
+                            style={{
+                                color: "#4a5568",
+                                textDecoration: "none",
+                                padding: "0.5rem 1rem",
+                                borderRadius: "8px",
+                                fontWeight: 500,
+                                transition: "all 0.2s",
+                                position: "relative",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "0.5rem",
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = "#f7fafc";
+                                e.currentTarget.style.color = "#667eea";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = "transparent";
+                                e.currentTarget.style.color = "#4a5568";
+                            }}
+                        >
+                            <span>Cart</span>
+                            {cartCount > 0 && (
+                                <span
+                                    style={{
+                                        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                        color: "#fff",
+                                        borderRadius: "50%",
+                                        minWidth: "20px",
+                                        height: "20px",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontSize: "0.75rem",
+                                        fontWeight: 700,
+                                        padding: "0 0.25rem",
+                                    }}
+                                >
+                                    {cartCount > 99 ? "99+" : cartCount}
+                                </span>
+                            )}
+                        </Link>
                         )}
                         {userRole === "PRODUCT_OWNER" && (
                             <Link
@@ -342,30 +342,30 @@ export default function HomePage() {
                                     }}
                                 >
                                     {userRole === "CUSTOMER" && (
-                                        <Link
-                                            to="/cart"
-                                            onClick={() => setShowDropdown(false)}
-                                            style={{
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: "0.8rem",
-                                                padding: "0.9rem 1.2rem",
-                                                color: "#2d3748",
-                                                textDecoration: "none",
-                                                fontSize: "0.95rem",
-                                                borderBottom: "1px solid #f1f5f9",
-                                                transition: "background 0.2s",
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                e.currentTarget.style.background = "#f7fafc";
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                e.currentTarget.style.background = "#fff";
-                                            }}
-                                        >
-                                            <span>🛒</span>
-                                            <span>My Cart</span>
-                                        </Link>
+                                    <Link
+                                        to="/cart"
+                                        onClick={() => setShowDropdown(false)}
+                                        style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "0.8rem",
+                                            padding: "0.9rem 1.2rem",
+                                            color: "#2d3748",
+                                            textDecoration: "none",
+                                            fontSize: "0.95rem",
+                                            borderBottom: "1px solid #f1f5f9",
+                                            transition: "background 0.2s",
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = "#f7fafc";
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = "#fff";
+                                        }}
+                                    >
+                                        <span>🛒</span>
+                                        <span>My Cart</span>
+                                    </Link>
                                     )}
                                     {userRole === "PRODUCT_OWNER" && (
                                         <Link
@@ -393,11 +393,9 @@ export default function HomePage() {
                                             <span>Dashboard</span>
                                         </Link>
                                     )}
-                                    <button
-                                        onClick={() => {
-                                            setShowDropdown(false);
-                                            showInfo("Order History feature coming soon!");
-                                        }}
+                                    <Link
+                                        to="/orders"
+                                        onClick={() => setShowDropdown(false)}
                                         style={{
                                             width: "100%",
                                             display: "flex",
@@ -411,6 +409,7 @@ export default function HomePage() {
                                             background: "transparent",
                                             cursor: "pointer",
                                             borderBottom: "1px solid #f1f5f9",
+                                            textDecoration: "none",
                                             transition: "background 0.2s",
                                         }}
                                         onMouseEnter={(e) => {
@@ -422,7 +421,7 @@ export default function HomePage() {
                                     >
                                         <span>📋</span>
                                         <span>Order History</span>
-                                    </button>
+                                    </Link>
                                     <button
                                         onClick={handleLogout}
                                         style={{
@@ -507,7 +506,7 @@ export default function HomePage() {
                             lineHeight: "1.2",
                         }}
                     >
-                        Welcome to Store
+                        Welcome to TeknoSU
                     </h1>
                     <p
                         style={{
@@ -609,31 +608,31 @@ export default function HomePage() {
                                 Browse Products
                             </Link>
                             {userRole === "CUSTOMER" && (
-                                <Link
-                                    to="/cart"
-                                    style={{
-                                        background: "rgba(255, 255, 255, 0.2)",
-                                        color: "#fff",
-                                        fontSize: "1.1rem",
-                                        fontWeight: 600,
-                                        padding: "1rem 2.5rem",
-                                        borderRadius: "12px",
-                                        border: "2px solid rgba(255, 255, 255, 0.5)",
-                                        textDecoration: "none",
-                                        transition: "all 0.3s",
-                                        backdropFilter: "blur(10px)",
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.background = "rgba(255, 255, 255, 0.3)";
-                                        e.currentTarget.style.transform = "translateY(-3px)";
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.background = "rgba(255, 255, 255, 0.2)";
-                                        e.currentTarget.style.transform = "translateY(0)";
-                                    }}
-                                >
-                                    View Cart
-                                </Link>
+                            <Link
+                                to="/cart"
+                                style={{
+                                    background: "rgba(255, 255, 255, 0.2)",
+                                    color: "#fff",
+                                    fontSize: "1.1rem",
+                                    fontWeight: 600,
+                                    padding: "1rem 2.5rem",
+                                    borderRadius: "12px",
+                                    border: "2px solid rgba(255, 255, 255, 0.5)",
+                                    textDecoration: "none",
+                                    transition: "all 0.3s",
+                                    backdropFilter: "blur(10px)",
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.3)";
+                                    e.currentTarget.style.transform = "translateY(-3px)";
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.2)";
+                                    e.currentTarget.style.transform = "translateY(0)";
+                                }}
+                            >
+                                View Cart
+                            </Link>
                             )}
                             {userRole === "PRODUCT_OWNER" && (
                                 <Link

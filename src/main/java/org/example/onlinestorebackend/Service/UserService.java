@@ -11,6 +11,7 @@ import org.example.onlinestorebackend.Repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -63,9 +64,9 @@ public class UserService {
         Order order = orderRepository.findByOrderId(dto.getOrderId())
                 .orElseThrow(() -> new RuntimeException("Order not found with orderId: " + dto.getOrderId()));
 
-        String isDelivered = order.getStatus();
+        String orderStatus = order.getStatus();
 
-        if (!isDelivered.equals("DELIVERED")) {
+        if (!orderStatus.equals("DELIVERED")) {
             return "You cannot make comment or give rating before the order is delivered.";
         }
 
@@ -80,15 +81,64 @@ public class UserService {
             return "Your order does not contain this product.";
         }
 
-        Review review = new Review();
-        review.setReviewId(UUID.randomUUID().toString());
-        review.setUserId(userId);
+        if (dto.getRating() < 1 || dto.getRating() > 10) {
+            return "Rating must be between 1 and 10.";
+        }
+
+        Optional<Review> existingReviewOpt = reviewRepository.findByUserIdAndProductId(userId, dto.getProductId());
+
+        Review review;
+        if (existingReviewOpt.isPresent()) {
+            review = existingReviewOpt.get();
+            review.setUpdatedAt(LocalDateTime.now());
+        } else {
+            review = new Review();
+            review.setReviewId(UUID.randomUUID().toString());
+            review.setUserId(userId);
+            review.setProductId(dto.getProductId());
+            review.setCreatedAt(LocalDateTime.now());
+            review.setUpdatedAt(LocalDateTime.now());
+        }
+
+        review.setOrderId(dto.getOrderId());
         review.setRating(dto.getRating());
-        review.setComment(dto.getComment());
-        review.setProductId(dto.getProductId());
+        
+        if (dto.getComment() != null && !dto.getComment().trim().isEmpty()) {
+            review.setComment(dto.getComment().trim());
+            review.setApproved(false);
+        }
 
         reviewRepository.save(review);
+        
+        String message = "Your review has been submitted. ";
+        if (review.getRating() != null && review.getRating() > 0) {
+            message += "Rating is visible immediately. ";
+        }
+        if (review.getComment() != null && !review.getComment().trim().isEmpty()) {
+            message += "Comment will be visible after approval.";
+        }
+        
+        return message;
+    }
 
-        return "Your review has been created.";
+    public List<ReviewDto> getUserReviews(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found: " + username));
+        String userId = user.getUserId();
+        
+        List<Review> reviews = reviewRepository.findByUserId(userId);
+        return reviews.stream()
+                .map(review -> {
+                    ReviewDto dto = new ReviewDto();
+                    dto.setReviewId(review.getReviewId());
+                    dto.setProductId(review.getProductId());
+                    dto.setOrderId(review.getOrderId());
+                    dto.setUserId(review.getUserId());
+                    dto.setRating(review.getRating() != null ? review.getRating() : 0);
+                    dto.setComment(review.getComment());
+                    dto.setApproved(review.getApproved());
+                    return dto;
+                })
+                .collect(java.util.stream.Collectors.toList());
     }
 }

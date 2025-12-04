@@ -67,7 +67,7 @@ export default function ForgotPasswordPage() {
                             textDecoration: "none",
                         }}
                     >
-                        🛍️ Store
+                        🛍️ TeknoSU
                     </Link>
                 </div>
                 <Link

@@ -34,11 +34,15 @@ export const ToastProvider = ({ children }) => {
     }, []);
 
     const success = useCallback((message, duration) => {
-        return showToast(message, "success", duration);
+        // Ensure message is always a string
+        const messageStr = typeof message === 'string' ? message : String(message || 'Success');
+        return showToast(messageStr, "success", duration);
     }, [showToast]);
 
     const error = useCallback((message, duration) => {
-        return showToast(message, "error", duration);
+        // Ensure message is always a string
+        const messageStr = typeof message === 'string' ? message : String(message || 'An error occurred');
+        return showToast(messageStr, "error", duration);
     }, [showToast]);
 
     const info = useCallback((message, duration) => {

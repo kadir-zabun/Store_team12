@@ -86,7 +86,7 @@ export default function ResetPasswordPage() {
                             textDecoration: "none",
                         }}
                     >
-                        🛍️ Store
+                        🛍️ TeknoSU
                     </Link>
                 </div>
                 <Link

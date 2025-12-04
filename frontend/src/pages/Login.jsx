@@ -106,13 +106,13 @@ export default function LoginPage() {
                         }
                         cartStorage.clearCart();
                         showSuccess("Cart items merged successfully!");
-                } catch (err) {
-                    console.error("Error merging cart:", err);
+                    } catch (err) {
+                        console.error("Error merging cart:", err);
                     const errorMessage = err.response?.data?.error?.message || 
                                         err.response?.data?.message || 
                                         "Some cart items could not be merged. Please check your cart.";
                     showError(errorMessage);
-                }
+                    }
                 }
                 
                 showSuccess("Login successful! Redirecting...");
@@ -134,8 +134,8 @@ export default function LoginPage() {
         } catch (err) {
             console.error("LOGIN ERROR:", err);
             const errorMessage = getLoginErrorMessage(err);
-            setError(errorMessage);
-            showError(errorMessage);
+                setError(errorMessage);
+                showError(errorMessage);
         }
     };
 
@@ -167,7 +167,7 @@ export default function LoginPage() {
                             textDecoration: "none",
                         }}
                     >
-                        🛍️ Store
+                        🛍️ TeknoSU
                     </Link>
                     <div style={{ display: "flex", alignItems: "center", gap: "2rem" }}>
                         <Link
@@ -213,27 +213,27 @@ export default function LoginPage() {
                             Products
                         </Link>
                         {userRole === "CUSTOMER" && (
-                            <Link
-                                to="/cart"
-                                style={{
-                                    color: "#4a5568",
-                                    textDecoration: "none",
-                                    padding: "0.5rem 1rem",
-                                    borderRadius: "8px",
-                                    fontWeight: 500,
-                                    transition: "all 0.2s",
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = "#f7fafc";
-                                    e.currentTarget.style.color = "#667eea";
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = "transparent";
-                                    e.currentTarget.style.color = "#4a5568";
-                                }}
-                            >
-                                Cart
-                            </Link>
+                        <Link
+                            to="/cart"
+                            style={{
+                                color: "#4a5568",
+                                textDecoration: "none",
+                                padding: "0.5rem 1rem",
+                                borderRadius: "8px",
+                                fontWeight: 500,
+                                transition: "all 0.2s",
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = "#f7fafc";
+                                e.currentTarget.style.color = "#667eea";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = "transparent";
+                                e.currentTarget.style.color = "#4a5568";
+                            }}
+                        >
+                            Cart
+                        </Link>
                         )}
                         {userRole === "PRODUCT_OWNER" && (
                             <Link
@@ -302,23 +302,23 @@ export default function LoginPage() {
                                     }}
                                 >
                                     {userRole === "CUSTOMER" && (
-                                        <Link
-                                            to="/cart"
-                                            onClick={() => setShowDropdown(false)}
-                                            style={{
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: "0.8rem",
-                                                padding: "0.9rem 1.2rem",
-                                                color: "#2d3748",
-                                                textDecoration: "none",
-                                                fontSize: "0.95rem",
-                                                borderBottom: "1px solid #f1f5f9",
-                                            }}
-                                        >
-                                            <span>🛒</span>
-                                            <span>My Cart</span>
-                                        </Link>
+                                    <Link
+                                        to="/cart"
+                                        onClick={() => setShowDropdown(false)}
+                                        style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "0.8rem",
+                                            padding: "0.9rem 1.2rem",
+                                            color: "#2d3748",
+                                            textDecoration: "none",
+                                            fontSize: "0.95rem",
+                                            borderBottom: "1px solid #f1f5f9",
+                                        }}
+                                    >
+                                        <span>🛒</span>
+                                        <span>My Cart</span>
+                                    </Link>
                                     )}
                                     {userRole === "PRODUCT_OWNER" && (
                                         <Link
@@ -339,11 +339,9 @@ export default function LoginPage() {
                                             <span>Dashboard</span>
                                         </Link>
                                     )}
-                                    <button
-                                        onClick={() => {
-                                            setShowDropdown(false);
-                                            showInfo("Order History feature coming soon!");
-                                        }}
+                                    <Link
+                                        to="/orders"
+                                        onClick={() => setShowDropdown(false)}
                                         style={{
                                             width: "100%",
                                             display: "flex",
@@ -357,11 +355,12 @@ export default function LoginPage() {
                                             background: "transparent",
                                             cursor: "pointer",
                                             borderBottom: "1px solid #f1f5f9",
+                                            textDecoration: "none",
                                         }}
                                     >
                                         <span>📋</span>
                                         <span>Order History</span>
-                                    </button>
+                                    </Link>
                                     <button
                                         onClick={handleLogout}
                                         style={{

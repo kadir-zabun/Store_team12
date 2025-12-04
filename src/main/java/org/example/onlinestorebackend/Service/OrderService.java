@@ -10,6 +10,10 @@ import org.example.onlinestorebackend.Entity.Product;
 import org.example.onlinestorebackend.Repository.CartRepository;
 import org.example.onlinestorebackend.Repository.OrderRepository;
 import org.example.onlinestorebackend.Repository.ProductRepository;
+import org.example.onlinestorebackend.Repository.UserRepository;
+import org.example.onlinestorebackend.Repository.DeliveryRepository;
+import org.example.onlinestorebackend.Entity.User;
+import org.example.onlinestorebackend.Entity.Delivery;
 import org.example.onlinestorebackend.exception.InsufficientStockException;
 import org.example.onlinestorebackend.exception.InvalidRequestException;
 import org.example.onlinestorebackend.exception.ResourceNotFoundException;
@@ -20,6 +24,9 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +35,8 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final CartRepository cartRepository;
+    private final UserRepository userRepository;
+    private final DeliveryRepository deliveryRepository;
 
     @Transactional
     public Order createOrder(CreateOrderRequest request) {
@@ -100,6 +109,7 @@ public class OrderService {
         }
 
         Order order = new Order();
+        order.setOrderId(UUID.randomUUID().toString());
         order.setCustomerId(customerId);
         order.setItems(orderItems);
         order.setOrderDate(LocalDateTime.now());
@@ -107,6 +117,18 @@ public class OrderService {
         order.setTotalPrice(totalPrice.doubleValue());
 
         Order savedOrder = orderRepository.save(order);
+
+        for (OrderItem item : orderItems) {
+            Delivery delivery = new Delivery();
+            delivery.setDeliveryId(UUID.randomUUID().toString());
+            delivery.setOrderId(savedOrder.getOrderId());
+            delivery.setCustomerId(customerId);
+            delivery.setProductId(item.getProductId());
+            delivery.setQuantity(item.getQuantity());
+            delivery.setTotalPrice(item.getPriceAtPurchase().multiply(BigDecimal.valueOf(item.getQuantity())).doubleValue());
+            delivery.setCompleted(false);
+            deliveryRepository.save(delivery);
+        }
 
         cart.getItems().clear();
         cart.setTotalPrice(BigDecimal.ZERO);
@@ -131,6 +153,49 @@ public class OrderService {
 
     public List<Order> getOrdersByStatus(String status) {
         return orderRepository.findByStatus(status);
+    }
+
+    public List<Order> getDeliveredOrdersByCustomer(String customerId) {
+        List<Order> allOrders = orderRepository.findByCustomerId(customerId);
+        return allOrders.stream()
+                .filter(order -> "DELIVERED".equals(order.getStatus()))
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    // Get orders for a product owner (only orders containing their products)
+    public List<Order> getOrdersByOwner(String ownerUsername, String status) {
+        User owner = userRepository.findByUsername(ownerUsername)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + ownerUsername));
+        String ownerId = owner.getUserId();
+
+        List<Product> ownerProducts = productRepository.findByOwnerId(ownerId);
+        Set<String> ownerProductIds = ownerProducts.stream()
+                .map(Product::getProductId)
+                .collect(Collectors.toSet());
+
+        if (ownerProductIds.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        List<Order> allOrders = status != null
+                ? orderRepository.findByStatus(status)
+                : orderRepository.findAll();
+
+        return allOrders.stream()
+                .filter(order -> {
+                    if (order.getItems() == null || order.getItems().isEmpty()) {
+                        return false;
+                    }
+                    return order.getItems().stream()
+                            .anyMatch(item -> ownerProductIds.contains(item.getProductId()));
+                })
+                .collect(Collectors.toList());
+    }
+
+    public String getUserIdByUsername(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
+        return user.getUserId();
     }
 
     @Transactional

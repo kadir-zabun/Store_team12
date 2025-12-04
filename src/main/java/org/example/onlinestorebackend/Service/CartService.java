@@ -4,10 +4,12 @@ import lombok.RequiredArgsConstructor;
 import org.example.onlinestorebackend.Entity.Cart;
 import org.example.onlinestorebackend.Entity.CartItem;
 import org.example.onlinestorebackend.Entity.Product;
+import org.example.onlinestorebackend.Entity.User;
 import org.example.onlinestorebackend.exception.InsufficientStockException;
 import org.example.onlinestorebackend.exception.ResourceNotFoundException;
 import org.example.onlinestorebackend.Repository.CartRepository;
 import org.example.onlinestorebackend.Repository.ProductRepository;
+import org.example.onlinestorebackend.Repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +22,14 @@ public class CartService {
 
     private final CartRepository cartRepository;
     private final ProductRepository productRepository;
+    private final UserRepository userRepository;
+
+    // Helper method to get userId from username
+    public String getUserIdByUsername(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with username: " + username));
+        return user.getUserId();
+    }
 
     // Kullanıcının cart'ını getir veya yeni oluştur
     public Cart getOrCreateCart(String userId) {

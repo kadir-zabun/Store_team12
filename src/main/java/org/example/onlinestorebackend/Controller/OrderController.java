@@ -8,6 +8,9 @@ import org.example.onlinestorebackend.Entity.Order;
 import org.example.onlinestorebackend.Service.OrderService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -25,9 +28,14 @@ public class OrderController {
         return ResponseEntity.status(HttpStatus.CREATED).body(order);
     }
 
-    @PostMapping("/from-cart/{customerId}")
-    public ResponseEntity<Order> createOrderFromCart(@PathVariable String customerId) {
-        Order order = orderService.createOrderFromCart(customerId);
+    @PostMapping("/from-cart")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<Order> createOrderFromCart(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        // Convert username from JWT to userId
+        String username = userDetails.getUsername();
+        String userId = orderService.getUserIdByUsername(username);
+        Order order = orderService.createOrderFromCart(userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(order);
     }
 
@@ -43,15 +51,26 @@ public class OrderController {
         return ResponseEntity.ok(orders);
     }
 
-    @GetMapping
-    public ResponseEntity<List<Order>> getAllOrders(@RequestParam(required = false) String status) {
-        List<Order> orders = status != null
-                ? orderService.getOrdersByStatus(status)
-                : orderService.getAllOrders();
+    // Get delivered orders for a customer (for review purposes)
+    @GetMapping("/customer/{customerId}/delivered")
+    public ResponseEntity<List<Order>> getDeliveredOrdersByCustomer(@PathVariable String customerId) {
+        List<Order> orders = orderService.getDeliveredOrdersByCustomer(customerId);
         return ResponseEntity.ok(orders);
     }
 
+    // Get orders for product owner (only their products' orders) - Only PRODUCT_OWNER
+    @GetMapping
+    @PreAuthorize("hasRole('PRODUCT_OWNER')")
+    public ResponseEntity<List<Order>> getOrdersForOwner(
+            @RequestParam(required = false) String status,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        List<Order> orders = orderService.getOrdersByOwner(userDetails.getUsername(), status);
+        return ResponseEntity.ok(orders);
+    }
+
+    // Update order status - Only PRODUCT_OWNER
     @PutMapping("/{orderId}/status")
+    @PreAuthorize("hasRole('PRODUCT_OWNER')")
     public ResponseEntity<Order> updateOrderStatus(
             @PathVariable String orderId,
             @Valid @RequestBody UpdateOrderStatusRequest request

@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayInputStream;
 import java.lang.reflect.Method;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -61,17 +62,17 @@ public class MailService {
                 Method setSubject = simpleMailMessageClass.getMethod("setSubject", String.class);
                 Method setText = simpleMailMessageClass.getMethod("setText", String.class);
                 
-                String fromEmail = mailFrom != null && !mailFrom.isEmpty() ? mailFrom : "noreply@store.com";
+                String fromEmail = mailFrom != null && !mailFrom.isEmpty() ? mailFrom : "noreply@teknosu.com";
                 setFrom.invoke(msg, fromEmail);
                 setTo.invoke(msg, email);
-                setSubject.invoke(msg, "Reset Your Password - Store");
+                setSubject.invoke(msg, "Reset Your Password - TeknoSU");
                 setText.invoke(msg, "Hello,\n\n" +
                         "You requested to reset your password. Click the link below to reset it:\n\n" +
                         link + "\n\n" +
                         "Or copy and paste the link into your browser if the link doesn't work.\n\n" +
                         "This link will expire in 1 hour.\n\n" +
                         "If you didn't request this, please ignore this email.\n\n" +
-                        "Best regards,\nStore Team");
+                        "Best regards,\nTeknoSU Team");
                 
                 log.info("Sending email via JavaMailSender...");
                 Class<?> mailSenderInterface = Class.forName("org.springframework.mail.javamail.JavaMailSender");
@@ -94,9 +95,6 @@ public class MailService {
         return link;
     }
 
-    /**
-     * Mock fatura maili gönderir. Gerçek PDF yerine basit bir metin içerir.
-     */
     public void sendInvoiceEmail(String email,
                                  String invoiceId,
                                  java.math.BigDecimal amount,
@@ -117,22 +115,21 @@ public class MailService {
             Method setSubject = simpleMailMessageClass.getMethod("setSubject", String.class);
             Method setText = simpleMailMessageClass.getMethod("setText", String.class);
 
-            String fromEmail = mailFrom != null && !mailFrom.isEmpty() ? mailFrom : "noreply@store.com";
+            String fromEmail = mailFrom != null && !mailFrom.isEmpty() ? mailFrom : "noreply@teknosu.com";
             setFrom.invoke(msg, fromEmail);
             setTo.invoke(msg, email);
-            setSubject.invoke(msg, "Your Invoice - Store");
+            setSubject.invoke(msg, "Your Invoice - TeknoSU");
 
             StringBuilder body = new StringBuilder();
             body.append("Hello,\n\n")
                 .append("Thank you for your payment. Here is your invoice information:\n\n")
                 .append("Invoice ID: ").append(invoiceId).append("\n")
-                .append("Amount: ").append(amount != null ? amount.toPlainString() : "0").append("\n");
+                .append("Amount: $").append(amount != null ? amount.toPlainString() : "0").append("\n");
             if (invoiceDate != null) {
                 body.append("Date: ").append(invoiceDate).append("\n");
             }
             body.append("\n")
-                .append("This is a mock invoice. In a real system, a PDF attachment or link would be provided.\n\n")
-                .append("Best regards,\nStore Team");
+                .append("Best regards,\nTeknoSU Team");
 
             setText.invoke(msg, body.toString());
 
@@ -145,6 +142,87 @@ public class MailService {
         } catch (Exception e) {
             log.error("Failed to send invoice email to {}: {}", email, e.getMessage());
             log.error("Exception details: ", e);
+        }
+    }
+
+    public void sendInvoiceEmailWithPdf(String email,
+                                       String invoiceId,
+                                       java.math.BigDecimal amount,
+                                       java.time.LocalDateTime invoiceDate,
+                                       byte[] pdfBytes) {
+        if (mailSender == null) {
+            log.error("JavaMailSender not configured. Cannot send invoice email to: {}", email);
+            log.error("Check if MAIL_USERNAME and MAIL_PASSWORD environment variables are set");
+            return;
+        }
+
+        if (pdfBytes == null || pdfBytes.length == 0) {
+            log.warn("PDF bytes are null or empty. Sending email without PDF attachment.");
+            sendInvoiceEmail(email, invoiceId, amount, invoiceDate);
+            return;
+        }
+
+        try {
+            log.info("Attempting to send invoice email with PDF to: {}", email);
+            log.info("PDF size: {} bytes", pdfBytes.length);
+
+            Class<?> mimeMessageHelperClass = Class.forName("org.springframework.mail.javamail.MimeMessageHelper");
+            Class<?> mimeMessageClass = Class.forName("jakarta.mail.internet.MimeMessage");
+            Class<?> mailSenderInterface = Class.forName("org.springframework.mail.javamail.JavaMailSender");
+            
+            Method createMimeMessageMethod = mailSenderInterface.getMethod("createMimeMessage");
+            Object mimeMessage = createMimeMessageMethod.invoke(mailSender);
+            
+            Object helper = mimeMessageHelperClass.getConstructor(mimeMessageClass, boolean.class)
+                    .newInstance(mimeMessage, true);
+
+            String fromEmail = mailFrom != null && !mailFrom.isEmpty() ? mailFrom : "noreply@teknosu.com";
+            Method setFrom = mimeMessageHelperClass.getMethod("setFrom", String.class);
+            Method setTo = mimeMessageHelperClass.getMethod("setTo", String.class);
+            Method setSubject = mimeMessageHelperClass.getMethod("setSubject", String.class);
+            Method setText = mimeMessageHelperClass.getMethod("setText", String.class, boolean.class);
+            Class<?> inputStreamSourceClass = Class.forName("org.springframework.core.io.InputStreamSource");
+            Method addAttachment = mimeMessageHelperClass.getMethod("addAttachment", String.class, inputStreamSourceClass);
+
+            setFrom.invoke(helper, fromEmail);
+            setTo.invoke(helper, email);
+            setSubject.invoke(helper, "Your Invoice - TeknoSU");
+
+            StringBuilder body = new StringBuilder();
+            body.append("Hello,\n\n")
+                .append("Thank you for your payment. Please find your invoice attached.\n\n")
+                .append("Invoice ID: ").append(invoiceId).append("\n")
+                .append("Amount: $").append(amount != null ? amount.toPlainString() : "0").append("\n");
+            if (invoiceDate != null) {
+                body.append("Date: ").append(invoiceDate).append("\n");
+            }
+            body.append("\n")
+                .append("Best regards,\nTeknoSU Team");
+
+            setText.invoke(helper, body.toString(), false);
+
+            Object pdfSource = new ByteArrayInputStream(pdfBytes);
+            addAttachment.invoke(helper, "invoice_" + invoiceId + ".pdf", pdfSource);
+
+            Method sendMethod = mailSenderInterface.getMethod("send", mimeMessageClass);
+            sendMethod.invoke(mailSender, mimeMessage);
+
+            log.info("Invoice email with PDF sent successfully to: {}", email);
+        } catch (Exception e) {
+            log.error("Failed to send invoice email with PDF to {}: {}", email, e.getMessage());
+            log.error("Exception class: {}", e.getClass().getName());
+            if (e.getCause() != null) {
+                log.error("Caused by: {}", e.getCause().getMessage());
+            }
+            log.error("Exception details: ", e);
+            
+            // Fallback: try to send email without PDF
+            log.info("Attempting to send email without PDF as fallback...");
+            try {
+                sendInvoiceEmail(email, invoiceId, amount, invoiceDate);
+            } catch (Exception e2) {
+                log.error("Fallback email also failed: {}", e2.getMessage());
+            }
         }
     }
 }

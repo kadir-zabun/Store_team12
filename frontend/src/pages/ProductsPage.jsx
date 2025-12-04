@@ -76,33 +76,109 @@ export default function ProductsPage() {
         };
     }, [showDropdown]);
 
+    const [searchQuery, setSearchQuery] = useState("");
+    const [sortBy, setSortBy] = useState("productName");
+    const [sortDir, setSortDir] = useState("asc");
+    const [filterInStock, setFilterInStock] = useState(false);
+    const [minPrice, setMinPrice] = useState("");
+    const [maxPrice, setMaxPrice] = useState("");
+
     useEffect(() => {
         const loadProducts = async () => {
             setLoading(true);
             try {
                 console.log("📥 Fetching products from database...");
-                const response = await productApi.getAllProducts(0, 100);
-                const apiResponse = response.data;
                 
                 let productsData = null;
-                if (apiResponse && apiResponse.data) {
-                    if (apiResponse.data.content) {
-                        productsData = apiResponse.data.content;
-                    } else if (Array.isArray(apiResponse.data)) {
-                        productsData = apiResponse.data;
-                    } else {
-                        productsData = apiResponse.data;
+                
+                // If search query exists, use search endpoint
+                if (searchQuery.trim()) {
+                    const response = await productApi.searchProducts(searchQuery.trim());
+                    // Backend returns {success: true, data: [...], meta: {...}}
+                    productsData = response.data?.data || response.data || [];
+                    if (!Array.isArray(productsData)) {
+                        productsData = [];
                     }
-                } else if (Array.isArray(apiResponse)) {
-                    productsData = apiResponse;
+                    console.log("Search results:", productsData);
+                }
+                // If price range is set, use price range endpoint
+                else if (minPrice || maxPrice) {
+                    const min = minPrice ? parseFloat(minPrice) : 0;
+                    const max = maxPrice ? parseFloat(maxPrice) : 999999;
+                    const response = await productApi.getProductsByPriceRange(min, max);
+                    productsData = response.data?.data || response.data || [];
+                    if (!Array.isArray(productsData)) {
+                        productsData = [];
+                    }
+                }
+                // If in stock filter is active, use in stock endpoint
+                else if (filterInStock) {
+                    const response = await productApi.getInStockProducts();
+                    productsData = response.data?.data || response.data || [];
+                    if (!Array.isArray(productsData)) {
+                        productsData = [];
+                    }
+                }
+                // Otherwise, use normal pagination with sorting
+                else {
+                    const response = await productApi.getAllProducts(0, 100, sortBy, sortDir);
+                    const apiResponse = response.data;
+                    
+                    if (apiResponse && apiResponse.data) {
+                        if (apiResponse.data.content) {
+                            productsData = apiResponse.data.content;
+                        } else if (Array.isArray(apiResponse.data)) {
+                            productsData = apiResponse.data;
+                        } else {
+                            productsData = apiResponse.data;
+                        }
+                    } else if (Array.isArray(apiResponse)) {
+                        productsData = apiResponse;
+                    }
                 }
                 
                 if (productsData && productsData.length > 0) {
-                    const backendProducts = productsData.map(formatProductForDisplay);
-                    setProducts(backendProducts);
-                    console.log(`✅ Loaded ${backendProducts.length} products from database`);
+                    let filteredProducts = productsData.map(formatProductForDisplay);
+                    
+                    // Apply in stock filter if active (for search/price range results)
+                    if (filterInStock && (searchQuery.trim() || minPrice || maxPrice)) {
+                        filteredProducts = filteredProducts.filter(p => p.inStock);
+                    }
+                    
+                    // Apply sorting if not using backend sorting
+                    if (searchQuery.trim() || minPrice || maxPrice || filterInStock) {
+                        filteredProducts.sort((a, b) => {
+                            let aVal, bVal;
+                            switch (sortBy) {
+                                case "productName":
+                                    aVal = a.productName?.toLowerCase() || "";
+                                    bVal = b.productName?.toLowerCase() || "";
+                                    break;
+                                case "price":
+                                    aVal = a.finalPrice || a.price || 0;
+                                    bVal = b.finalPrice || b.price || 0;
+                                    break;
+                                case "popularity":
+                                    aVal = a.popularity || 0;
+                                    bVal = b.popularity || 0;
+                                    break;
+                                default:
+                                    aVal = a.productName?.toLowerCase() || "";
+                                    bVal = b.productName?.toLowerCase() || "";
+                            }
+                            
+                            if (sortDir === "asc") {
+                                return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+                            } else {
+                                return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+                            }
+                        });
+                    }
+                    
+                    setProducts(filteredProducts);
+                    console.log(`✅ Loaded ${filteredProducts.length} products from database`);
                 } else {
-                    console.log("ℹ️ No products in database yet");
+                    console.log("ℹ️ No products found");
                     setProducts([]);
                 }
             } catch (error) {
@@ -115,8 +191,13 @@ export default function ProductsPage() {
             }
         };
 
-        loadProducts();
-    }, []);
+        // Debounce search query to avoid too many API calls
+        const timeoutId = setTimeout(() => {
+            loadProducts();
+        }, searchQuery.trim() ? 500 : 0); // 500ms delay for search, immediate for other filters
+
+        return () => clearTimeout(timeoutId);
+    }, [searchQuery, sortBy, sortDir, filterInStock, minPrice, maxPrice, showError]);
 
     const handleLogout = () => {
         localStorage.removeItem("access_token");
@@ -200,7 +281,7 @@ export default function ProductsPage() {
                             textDecoration: "none",
                         }}
                     >
-                        🛍️ Store
+                        🛍️ TeknoSU
                     </Link>
                     <div style={{ display: "flex", alignItems: "center", gap: "2rem" }}>
                         <Link
@@ -388,11 +469,9 @@ export default function ProductsPage() {
                                             <span>Dashboard</span>
                                         </Link>
                                     )}
-                                    <button
-                                        onClick={() => {
-                                            setShowDropdown(false);
-                                            showInfo("Order History feature coming soon!");
-                                        }}
+                                    <Link
+                                        to="/orders"
+                                        onClick={() => setShowDropdown(false)}
                                         style={{
                                             width: "100%",
                                             display: "flex",
@@ -402,15 +481,13 @@ export default function ProductsPage() {
                                             padding: "0.9rem 1.2rem",
                                             color: "#2d3748",
                                             fontSize: "0.95rem",
-                                            border: "none",
-                                            background: "transparent",
-                                            cursor: "pointer",
+                                            textDecoration: "none",
                                             borderBottom: "1px solid #f1f5f9",
                                         }}
                                     >
                                         <span>📋</span>
                                         <span>Order History</span>
-                                    </button>
+                                    </Link>
                                     <button
                                         onClick={handleLogout}
                                         style={{
@@ -473,29 +550,182 @@ export default function ProductsPage() {
                         width: "100%",
                     }}
                 >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem", flexWrap: "wrap", gap: "1rem" }}>
-                        <h1
-                            style={{
-                                fontSize: "clamp(2rem, 4vw, 3rem)",
-                                fontWeight: 700,
-                                color: "#2d3748",
-                            }}
-                        >
-                            Products
-                        </h1>
-                        {products.length > 0 && (
-                            <div
+                    <div style={{ marginBottom: "2rem" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", flexWrap: "wrap", gap: "1rem" }}>
+                            <h1
                                 style={{
-                                    padding: "0.5rem 1rem",
-                                    background: "#c6f6d5",
-                                    color: "#22543d",
-                                    borderRadius: "8px",
-                                    fontSize: "0.9rem",
+                                    fontSize: "clamp(2rem, 4vw, 3rem)",
+                                    fontWeight: 700,
+                                    color: "#2d3748",
                                 }}
                             >
-                                📦 Database: {products.length} products
+                                Products
+                            </h1>
+                            {products.length > 0 && (
+                                <div
+                                    style={{
+                                        padding: "0.5rem 1rem",
+                                        background: "#c6f6d5",
+                                        color: "#22543d",
+                                        borderRadius: "8px",
+                                        fontSize: "0.9rem",
+                                    }}
+                                >
+                                    📦 {products.length} products
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Search and Filters */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginBottom: "1.5rem" }}>
+                            {/* Search Bar */}
+                            <div style={{ display: "flex", gap: "1rem", alignItems: "center", flexWrap: "wrap" }}>
+                                <input
+                                    type="text"
+                                    placeholder="Search products..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    style={{
+                                        flex: "1",
+                                        minWidth: "200px",
+                                        padding: "0.75rem 1rem",
+                                        borderRadius: "10px",
+                                        border: "2px solid #e2e8f0",
+                                        fontSize: "1rem",
+                                        outline: "none",
+                                        transition: "all 0.2s",
+                                        background: "#fff",
+                                        color: "#2d3748",
+                                    }}
+                                    onFocus={(e) => {
+                                        e.currentTarget.style.borderColor = "#667eea";
+                                    }}
+                                    onBlur={(e) => {
+                                        e.currentTarget.style.borderColor = "#e2e8f0";
+                                    }}
+                                />
+                                <button
+                                    onClick={() => {
+                                        setSearchQuery("");
+                                        setMinPrice("");
+                                        setMaxPrice("");
+                                        setFilterInStock(false);
+                                    }}
+                                    style={{
+                                        padding: "0.75rem 1.5rem",
+                                        background: "#e2e8f0",
+                                        color: "#4a5568",
+                                        border: "none",
+                                        borderRadius: "10px",
+                                        fontWeight: 600,
+                                        cursor: "pointer",
+                                        transition: "all 0.2s",
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = "#cbd5e0";
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = "#e2e8f0";
+                                    }}
+                                >
+                                    Clear
+                                </button>
                             </div>
-                        )}
+
+                            {/* Sort and Filters */}
+                            <div style={{ display: "flex", gap: "1rem", alignItems: "center", flexWrap: "wrap" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                    <label style={{ fontSize: "0.9rem", fontWeight: 600, color: "#4a5568" }}>Sort by:</label>
+                                    <select
+                                        value={sortBy}
+                                        onChange={(e) => setSortBy(e.target.value)}
+                                        style={{
+                                            padding: "0.5rem 1rem",
+                                            borderRadius: "8px",
+                                            border: "2px solid #e2e8f0",
+                                            fontSize: "0.9rem",
+                                            outline: "none",
+                                            cursor: "pointer",
+                                            background: "#fff",
+                                            color: "#2d3748",
+                                        }}
+                                    >
+                                        <option value="productName">Name</option>
+                                        <option value="price">Price</option>
+                                        <option value="popularity">Popularity</option>
+                                    </select>
+                                    <select
+                                        value={sortDir}
+                                        onChange={(e) => setSortDir(e.target.value)}
+                                        style={{
+                                            padding: "0.5rem 1rem",
+                                            borderRadius: "8px",
+                                            border: "2px solid #e2e8f0",
+                                            fontSize: "0.9rem",
+                                            outline: "none",
+                                            cursor: "pointer",
+                                            background: "#fff",
+                                            color: "#2d3748",
+                                        }}
+                                    >
+                                        <option value="asc">Ascending</option>
+                                        <option value="desc">Descending</option>
+                                    </select>
+                                </div>
+
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                    <label style={{ fontSize: "0.9rem", fontWeight: 600, color: "#4a5568" }}>Price:</label>
+                                    <input
+                                        type="number"
+                                        placeholder="Min"
+                                        value={minPrice}
+                                        onChange={(e) => setMinPrice(e.target.value)}
+                                        style={{
+                                            width: "100px",
+                                            padding: "0.5rem",
+                                            borderRadius: "8px",
+                                            border: "2px solid #e2e8f0",
+                                            fontSize: "0.9rem",
+                                            outline: "none",
+                                            background: "#fff",
+                                            color: "#2d3748",
+                                        }}
+                                    />
+                                    <span style={{ color: "#4a5568" }}>-</span>
+                                    <input
+                                        type="number"
+                                        placeholder="Max"
+                                        value={maxPrice}
+                                        onChange={(e) => setMaxPrice(e.target.value)}
+                                        style={{
+                                            width: "100px",
+                                            padding: "0.5rem",
+                                            borderRadius: "8px",
+                                            border: "2px solid #e2e8f0",
+                                            fontSize: "0.9rem",
+                                            outline: "none",
+                                            background: "#fff",
+                                            color: "#2d3748",
+                                        }}
+                                    />
+                                </div>
+
+                                <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={filterInStock}
+                                        onChange={(e) => setFilterInStock(e.target.checked)}
+                                        style={{
+                                            width: "18px",
+                                            height: "18px",
+                                            cursor: "pointer",
+                                            accentColor: "#667eea",
+                                        }}
+                                    />
+                                    <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "#4a5568" }}>In Stock Only</span>
+                                </label>
+                            </div>
+                        </div>
                     </div>
 
                     {loading ? (
@@ -525,6 +755,7 @@ export default function ProductsPage() {
                                         transition: "all 0.3s",
                                         cursor: "pointer",
                                     }}
+                                    onClick={() => navigate(`/products/${product.productId}`)}
                                     onMouseEnter={(e) => {
                                         e.currentTarget.style.transform = "translateY(-8px)";
                                         e.currentTarget.style.boxShadow = "0 12px 24px rgba(0, 0, 0, 0.15)";
@@ -643,7 +874,10 @@ export default function ProductsPage() {
                                         </div>
                                         {userRole === "CUSTOMER" && (
                                             <button
-                                                onClick={() => handleAddToCart(product.productId)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleAddToCart(product.productId);
+                                                }}
                                                 disabled={!product.inStock || addingToCart[product.productId]}
                                                 style={{
                                                     width: "100%",

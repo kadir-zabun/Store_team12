@@ -336,7 +336,7 @@ export default function CartPage() {
                             textDecoration: "none",
                         }}
                     >
-                        🛍️ Store
+                        🛍️ TeknoSU
                     </Link>
                     <div style={{ display: "flex", alignItems: "center", gap: "2rem" }}>
                         <Link
@@ -478,11 +478,9 @@ export default function CartPage() {
                                         <span>🛒</span>
                                         <span>My Cart</span>
                                     </Link>
-                                    <button
-                                        onClick={() => {
-                                            setShowDropdown(false);
-                                            showInfo("Order History feature coming soon!");
-                                        }}
+                                    <Link
+                                        to="/orders"
+                                        onClick={() => setShowDropdown(false)}
                                         style={{
                                             width: "100%",
                                             display: "flex",
@@ -496,11 +494,12 @@ export default function CartPage() {
                                             background: "transparent",
                                             cursor: "pointer",
                                             borderBottom: "1px solid #f1f5f9",
+                                            textDecoration: "none",
                                         }}
                                     >
                                         <span>📋</span>
                                         <span>Order History</span>
-                                    </button>
+                                    </Link>
                                     <button
                                         onClick={handleLogout}
                                         style={{
@@ -823,7 +822,7 @@ export default function CartPage() {
                                                 navigate("/login");
                                             }
                                         } else {
-                                            showInfo("Checkout feature coming soon!");
+                                            navigate("/checkout");
                                         }
                                     }}
                                     style={{
