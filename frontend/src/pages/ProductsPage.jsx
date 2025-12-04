@@ -7,6 +7,8 @@ import { cartStorage } from "../utils/cartStorage";
 import { formatProductForDisplay } from "../utils/productAdapter";
 import { useCartCount } from "../hooks/useCartCount";
 import { useToast } from "../contexts/ToastContext";
+import { useUserRole } from "../hooks/useUserRole";
+import { getErrorMessage } from "../utils/errorHandler";
 
 export default function ProductsPage() {
     const [userName, setUserName] = useState(null);
@@ -19,6 +21,7 @@ export default function ProductsPage() {
     const location = useLocation();
     const { cartCount, refreshCartCount } = useCartCount();
     const { success: showSuccess, error: showError, info: showInfo } = useToast();
+    const userRole = useUserRole();
 
     const extractUsernameFromToken = () => {
         const token = localStorage.getItem("access_token");
@@ -104,6 +107,8 @@ export default function ProductsPage() {
                 }
             } catch (error) {
                 console.error("❌ Error loading products from database:", error);
+                const errorMessage = getErrorMessage(error, "Failed to load products. Please refresh the page.");
+                showError(errorMessage);
                 setProducts([]);
             } finally {
                 setLoading(false);
@@ -115,6 +120,7 @@ export default function ProductsPage() {
 
     const handleLogout = () => {
         localStorage.removeItem("access_token");
+        localStorage.removeItem("user_role");
         setUserName(null);
         setShowDropdown(false);
         navigate("/login");
@@ -125,6 +131,12 @@ export default function ProductsPage() {
     };
 
     const handleAddToCart = async (productId) => {
+        // Only CUSTOMER can add to cart
+        if (userRole !== "CUSTOMER") {
+            showError("Only customers can add products to cart.");
+            return;
+        }
+
         const token = localStorage.getItem("access_token");
         const product = products.find(p => p.productId === productId);
         
@@ -153,11 +165,8 @@ export default function ProductsPage() {
             }
         } catch (err) {
             console.error("Error adding to cart:", err);
-            const message =
-                err.response?.data?.error?.message ||
-                err.response?.data?.message ||
-                "Failed to add product to cart. Please try again.";
-            showError(message);
+            const errorMessage = getErrorMessage(err, "Failed to add product to cart. Please try again.");
+            showError(errorMessage);
         } finally {
             setAddingToCart({ ...addingToCart, [productId]: false });
         }
@@ -229,50 +238,75 @@ export default function ProductsPage() {
                         >
                             Products
                         </Link>
-                        <Link
-                            to="/cart"
-                            style={{
-                                color: "#4a5568",
-                                textDecoration: "none",
-                                padding: "0.5rem 1rem",
-                                borderRadius: "8px",
-                                fontWeight: 500,
-                                transition: "all 0.2s",
-                                position: "relative",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "0.5rem",
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.background = "#f7fafc";
-                                e.currentTarget.style.color = "#667eea";
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.background = "transparent";
-                                e.currentTarget.style.color = "#4a5568";
-                            }}
-                        >
-                            <span>Cart</span>
-                            {cartCount > 0 && (
-                                <span
-                                    style={{
-                                        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                                        color: "#fff",
-                                        borderRadius: "50%",
-                                        minWidth: "20px",
-                                        height: "20px",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        fontSize: "0.75rem",
-                                        fontWeight: 700,
-                                        padding: "0 0.25rem",
-                                    }}
-                                >
-                                    {cartCount > 99 ? "99+" : cartCount}
-                                </span>
-                            )}
-                        </Link>
+                        {userRole === "CUSTOMER" && (
+                            <Link
+                                to="/cart"
+                                style={{
+                                    color: "#4a5568",
+                                    textDecoration: "none",
+                                    padding: "0.5rem 1rem",
+                                    borderRadius: "8px",
+                                    fontWeight: 500,
+                                    transition: "all 0.2s",
+                                    position: "relative",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "0.5rem",
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = "#f7fafc";
+                                    e.currentTarget.style.color = "#667eea";
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = "transparent";
+                                    e.currentTarget.style.color = "#4a5568";
+                                }}
+                            >
+                                <span>Cart</span>
+                                {cartCount > 0 && (
+                                    <span
+                                        style={{
+                                            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                            color: "#fff",
+                                            borderRadius: "50%",
+                                            minWidth: "20px",
+                                            height: "20px",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            fontSize: "0.75rem",
+                                            fontWeight: 700,
+                                            padding: "0 0.25rem",
+                                        }}
+                                    >
+                                        {cartCount > 99 ? "99+" : cartCount}
+                                    </span>
+                                )}
+                            </Link>
+                        )}
+                        {userRole === "PRODUCT_OWNER" && (
+                            <Link
+                                to="/owner-dashboard"
+                                style={{
+                                    color: "#4a5568",
+                                    textDecoration: "none",
+                                    padding: "0.5rem 1rem",
+                                    borderRadius: "8px",
+                                    fontWeight: 500,
+                                    transition: "all 0.2s",
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = "#f7fafc";
+                                    e.currentTarget.style.color = "#667eea";
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = "transparent";
+                                    e.currentTarget.style.color = "#4a5568";
+                                }}
+                            >
+                                Dashboard
+                            </Link>
+                        )}
                     </div>
                 </div>
 
@@ -316,23 +350,44 @@ export default function ProductsPage() {
                                         zIndex: 1000,
                                     }}
                                 >
-                                    <Link
-                                        to="/cart"
-                                        onClick={() => setShowDropdown(false)}
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "0.8rem",
-                                            padding: "0.9rem 1.2rem",
-                                            color: "#2d3748",
-                                            textDecoration: "none",
-                                            fontSize: "0.95rem",
-                                            borderBottom: "1px solid #f1f5f9",
-                                        }}
-                                    >
-                                        <span>🛒</span>
-                                        <span>My Cart</span>
-                                    </Link>
+                                    {userRole === "CUSTOMER" && (
+                                        <Link
+                                            to="/cart"
+                                            onClick={() => setShowDropdown(false)}
+                                            style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "0.8rem",
+                                                padding: "0.9rem 1.2rem",
+                                                color: "#2d3748",
+                                                textDecoration: "none",
+                                                fontSize: "0.95rem",
+                                                borderBottom: "1px solid #f1f5f9",
+                                            }}
+                                        >
+                                            <span>🛒</span>
+                                            <span>My Cart</span>
+                                        </Link>
+                                    )}
+                                    {userRole === "PRODUCT_OWNER" && (
+                                        <Link
+                                            to="/owner-dashboard"
+                                            onClick={() => setShowDropdown(false)}
+                                            style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "0.8rem",
+                                                padding: "0.9rem 1.2rem",
+                                                color: "#2d3748",
+                                                textDecoration: "none",
+                                                fontSize: "0.95rem",
+                                                borderBottom: "1px solid #f1f5f9",
+                                            }}
+                                        >
+                                            <span>📊</span>
+                                            <span>Dashboard</span>
+                                        </Link>
+                                    )}
                                     <button
                                         onClick={() => {
                                             setShowDropdown(false);
@@ -586,36 +641,55 @@ export default function ProductsPage() {
                                         >
                                             {product.inStock ? `✓ In Stock (${product.quantity})` : "✗ Out of Stock"}
                                         </div>
-                                        <button
-                                            onClick={() => handleAddToCart(product.productId)}
-                                            disabled={!product.inStock || addingToCart[product.productId]}
-                                            style={{
-                                                width: "100%",
-                                                padding: "0.75rem",
-                                                background: product.inStock && !addingToCart[product.productId]
-                                                    ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
-                                                    : "#cbd5e0",
-                                                color: "#fff",
-                                                border: "none",
-                                                borderRadius: "10px",
-                                                fontWeight: 600,
-                                                cursor: product.inStock && !addingToCart[product.productId] ? "pointer" : "not-allowed",
-                                                transition: "all 0.2s",
-                                                opacity: product.inStock && !addingToCart[product.productId] ? 1 : 0.6,
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                if (product.inStock && !addingToCart[product.productId]) {
-                                                    e.currentTarget.style.transform = "scale(1.02)";
-                                                }
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                if (product.inStock && !addingToCart[product.productId]) {
-                                                    e.currentTarget.style.transform = "scale(1)";
-                                                }
-                                            }}
-                                        >
-                                            {addingToCart[product.productId] ? "Adding..." : product.inStock ? "Add to Cart" : "Out of Stock"}
-                                        </button>
+                                        {userRole === "CUSTOMER" && (
+                                            <button
+                                                onClick={() => handleAddToCart(product.productId)}
+                                                disabled={!product.inStock || addingToCart[product.productId]}
+                                                style={{
+                                                    width: "100%",
+                                                    padding: "0.75rem",
+                                                    background: product.inStock && !addingToCart[product.productId]
+                                                        ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+                                                        : "#cbd5e0",
+                                                    color: "#fff",
+                                                    border: "none",
+                                                    borderRadius: "10px",
+                                                    fontWeight: 600,
+                                                    cursor: product.inStock && !addingToCart[product.productId] ? "pointer" : "not-allowed",
+                                                    transition: "all 0.2s",
+                                                    opacity: product.inStock && !addingToCart[product.productId] ? 1 : 0.6,
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    if (product.inStock && !addingToCart[product.productId]) {
+                                                        e.currentTarget.style.transform = "scale(1.02)";
+                                                    }
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    if (product.inStock && !addingToCart[product.productId]) {
+                                                        e.currentTarget.style.transform = "scale(1)";
+                                                    }
+                                                }}
+                                            >
+                                                {addingToCart[product.productId] ? "Adding..." : product.inStock ? "Add to Cart" : "Out of Stock"}
+                                            </button>
+                                        )}
+                                        {userRole === "PRODUCT_OWNER" && (
+                                            <div
+                                                style={{
+                                                    width: "100%",
+                                                    padding: "0.75rem",
+                                                    background: "#e2e8f0",
+                                                    color: "#4a5568",
+                                                    border: "none",
+                                                    borderRadius: "10px",
+                                                    fontWeight: 600,
+                                                    textAlign: "center",
+                                                    fontSize: "0.9rem",
+                                                }}
+                                            >
+                                                Product Owner View
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             ))}
