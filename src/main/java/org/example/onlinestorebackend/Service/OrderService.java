@@ -57,11 +57,15 @@ public class OrderService {
             OrderItem orderItem = new OrderItem();
             orderItem.setProductId(product.getProductId());
             orderItem.setQuantity(itemRequest.getQuantity());
-            orderItem.setPriceAtPurchase(product.getPrice());
+            // İndirimli fiyatı hesapla (price - discount)
+            BigDecimal finalPrice = product.getPrice().subtract(
+                product.getDiscount() != null ? product.getDiscount() : BigDecimal.ZERO
+            );
+            orderItem.setPriceAtPurchase(finalPrice);
 
             orderItems.add(orderItem);
 
-            BigDecimal itemTotal = product.getPrice().multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
+            BigDecimal itemTotal = finalPrice.multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
             totalPrice = totalPrice.add(itemTotal);
         }
 

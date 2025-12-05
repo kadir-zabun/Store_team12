@@ -7,7 +7,9 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.example.onlinestorebackend.Dto.PaymentRequestDto;
 import org.example.onlinestorebackend.Entity.Order;
+import org.example.onlinestorebackend.Entity.Product;
 import org.example.onlinestorebackend.Entity.User;
+import org.example.onlinestorebackend.Repository.ProductRepository;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
@@ -19,6 +21,8 @@ import java.time.format.DateTimeFormatter;
 @Service
 @RequiredArgsConstructor
 public class InvoiceService {
+
+    private final ProductRepository productRepository;
 
     public byte[] generateInvoicePdf(String invoiceId, Order order, User user, 
                                      BigDecimal totalAmount, LocalDateTime invoiceDate,
@@ -128,8 +132,14 @@ public class InvoiceService {
                         if (tableY < 100) {
                             break;
                         }
+                        // Product name'i ProductRepository'den çek
                         String itemName = "Product " + item.getProductId();
+                        Product product = productRepository.findById(item.getProductId()).orElse(null);
+                        if (product != null && product.getProductName() != null) {
+                            itemName = product.getProductName();
+                        }
                         String qty = String.valueOf(item.getQuantity());
+                        // Price zaten indirimli fiyat olmalı (cart'tan geldiği için)
                         String price = "$" + (item.getPrice() != null ? item.getPrice().toPlainString() : "0.00");
                         BigDecimal itemTotal = item.getPrice() != null 
                             ? item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()))
@@ -160,8 +170,14 @@ public class InvoiceService {
                         if (tableY < 100) {
                             break;
                         }
+                        // Product name'i ProductRepository'den çek
                         String itemName = "Product " + item.getProductId();
+                        Product product = productRepository.findById(item.getProductId()).orElse(null);
+                        if (product != null && product.getProductName() != null) {
+                            itemName = product.getProductName();
+                        }
                         String qty = String.valueOf(item.getQuantity());
+                        // priceAtPurchase zaten indirimli fiyat olmalı
                         String price = "$" + (item.getPriceAtPurchase() != null 
                             ? item.getPriceAtPurchase().toPlainString() 
                             : "0.00");

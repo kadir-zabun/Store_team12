@@ -36,8 +36,45 @@ public class ProductService {
 
     // Tüm ürünleri getir (pagination ile)
     public Page<ProductResponseDto> getAllProducts(Pageable pageable) {
-        Page<Product> products = productRepository.findAll(pageable);
-        return products.map(this::convertToDto);
+        String sortProperty = pageable.getSort().stream()
+                .findFirst()
+                .map(order -> order.getProperty())
+                .orElse("productName");
+        
+        // Eğer price sıralaması ise, finalPrice (price - discount) üzerinden sıralama yap
+        if ("price".equals(sortProperty)) {
+            // Tüm ürünleri çek, finalPrice'a göre sırala, sonra pagination yap
+            List<Product> allProducts = productRepository.findAll();
+            boolean isDescending = pageable.getSort().stream()
+                    .findFirst()
+                    .map(order -> order.isDescending())
+                    .orElse(false);
+            
+            allProducts.sort((a, b) -> {
+                BigDecimal finalPriceA = a.getPrice().subtract(a.getDiscount() != null ? a.getDiscount() : BigDecimal.ZERO);
+                BigDecimal finalPriceB = b.getPrice().subtract(b.getDiscount() != null ? b.getDiscount() : BigDecimal.ZERO);
+                int comparison = finalPriceA.compareTo(finalPriceB);
+                return isDescending ? -comparison : comparison;
+            });
+            
+            // Pagination uygula
+            int start = (int) pageable.getOffset();
+            int end = Math.min(start + pageable.getPageSize(), allProducts.size());
+            if (start >= end) {
+                return new PageImpl<>(Collections.emptyList(), pageable, allProducts.size());
+            }
+            
+            List<Product> pagedProducts = allProducts.subList(start, end);
+            List<ProductResponseDto> dtos = pagedProducts.stream()
+                    .map(this::convertToDto)
+                    .collect(Collectors.toList());
+            
+            return new PageImpl<>(dtos, pageable, allProducts.size());
+        } else {
+            // Diğer sıralamalar için normal pagination
+            Page<Product> products = productRepository.findAll(pageable);
+            return products.map(this::convertToDto);
+        }
     }
 
     // ID'ye göre ürün getir

@@ -13,6 +13,7 @@ import org.example.onlinestorebackend.Repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -76,11 +77,15 @@ public class CartService {
             item.setQuantity(newQuantity);
             item.calculateSubtotal();
         } else {
-            // Yeni item ekle
+            // Yeni item ekle - indirimli fiyat kullan
             CartItem newItem = new CartItem();
             newItem.setProductId(product.getProductId());
             newItem.setProductName(product.getProductName());
-            newItem.setPrice(product.getPrice());
+            // İndirimli fiyatı hesapla (price - discount)
+            BigDecimal finalPrice = product.getPrice().subtract(
+                product.getDiscount() != null ? product.getDiscount() : BigDecimal.ZERO
+            );
+            newItem.setPrice(finalPrice);
             newItem.setQuantity(quantity);
             newItem.calculateSubtotal();
 

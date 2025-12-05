@@ -195,7 +195,7 @@ export const formatProductForDisplay = (product) => {
         finalPrice: parseFloat(finalPrice),
         hasDiscount: product.discount > 0,
         discountPercentage: product.discount > 0 
-            ? Math.round((product.discount / product.price) * 100)
+            ? Math.min(99, Math.round((product.discount / product.price) * 100))
             : 0,
     };
 };

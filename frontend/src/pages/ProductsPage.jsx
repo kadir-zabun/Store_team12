@@ -121,7 +121,8 @@ export default function ProductsPage() {
                 }
                 // Otherwise, use normal pagination with sorting
                 else {
-                    const response = await productApi.getAllProducts(0, 100, sortBy, sortDir);
+                    // Backend'de sıralama yapılıyor, daha az ürün çek (performans için)
+                    const response = await productApi.getAllProducts(0, 200, sortBy, sortDir);
                     const apiResponse = response.data;
                     
                     if (apiResponse && apiResponse.data) {
