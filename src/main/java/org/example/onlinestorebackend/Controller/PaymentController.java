@@ -11,6 +11,7 @@ import org.example.onlinestorebackend.Repository.UserRepository;
 import org.example.onlinestorebackend.Service.InvoiceService;
 import org.example.onlinestorebackend.Service.MailService;
 import org.example.onlinestorebackend.Service.OrderService;
+import org.example.onlinestorebackend.exception.ResourceNotFoundException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,16 +31,43 @@ public class PaymentController {
     private final InvoiceService invoiceService;
     private final OrderService orderService;
 
-    // /api/payment/mock
     @PostMapping("/mock")
     public ResponseEntity<InvoiceResponseDto> mockPayment(@RequestBody PaymentRequestDto request) {
 
+        // 1) MOCK BANKA ONAYI (şimdilik hep success)
+        boolean paymentApproved = true;
+        if (!paymentApproved) {
+            throw new RuntimeException("Mock payment failed");
+        }
+
+        // 2) ORDER BUL / OLUŞTUR
+        Order order = null;
+
+        if (request.getOrderId() != null) {
+            try {
+                order = orderService.getOrderById(request.getOrderId());
+            } catch (ResourceNotFoundException e) {
+                order = null; // yoksa null bırak
+            }
+        } else if (request.getUserId() != null) {
+            // orderId yoksa sepete göre yeni order yarat
+            order = orderService.createOrderFromCart(request.getUserId());
+            request.setOrderId(order.getOrderId());
+        }
+
+        // 3) TOTAL HESABI (amount boşsa order.totalPrice kullan)
+        BigDecimal total;
+        if (request.getAmount() != null) {
+            total = request.getAmount();
+        } else if (order != null && order.getTotalPrice() != null) {
+            total = BigDecimal.valueOf(order.getTotalPrice());
+        } else {
+            total = BigDecimal.ZERO;
+        }
+
+        // 4) INVOICE ENTITY’Yİ KAYDET
         String invoiceId = UUID.randomUUID().toString();
         LocalDateTime now = LocalDateTime.now();
-
-        BigDecimal total = request.getAmount() != null
-                ? request.getAmount()
-                : BigDecimal.ZERO;
 
         Invoice invoiceEntity = new Invoice();
         invoiceEntity.setInvoiceId(invoiceId);
@@ -48,27 +76,20 @@ public class PaymentController {
         invoiceEntity.setPdfUrl(null);
         invoiceRepository.save(invoiceEntity);
 
+        // 5) USER + MAIL (PDF’li / PDFsiz)
         if (request.getUserId() != null) {
             Optional<User> userOpt = userRepository.findByUserId(request.getUserId());
             if (userOpt.isPresent()) {
                 User user = userOpt.get();
                 if (user.getEmail() != null && !user.getEmail().isBlank()) {
                     try {
-                        Order order = null;
-                        if (request.getOrderId() != null) {
-                            try {
-                                order = orderService.getOrderById(request.getOrderId());
-                            } catch (Exception e) {
-                                // Order not found, continue without it
-                            }
-                        }
-
-                        PaymentRequestDto.ItemDto[] itemsArray = request.getItems() != null
-                            ? request.getItems().toArray(new PaymentRequestDto.ItemDto[0])
-                            : new PaymentRequestDto.ItemDto[0];
+                        PaymentRequestDto.ItemDto[] itemsArray =
+                                request.getItems() != null
+                                        ? request.getItems().toArray(new PaymentRequestDto.ItemDto[0])
+                                        : new PaymentRequestDto.ItemDto[0];
 
                         byte[] pdfBytes = invoiceService.generateInvoicePdf(
-                            invoiceId, order, user, total, now, itemsArray
+                                invoiceId, order, user, total, now, itemsArray
                         );
 
                         System.out.println("PDF generated successfully, size: " + pdfBytes.length + " bytes");
@@ -76,11 +97,9 @@ public class PaymentController {
                         System.out.println("Invoice email sent to: " + user.getEmail());
                     } catch (Exception e) {
                         System.err.println("ERROR: Failed to generate or send invoice PDF");
-                        System.err.println("Error message: " + e.getMessage());
-                        System.err.println("Error class: " + e.getClass().getName());
                         e.printStackTrace();
-                        
-                        // Try to send email without PDF as fallback
+
+                        // fallback: PDFsiz mail
                         try {
                             System.out.println("Attempting to send email without PDF as fallback...");
                             mailService.sendInvoiceEmail(user.getEmail(), invoiceId, total, now);
@@ -93,7 +112,7 @@ public class PaymentController {
             }
         }
 
-        // Ekranda gösterilecek invoice DTO
+        // 6) EKRANDA GÖSTERİLECEK DTO
         InvoiceResponseDto invoice = new InvoiceResponseDto(
                 invoiceId,
                 now,

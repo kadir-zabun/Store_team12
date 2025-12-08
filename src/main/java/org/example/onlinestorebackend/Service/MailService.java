@@ -6,7 +6,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 
-import java.io.ByteArrayInputStream;
 import java.lang.reflect.Method;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -53,15 +52,15 @@ public class MailService {
         if (mailSender != null) {
             try {
                 log.info("Attempting to send password reset email to: {}", email);
-                
+
                 Class<?> simpleMailMessageClass = Class.forName("org.springframework.mail.SimpleMailMessage");
                 Object msg = simpleMailMessageClass.getDeclaredConstructor().newInstance();
-                
+
                 Method setFrom = simpleMailMessageClass.getMethod("setFrom", String.class);
                 Method setTo = simpleMailMessageClass.getMethod("setTo", String.class);
                 Method setSubject = simpleMailMessageClass.getMethod("setSubject", String.class);
                 Method setText = simpleMailMessageClass.getMethod("setText", String.class);
-                
+
                 String fromEmail = mailFrom != null && !mailFrom.isEmpty() ? mailFrom : "noreply@teknosu.com";
                 setFrom.invoke(msg, fromEmail);
                 setTo.invoke(msg, email);
@@ -73,12 +72,12 @@ public class MailService {
                         "This link will expire in 1 hour.\n\n" +
                         "If you didn't request this, please ignore this email.\n\n" +
                         "Best regards,\nTeknoSU Team");
-                
+
                 log.info("Sending email via JavaMailSender...");
                 Class<?> mailSenderInterface = Class.forName("org.springframework.mail.javamail.JavaMailSender");
                 Method sendMethod = mailSenderInterface.getMethod("send", simpleMailMessageClass);
                 sendMethod.invoke(mailSender, msg);
-                
+
                 log.info("Password reset email sent successfully to: {}", email);
             } catch (Exception e) {
                 log.error("Failed to send email to {}: {}", email, e.getMessage());
@@ -91,7 +90,7 @@ public class MailService {
         } else {
             log.warn("JavaMailSender not configured. Password reset link for {} -> {}", email, link);
         }
-        
+
         return link;
     }
 
@@ -122,14 +121,14 @@ public class MailService {
 
             StringBuilder body = new StringBuilder();
             body.append("Hello,\n\n")
-                .append("Thank you for your payment. Here is your invoice information:\n\n")
-                .append("Invoice ID: ").append(invoiceId).append("\n")
-                .append("Amount: $").append(amount != null ? amount.toPlainString() : "0").append("\n");
+                    .append("Thank you for your payment. Here is your invoice information:\n\n")
+                    .append("Invoice ID: ").append(invoiceId).append("\n")
+                    .append("Amount: $").append(amount != null ? amount.toPlainString() : "0").append("\n");
             if (invoiceDate != null) {
                 body.append("Date: ").append(invoiceDate).append("\n");
             }
             body.append("\n")
-                .append("Best regards,\nTeknoSU Team");
+                    .append("Best regards,\nTeknoSU Team");
 
             setText.invoke(msg, body.toString());
 
@@ -146,10 +145,10 @@ public class MailService {
     }
 
     public void sendInvoiceEmailWithPdf(String email,
-                                       String invoiceId,
-                                       java.math.BigDecimal amount,
-                                       java.time.LocalDateTime invoiceDate,
-                                       byte[] pdfBytes) {
+                                        String invoiceId,
+                                        java.math.BigDecimal amount,
+                                        java.time.LocalDateTime invoiceDate,
+                                        byte[] pdfBytes) {
         if (mailSender == null) {
             log.error("JavaMailSender not configured. Cannot send invoice email to: {}", email);
             log.error("Check if MAIL_USERNAME and MAIL_PASSWORD environment variables are set");
@@ -169,10 +168,12 @@ public class MailService {
             Class<?> mimeMessageHelperClass = Class.forName("org.springframework.mail.javamail.MimeMessageHelper");
             Class<?> mimeMessageClass = Class.forName("jakarta.mail.internet.MimeMessage");
             Class<?> mailSenderInterface = Class.forName("org.springframework.mail.javamail.JavaMailSender");
-            
+            Class<?> inputStreamSourceClass = Class.forName("org.springframework.core.io.InputStreamSource");
+            Class<?> byteArrayResourceClass = Class.forName("org.springframework.core.io.ByteArrayResource");
+
             Method createMimeMessageMethod = mailSenderInterface.getMethod("createMimeMessage");
             Object mimeMessage = createMimeMessageMethod.invoke(mailSender);
-            
+
             Object helper = mimeMessageHelperClass.getConstructor(mimeMessageClass, boolean.class)
                     .newInstance(mimeMessage, true);
 
@@ -181,7 +182,6 @@ public class MailService {
             Method setTo = mimeMessageHelperClass.getMethod("setTo", String.class);
             Method setSubject = mimeMessageHelperClass.getMethod("setSubject", String.class);
             Method setText = mimeMessageHelperClass.getMethod("setText", String.class, boolean.class);
-            Class<?> inputStreamSourceClass = Class.forName("org.springframework.core.io.InputStreamSource");
             Method addAttachment = mimeMessageHelperClass.getMethod("addAttachment", String.class, inputStreamSourceClass);
 
             setFrom.invoke(helper, fromEmail);
@@ -190,18 +190,22 @@ public class MailService {
 
             StringBuilder body = new StringBuilder();
             body.append("Hello,\n\n")
-                .append("Thank you for your payment. Please find your invoice attached.\n\n")
-                .append("Invoice ID: ").append(invoiceId).append("\n")
-                .append("Amount: $").append(amount != null ? amount.toPlainString() : "0").append("\n");
+                    .append("Thank you for your payment. Please find your invoice attached.\n\n")
+                    .append("Invoice ID: ").append(invoiceId).append("\n")
+                    .append("Amount: $").append(amount != null ? amount.toPlainString() : "0").append("\n");
             if (invoiceDate != null) {
                 body.append("Date: ").append(invoiceDate).append("\n");
             }
             body.append("\n")
-                .append("Best regards,\nTeknoSU Team");
+                    .append("Best regards,\nTeknoSU Team");
 
             setText.invoke(helper, body.toString(), false);
 
-            Object pdfSource = new ByteArrayInputStream(pdfBytes);
+            // ÖNEMLİ: ByteArrayResource kullan (InputStreamSource implement ediyor)
+            Object pdfSource = byteArrayResourceClass
+                    .getConstructor(byte[].class)
+                    .newInstance(pdfBytes);
+
             addAttachment.invoke(helper, "invoice_" + invoiceId + ".pdf", pdfSource);
 
             Method sendMethod = mailSenderInterface.getMethod("send", mimeMessageClass);
@@ -215,8 +219,8 @@ public class MailService {
                 log.error("Caused by: {}", e.getCause().getMessage());
             }
             log.error("Exception details: ", e);
-            
-            // Fallback: try to send email without PDF
+
+            // Fallback: PDFsiz mail
             log.info("Attempting to send email without PDF as fallback...");
             try {
                 sendInvoiceEmail(email, invoiceId, amount, invoiceDate);

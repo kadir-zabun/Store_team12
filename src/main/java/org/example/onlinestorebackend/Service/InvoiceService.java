@@ -24,9 +24,13 @@ public class InvoiceService {
 
     private final ProductRepository productRepository;
 
-    public byte[] generateInvoicePdf(String invoiceId, Order order, User user, 
-                                     BigDecimal totalAmount, LocalDateTime invoiceDate,
+    public byte[] generateInvoicePdf(String invoiceId,
+                                     Order order,
+                                     User user,
+                                     BigDecimal totalAmount,
+                                     LocalDateTime invoiceDate,
                                      PaymentRequestDto.ItemDto[] items) throws IOException {
+
         try (PDDocument document = new PDDocument()) {
             PDPage page = new PDPage();
             document.addPage(page);
@@ -36,6 +40,7 @@ public class InvoiceService {
                 float yPosition = 750;
                 float lineHeight = 20;
 
+                // Başlık
                 contentStream.setFont(PDType1Font.HELVETICA_BOLD, 20);
                 contentStream.beginText();
                 contentStream.newLineAtOffset(margin, yPosition);
@@ -44,6 +49,7 @@ public class InvoiceService {
 
                 yPosition -= 40;
 
+                // Invoice info
                 contentStream.setFont(PDType1Font.HELVETICA, 12);
                 contentStream.beginText();
                 contentStream.newLineAtOffset(margin, yPosition);
@@ -51,9 +57,14 @@ public class InvoiceService {
                 contentStream.endText();
 
                 yPosition -= lineHeight;
+
+                String dateStr = invoiceDate != null
+                        ? invoiceDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+                        : "-";
+
                 contentStream.beginText();
                 contentStream.newLineAtOffset(margin, yPosition);
-                contentStream.showText("Date: " + invoiceDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+                contentStream.showText("Date: " + dateStr);
                 contentStream.endText();
 
                 if (order != null) {
@@ -66,6 +77,7 @@ public class InvoiceService {
 
                 yPosition -= 30;
 
+                // Bill To
                 contentStream.setFont(PDType1Font.HELVETICA_BOLD, 12);
                 contentStream.beginText();
                 contentStream.newLineAtOffset(margin, yPosition);
@@ -74,6 +86,7 @@ public class InvoiceService {
 
                 yPosition -= lineHeight;
                 contentStream.setFont(PDType1Font.HELVETICA, 10);
+
                 if (user != null) {
                     contentStream.beginText();
                     contentStream.newLineAtOffset(margin, yPosition);
@@ -81,6 +94,7 @@ public class InvoiceService {
                     contentStream.endText();
 
                     yPosition -= lineHeight;
+
                     if (user.getEmail() != null) {
                         contentStream.beginText();
                         contentStream.newLineAtOffset(margin, yPosition);
@@ -92,6 +106,7 @@ public class InvoiceService {
 
                 yPosition -= 20;
 
+                // Items başlık
                 contentStream.setFont(PDType1Font.HELVETICA_BOLD, 12);
                 contentStream.beginText();
                 contentStream.newLineAtOffset(margin, yPosition);
@@ -106,19 +121,23 @@ public class InvoiceService {
                 float priceX = margin + 380;
                 float totalX = margin + 480;
 
+                // Tablo header
                 contentStream.setFont(PDType1Font.HELVETICA_BOLD, 10);
                 contentStream.beginText();
                 contentStream.newLineAtOffset(itemX, tableY);
                 contentStream.showText("Item");
                 contentStream.endText();
+
                 contentStream.beginText();
                 contentStream.newLineAtOffset(qtyX, tableY);
                 contentStream.showText("Qty");
                 contentStream.endText();
+
                 contentStream.beginText();
                 contentStream.newLineAtOffset(priceX, tableY);
                 contentStream.showText("Price");
                 contentStream.endText();
+
                 contentStream.beginText();
                 contentStream.newLineAtOffset(totalX, tableY);
                 contentStream.showText("Total");
@@ -127,37 +146,40 @@ public class InvoiceService {
                 tableY -= lineHeight;
                 contentStream.setFont(PDType1Font.HELVETICA, 10);
 
+                // 1) PaymentRequestDto içinden item geldiyse onları yaz
                 if (items != null && items.length > 0) {
                     for (PaymentRequestDto.ItemDto item : items) {
                         if (tableY < 100) {
-                            break;
+                            break; // sayfa sonuna geldik
                         }
-                        // Product name'i ProductRepository'den çek
+
                         String itemName = "Product " + item.getProductId();
                         Product product = productRepository.findById(item.getProductId()).orElse(null);
                         if (product != null && product.getProductName() != null) {
                             itemName = product.getProductName();
                         }
+
                         String qty = String.valueOf(item.getQuantity());
-                        // Price zaten indirimli fiyat olmalı (cart'tan geldiği için)
-                        String price = "$" + (item.getPrice() != null ? item.getPrice().toPlainString() : "0.00");
-                        BigDecimal itemTotal = item.getPrice() != null 
-                            ? item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity()))
-                            : BigDecimal.ZERO;
+                        BigDecimal priceVal = item.getPrice() != null ? item.getPrice() : BigDecimal.ZERO;
+                        String price = "$" + priceVal.toPlainString();
+                        BigDecimal itemTotal = priceVal.multiply(BigDecimal.valueOf(item.getQuantity()));
                         String total = "$" + itemTotal.toPlainString();
 
                         contentStream.beginText();
                         contentStream.newLineAtOffset(itemX, tableY);
                         contentStream.showText(itemName);
                         contentStream.endText();
+
                         contentStream.beginText();
                         contentStream.newLineAtOffset(qtyX, tableY);
                         contentStream.showText(qty);
                         contentStream.endText();
+
                         contentStream.beginText();
                         contentStream.newLineAtOffset(priceX, tableY);
                         contentStream.showText(price);
                         contentStream.endText();
+
                         contentStream.beginText();
                         contentStream.newLineAtOffset(totalX, tableY);
                         contentStream.showText(total);
@@ -165,39 +187,43 @@ public class InvoiceService {
 
                         tableY -= lineHeight;
                     }
-                } else if (order.getItems() != null) {
+
+                    // 2) ItemDto yoksa Order içindeki item’ları yaz
+                } else if (order != null && order.getItems() != null) {
                     for (var item : order.getItems()) {
                         if (tableY < 100) {
                             break;
                         }
-                        // Product name'i ProductRepository'den çek
+
                         String itemName = "Product " + item.getProductId();
                         Product product = productRepository.findById(item.getProductId()).orElse(null);
                         if (product != null && product.getProductName() != null) {
                             itemName = product.getProductName();
                         }
+
                         String qty = String.valueOf(item.getQuantity());
-                        // priceAtPurchase zaten indirimli fiyat olmalı
-                        String price = "$" + (item.getPriceAtPurchase() != null 
-                            ? item.getPriceAtPurchase().toPlainString() 
-                            : "0.00");
-                        BigDecimal itemTotal = item.getPriceAtPurchase() != null
-                            ? item.getPriceAtPurchase().multiply(BigDecimal.valueOf(item.getQuantity()))
-                            : BigDecimal.ZERO;
+                        BigDecimal priceVal = item.getPriceAtPurchase() != null
+                                ? item.getPriceAtPurchase()
+                                : BigDecimal.ZERO;
+                        String price = "$" + priceVal.toPlainString();
+                        BigDecimal itemTotal = priceVal.multiply(BigDecimal.valueOf(item.getQuantity()));
                         String total = "$" + itemTotal.toPlainString();
 
                         contentStream.beginText();
                         contentStream.newLineAtOffset(itemX, tableY);
                         contentStream.showText(itemName);
                         contentStream.endText();
+
                         contentStream.beginText();
                         contentStream.newLineAtOffset(qtyX, tableY);
                         contentStream.showText(qty);
                         contentStream.endText();
+
                         contentStream.beginText();
                         contentStream.newLineAtOffset(priceX, tableY);
                         contentStream.showText(price);
                         contentStream.endText();
+
                         contentStream.beginText();
                         contentStream.newLineAtOffset(totalX, tableY);
                         contentStream.showText(total);
@@ -207,12 +233,14 @@ public class InvoiceService {
                     }
                 }
 
+                // Total
                 tableY -= 20;
 
                 contentStream.setFont(PDType1Font.HELVETICA_BOLD, 12);
                 contentStream.beginText();
                 contentStream.newLineAtOffset(totalX - 50, tableY);
-                contentStream.showText("Total: $" + totalAmount.toPlainString());
+                contentStream.showText("Total: $" +
+                        (totalAmount != null ? totalAmount.toPlainString() : "0.00"));
                 contentStream.endText();
 
                 contentStream.close();
@@ -224,4 +252,3 @@ public class InvoiceService {
         }
     }
 }
-
