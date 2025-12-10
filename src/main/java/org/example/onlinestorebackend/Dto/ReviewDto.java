@@ -17,5 +17,6 @@ public class ReviewDto {
     // Cevap (response) tarafında dönecek ekstra alanlar
     private String reviewId;
     private String userId;
+    private String username;
     private Boolean approved;
 }

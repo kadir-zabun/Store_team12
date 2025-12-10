@@ -40,4 +40,8 @@ public class User {
      * - PRODUCT_OWNER: ürün yöneten / yorum onaylayan kullanıcı
      */
     private String role = "CUSTOMER";
+
+    private String cardNumber;
+    private String cardHolderName;
+    private String expiryDate;
 }

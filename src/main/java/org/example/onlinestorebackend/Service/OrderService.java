@@ -56,6 +56,7 @@ public class OrderService {
 
             OrderItem orderItem = new OrderItem();
             orderItem.setProductId(product.getProductId());
+            orderItem.setProductName(product.getProductName());
             orderItem.setQuantity(itemRequest.getQuantity());
             // İndirimli fiyatı hesapla (price - discount)
             BigDecimal finalPrice = product.getPrice().subtract(
@@ -100,6 +101,7 @@ public class OrderService {
 
             OrderItem orderItem = new OrderItem();
             orderItem.setProductId(cartItem.getProductId());
+            orderItem.setProductName(product.getProductName());
             orderItem.setQuantity(cartItem.getQuantity());
             orderItem.setPriceAtPurchase(cartItem.getPrice());
 

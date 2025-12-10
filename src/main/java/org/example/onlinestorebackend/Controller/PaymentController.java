@@ -12,7 +12,11 @@ import org.example.onlinestorebackend.Service.InvoiceService;
 import org.example.onlinestorebackend.Service.MailService;
 import org.example.onlinestorebackend.Service.OrderService;
 import org.example.onlinestorebackend.exception.ResourceNotFoundException;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -65,7 +69,29 @@ public class PaymentController {
             total = BigDecimal.ZERO;
         }
 
-        // 4) INVOICE ENTITY’Yİ KAYDET
+        // 4) KART BİLGİLERİNİ KAYDET (eğer saveCard true ise)
+        if (request.getSaveCard() != null && request.getSaveCard() && request.getUserId() != null) {
+            try {
+                Optional<User> userOpt = userRepository.findByUserId(request.getUserId());
+                if (userOpt.isPresent()) {
+                    User user = userOpt.get();
+                    if (request.getCardNumber() != null && !request.getCardNumber().trim().isEmpty()) {
+                        user.setCardNumber(request.getCardNumber());
+                    }
+                    if (request.getCardHolderName() != null && !request.getCardHolderName().trim().isEmpty()) {
+                        user.setCardHolderName(request.getCardHolderName());
+                    }
+                    if (request.getExpiryDate() != null && !request.getExpiryDate().trim().isEmpty()) {
+                        user.setExpiryDate(request.getExpiryDate());
+                    }
+                    userRepository.save(user);
+                }
+            } catch (Exception e) {
+                System.err.println("Failed to save card information: " + e.getMessage());
+            }
+        }
+
+        // 5) INVOICE ENTITY'Yİ KAYDET
         String invoiceId = UUID.randomUUID().toString();
         LocalDateTime now = LocalDateTime.now();
 
@@ -76,7 +102,7 @@ public class PaymentController {
         invoiceEntity.setPdfUrl(null);
         invoiceRepository.save(invoiceEntity);
 
-        // 5) USER + MAIL (PDF’li / PDFsiz)
+        // 6) USER + MAIL (PDF'li / PDFsiz)
         if (request.getUserId() != null) {
             Optional<User> userOpt = userRepository.findByUserId(request.getUserId());
             if (userOpt.isPresent()) {
@@ -112,7 +138,7 @@ public class PaymentController {
             }
         }
 
-        // 6) EKRANDA GÖSTERİLECEK DTO
+        // 7) EKRANDA GÖSTERİLECEK DTO
         InvoiceResponseDto invoice = new InvoiceResponseDto(
                 invoiceId,
                 now,
@@ -121,5 +147,64 @@ public class PaymentController {
         );
 
         return ResponseEntity.ok(invoice);
+    }
+
+    @GetMapping("/invoice/{orderId}/pdf")
+    public ResponseEntity<byte[]> getInvoicePdf(@PathVariable String orderId,
+                                                @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            Order order = orderService.getOrderById(orderId);
+            
+            String username = userDetails != null ? userDetails.getUsername() : null;
+            if (username == null) {
+                return ResponseEntity.status(401).build();
+            }
+            
+            String userId = orderService.getUserIdByUsername(username);
+            
+            if (!order.getCustomerId().equals(userId)) {
+                return ResponseEntity.status(403).build();
+            }
+            
+            Optional<Invoice> invoiceOpt = Optional.ofNullable(invoiceRepository.findByOrderId(orderId));
+            String invoiceId = invoiceOpt.map(Invoice::getInvoiceId).orElse(orderId);
+            LocalDateTime invoiceDate = invoiceOpt.map(Invoice::getInvoiceDate).orElse(order.getOrderDate());
+            
+            Optional<User> userOpt = userRepository.findByUserId(userId);
+            if (userOpt.isEmpty()) {
+                return ResponseEntity.status(404).build();
+            }
+            
+            User user = userOpt.get();
+            BigDecimal totalAmount = BigDecimal.valueOf(order.getTotalPrice() != null ? order.getTotalPrice() : 0);
+            
+            PaymentRequestDto.ItemDto[] itemsArray = order.getItems().stream()
+                    .map(item -> {
+                        PaymentRequestDto.ItemDto dto = new PaymentRequestDto.ItemDto();
+                        dto.setProductId(item.getProductId());
+                        dto.setQuantity(item.getQuantity());
+                        dto.setPrice(item.getPriceAtPurchase());
+                        return dto;
+                    })
+                    .toArray(PaymentRequestDto.ItemDto[]::new);
+            
+            byte[] pdfBytes = invoiceService.generateInvoicePdf(
+                    invoiceId, order, user, totalAmount, invoiceDate, itemsArray
+            );
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("inline", "invoice_" + invoiceId + ".pdf");
+            headers.setContentLength(pdfBytes.length);
+            
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(pdfBytes);
+                    
+        } catch (Exception e) {
+            System.err.println("Error generating PDF: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
+        }
     }
 }

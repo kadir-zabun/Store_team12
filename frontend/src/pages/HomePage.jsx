@@ -387,7 +387,7 @@ export default function HomePage() {
                                             }}
                                             onMouseLeave={(e) => {
                                                 e.currentTarget.style.background = "#fff";
-                                            }}
+                                        }}
                                         >
                                             <span>📊</span>
                                             <span>Dashboard</span>

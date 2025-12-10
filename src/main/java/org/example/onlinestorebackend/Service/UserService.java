@@ -141,4 +141,28 @@ public class UserService {
                 })
                 .collect(java.util.stream.Collectors.toList());
     }
+
+    public void saveCardInfo(String username, org.example.onlinestorebackend.Controller.UserController.CardInfoDto cardInfo) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found: " + username));
+        
+        user.setCardNumber(cardInfo.getCardNumber());
+        user.setCardHolderName(cardInfo.getCardHolderName());
+        user.setExpiryDate(cardInfo.getExpiryDate());
+        
+        userRepository.save(user);
+    }
+
+    public org.example.onlinestorebackend.Controller.UserController.CardInfoDto getCardInfo(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found: " + username));
+        
+        org.example.onlinestorebackend.Controller.UserController.CardInfoDto cardInfo = 
+                new org.example.onlinestorebackend.Controller.UserController.CardInfoDto();
+        cardInfo.setCardNumber(user.getCardNumber());
+        cardInfo.setCardHolderName(user.getCardHolderName());
+        cardInfo.setExpiryDate(user.getExpiryDate());
+        
+        return cardInfo;
+    }
 }

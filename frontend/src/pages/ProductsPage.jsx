@@ -213,9 +213,9 @@ export default function ProductsPage() {
     };
 
     const handleAddToCart = async (productId) => {
-        // Only CUSTOMER can add to cart
-        if (userRole !== "CUSTOMER") {
-            showError("Only customers can add products to cart.");
+        // PRODUCT_OWNER cannot add to cart
+        if (userRole === "PRODUCT_OWNER") {
+            showError("Product owners cannot add products to cart.");
             return;
         }
 
@@ -243,7 +243,8 @@ export default function ProductsPage() {
                     1
                 );
                 window.dispatchEvent(new Event("cartUpdated"));
-                showSuccess("Product added to cart! Login to sync with your account.");
+                refreshCartCount();
+                showSuccess("Product added to cart! Please login to checkout.");
             }
         } catch (err) {
             console.error("Error adding to cart:", err);
@@ -320,7 +321,7 @@ export default function ProductsPage() {
                         >
                             Products
                         </Link>
-                        {userRole === "CUSTOMER" && (
+                        {userRole !== "PRODUCT_OWNER" && (
                             <Link
                                 to="/cart"
                                 style={{
@@ -432,7 +433,7 @@ export default function ProductsPage() {
                                         zIndex: 1000,
                                     }}
                                 >
-                                    {userRole === "CUSTOMER" && (
+                                    {userRole !== "PRODUCT_OWNER" && (
                                         <Link
                                             to="/cart"
                                             onClick={() => setShowDropdown(false)}
@@ -873,7 +874,7 @@ export default function ProductsPage() {
                                         >
                                             {product.inStock ? `✓ In Stock (${product.quantity})` : "✗ Out of Stock"}
                                         </div>
-                                        {userRole === "CUSTOMER" && (
+                                        {userRole !== "PRODUCT_OWNER" && (
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();

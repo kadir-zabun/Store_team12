@@ -17,10 +17,16 @@ public class PaymentRequestDto {
     private BigDecimal amount;
     private List<ItemDto> items;
 
+    private String cardNumber;
+    private String cardHolderName;
+    private String expiryDate;
+    private String cvv;
+    private Boolean saveCard;
+
     @Data
     public static class ItemDto {
         private String productId;
         private Integer quantity;
-        private BigDecimal price;   // istersen frontend doldurur, istersen boş bırak
+        private BigDecimal price;
     }
 }

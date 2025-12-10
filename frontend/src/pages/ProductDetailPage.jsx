@@ -43,6 +43,7 @@ export default function ProductDetailPage() {
                 }
 
                 setProduct(productData);
+                console.log("Loaded reviews:", reviewsData);
                 setReviews(Array.isArray(reviewsData) ? reviewsData : []);
             } catch (error) {
                 console.error("Error loading product:", error);
@@ -345,7 +346,9 @@ export default function ProductDetailPage() {
                             </div>
                         ) : (
                             <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-                                {reviews.map((review, index) => (
+                                {reviews.map((review, index) => {
+                                    console.log("Review:", review, "Username:", review.username);
+                                    return (
                                     <div
                                         key={review.reviewId || index}
                                         style={{
@@ -355,14 +358,25 @@ export default function ProductDetailPage() {
                                             border: "1px solid #e2e8f0",
                                         }}
                                     >
-                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-                                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                                <span style={{ fontSize: "1.1rem", fontWeight: 600, color: "#d69e2e" }}>
-                                                    {"⭐".repeat(review.rating || 0)}
-                                                </span>
-                                                <span style={{ fontSize: "0.9rem", color: "#718096" }}>
-                                                    {review.rating}/10
-                                                </span>
+                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
+                                            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                                                {review.username ? (
+                                                    <div style={{ fontSize: "1rem", fontWeight: 600, color: "#2d3748" }}>
+                                                        {review.username}
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ fontSize: "0.9rem", color: "#718096", fontStyle: "italic" }}>
+                                                        Anonymous
+                                                    </div>
+                                                )}
+                                                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                                    <span style={{ fontSize: "1.1rem", fontWeight: 600, color: "#d69e2e" }}>
+                                                        {"⭐".repeat(review.rating || 0)}
+                                                    </span>
+                                                    <span style={{ fontSize: "0.9rem", color: "#718096" }}>
+                                                        {review.rating}/10
+                                                    </span>
+                                                </div>
                                             </div>
                                             {review.createdAt && (
                                                 <span style={{ fontSize: "0.9rem", color: "#718096" }}>
@@ -376,7 +390,8 @@ export default function ProductDetailPage() {
                                             </p>
                                         )}
                                     </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>

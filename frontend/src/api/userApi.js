@@ -21,6 +21,12 @@ const userApi = {
 
     getMyReviews: () =>
         axiosClient.get("/api/users/my-reviews"),
+
+    saveCard: (cardInfo) =>
+        axiosClient.post("/api/users/save-card", cardInfo),
+
+    getMyCard: () =>
+        axiosClient.get("/api/users/my-card"),
 };
 
 export default userApi;
