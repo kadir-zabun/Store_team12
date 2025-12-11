@@ -25,4 +25,8 @@ public class ProductResponseDto {
     private List<String> categoryIds;
     private List<String> categoryNames;
     private Integer popularity;
+    private String model;
+    private String serialNumber;
+    private String warrantyStatus;
+    private String distributionInfo;
 }

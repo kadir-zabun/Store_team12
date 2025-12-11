@@ -1,5 +1,6 @@
 package org.example.onlinestorebackend.Controller;
 
+import lombok.Data;
 import org.example.onlinestorebackend.Dto.ReviewDto;
 import org.example.onlinestorebackend.Entity.User;
 import org.example.onlinestorebackend.Service.UserService;
@@ -86,5 +87,30 @@ public class UserController {
 
         List<ReviewDto> reviews = userService.getUserReviews(authentication.getName());
         return ResponseEntity.ok(reviews);
+    }
+
+    @PostMapping("/save-card")
+    public ResponseEntity<String> saveCard(@RequestBody CardInfoDto cardInfo, Authentication authentication) {
+        if (authentication == null || authentication.getName() == null)
+            throw new IllegalArgumentException("Auth missing");
+
+        userService.saveCardInfo(authentication.getName(), cardInfo);
+        return ResponseEntity.ok("Card information saved successfully");
+    }
+
+    @GetMapping("/my-card")
+    public ResponseEntity<CardInfoDto> getMyCard(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null)
+            throw new IllegalArgumentException("Auth missing");
+
+        CardInfoDto cardInfo = userService.getCardInfo(authentication.getName());
+        return ResponseEntity.ok(cardInfo);
+    }
+
+    @Data
+    public static class CardInfoDto {
+        private String cardNumber;
+        private String cardHolderName;
+        private String expiryDate;
     }
 }

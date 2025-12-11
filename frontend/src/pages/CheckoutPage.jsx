@@ -21,6 +21,14 @@ export default function CheckoutPage() {
         zipCode: "",
         phone: "",
     });
+    const [paymentInfo, setPaymentInfo] = useState({
+        cardNumber: "",
+        cardHolderName: "",
+        expiryDate: "",
+        cvv: "",
+        saveCard: false,
+    });
+    const [savedCard, setSavedCard] = useState(null);
     const navigate = useNavigate();
     const { refreshCartCount } = useCartCount();
     const { success: showSuccess, error: showError } = useToast();
@@ -78,6 +86,24 @@ export default function CheckoutPage() {
                             const userId = userIdResponse.data || userIdResponse.data?.data;
                             console.log("Got userId from API:", userId);
                             setUserId(userId || username); // Fallback to username if userId not found
+                            
+                            // Load saved card information
+                            try {
+                                const cardResponse = await userApi.getMyCard();
+                                const cardData = cardResponse.data?.data || cardResponse.data;
+                                if (cardData && cardData.cardNumber) {
+                                    setSavedCard(cardData);
+                                    setPaymentInfo({
+                                        cardNumber: cardData.cardNumber || "",
+                                        cardHolderName: cardData.cardHolderName || "",
+                                        expiryDate: cardData.expiryDate || "",
+                                        cvv: "",
+                                        saveCard: false,
+                                    });
+                                }
+                            } catch (e) {
+                                console.log("No saved card found or error loading card:", e);
+                            }
                         } catch (e) {
                             console.warn("Could not get userId, using username as fallback:", e);
                             setUserId(username);
@@ -122,6 +148,11 @@ export default function CheckoutPage() {
 
         if (!shippingInfo.fullName || !shippingInfo.address || !shippingInfo.city || !shippingInfo.zipCode || !shippingInfo.phone) {
             showError("Please fill in all shipping information.");
+            return;
+        }
+
+        if (!paymentInfo.cardNumber || !paymentInfo.cardHolderName || !paymentInfo.expiryDate || !paymentInfo.cvv) {
+            showError("Please fill in all payment information.");
             return;
         }
 
@@ -228,6 +259,11 @@ export default function CheckoutPage() {
                     quantity: item.quantity,
                     price: item.price || (item.subtotal ? item.subtotal / item.quantity : 0),
                 })),
+                cardNumber: paymentInfo.cardNumber,
+                cardHolderName: paymentInfo.cardHolderName,
+                expiryDate: paymentInfo.expiryDate,
+                cvv: paymentInfo.cvv,
+                saveCard: paymentInfo.saveCard,
             };
 
             console.log("Processing payment:", paymentData);
@@ -300,18 +336,64 @@ export default function CheckoutPage() {
 
     if (loading) {
         return (
-            <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <div style={{ color: "#fff", fontSize: "1.5rem" }}>Loading...</div>
+            <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", padding: "2rem" }}>
+                <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
+                    <div style={{ marginBottom: "1.5rem" }}>
+                        <Link 
+                            to="/cart" 
+                            style={{ 
+                                display: "inline-flex", 
+                                alignItems: "center", 
+                                gap: "0.5rem", 
+                                color: "#fff", 
+                                textDecoration: "none", 
+                                fontSize: "1rem",
+                                fontWeight: 500,
+                                padding: "0.5rem 1rem",
+                                borderRadius: "8px",
+                                background: "rgba(255, 255, 255, 0.2)",
+                            }}
+                        >
+                            ← Back to Cart
+                        </Link>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+                        <div style={{ color: "#fff", fontSize: "1.5rem" }}>Loading...</div>
+                    </div>
+                </div>
             </div>
         );
     }
 
     if (!cart || !Array.isArray(cart.items) || cart.items.length === 0) {
         return (
-            <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <div style={{ background: "rgba(255, 255, 255, 0.95)", padding: "2rem", borderRadius: "20px", textAlign: "center" }}>
-                    <h2 style={{ marginBottom: "1rem" }}>Your cart is empty</h2>
-                    <Link to="/products" style={{ color: "#667eea", textDecoration: "none", fontWeight: 600 }}>Continue Shopping</Link>
+            <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", padding: "2rem" }}>
+                <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
+                    <div style={{ marginBottom: "1.5rem" }}>
+                        <Link 
+                            to="/cart" 
+                            style={{ 
+                                display: "inline-flex", 
+                                alignItems: "center", 
+                                gap: "0.5rem", 
+                                color: "#fff", 
+                                textDecoration: "none", 
+                                fontSize: "1rem",
+                                fontWeight: 500,
+                                padding: "0.5rem 1rem",
+                                borderRadius: "8px",
+                                background: "rgba(255, 255, 255, 0.2)",
+                            }}
+                        >
+                            ← Back to Cart
+                        </Link>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+                        <div style={{ background: "rgba(255, 255, 255, 0.95)", padding: "2rem", borderRadius: "20px", textAlign: "center" }}>
+                            <h2 style={{ marginBottom: "1rem" }}>Your cart is empty</h2>
+                            <Link to="/products" style={{ color: "#667eea", textDecoration: "none", fontWeight: 600 }}>Continue Shopping</Link>
+                        </div>
+                    </div>
                 </div>
             </div>
         );
@@ -319,10 +401,59 @@ export default function CheckoutPage() {
 
     const totalPrice = cart.totalPrice || cart.items.reduce((sum, item) => sum + (item.subtotal || item.price * item.quantity), 0);
 
+    const formatCardNumber = (value) => {
+        const v = value.replace(/\s+/g, "").replace(/[^0-9]/gi, "");
+        const matches = v.match(/\d{4,16}/g);
+        const match = (matches && matches[0]) || "";
+        const parts = [];
+        for (let i = 0, len = match.length; i < len; i += 4) {
+            parts.push(match.substring(i, i + 4));
+        }
+        if (parts.length) {
+            return parts.join(" ");
+        } else {
+            return v;
+        }
+    };
+
+    const formatExpiryDate = (value) => {
+        const v = value.replace(/\s+/g, "").replace(/[^0-9]/gi, "");
+        if (v.length >= 2) {
+            return v.substring(0, 2) + "/" + v.substring(2, 4);
+        }
+        return v;
+    };
+
     return (
         <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", padding: "2rem" }}>
-            <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2rem", marginBottom: "2rem" }}>
+            <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
+                <div style={{ marginBottom: "1.5rem" }}>
+                    <Link 
+                        to="/cart" 
+                        style={{ 
+                            display: "inline-flex", 
+                            alignItems: "center", 
+                            gap: "0.5rem", 
+                            color: "#fff", 
+                            textDecoration: "none", 
+                            fontSize: "1rem",
+                            fontWeight: 500,
+                            padding: "0.5rem 1rem",
+                            borderRadius: "8px",
+                            background: "rgba(255, 255, 255, 0.2)",
+                            transition: "all 0.3s",
+                        }}
+                        onMouseEnter={(e) => {
+                            e.target.style.background = "rgba(255, 255, 255, 0.3)";
+                        }}
+                        onMouseLeave={(e) => {
+                            e.target.style.background = "rgba(255, 255, 255, 0.2)";
+                        }}
+                    >
+                        ← Back to Cart
+                    </Link>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "2rem", marginBottom: "2rem" }}>
                     {/* Shipping Information */}
                     <div style={{ background: "rgba(255, 255, 255, 0.95)", padding: "2rem", borderRadius: "20px", boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)" }}>
                         <h2 style={{ marginBottom: "1.5rem", color: "#2d3748" }}>Shipping Information</h2>
@@ -367,23 +498,108 @@ export default function CheckoutPage() {
                         </div>
                     </div>
 
+                    {/* Payment Information */}
+                    <div style={{ background: "rgba(255, 255, 255, 0.95)", padding: "2rem", borderRadius: "20px", boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)" }}>
+                        <h2 style={{ marginBottom: "1.5rem", color: "#2d3748" }}>Payment Information</h2>
+                        {savedCard && (
+                            <div style={{ marginBottom: "1rem", padding: "0.75rem", background: "#f0f9ff", borderRadius: "10px", border: "1px solid #bfdbfe" }}>
+                                <div style={{ fontSize: "0.9rem", color: "#1e40af", marginBottom: "0.5rem" }}>Saved Card: •••• {savedCard.cardNumber?.slice(-4)}</div>
+                                <button
+                                    onClick={() => {
+                                        setSavedCard(null);
+                                        setPaymentInfo({
+                                            cardNumber: "",
+                                            cardHolderName: "",
+                                            expiryDate: "",
+                                            cvv: "",
+                                            saveCard: false,
+                                        });
+                                    }}
+                                    style={{ fontSize: "0.85rem", color: "#667eea", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}
+                                >
+                                    Use different card
+                                </button>
+                            </div>
+                        )}
+                        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                            <input
+                                type="text"
+                                placeholder="Card Number"
+                                value={paymentInfo.cardNumber}
+                                onChange={(e) => setPaymentInfo({ ...paymentInfo, cardNumber: formatCardNumber(e.target.value) })}
+                                maxLength={19}
+                                style={{ padding: "0.75rem", borderRadius: "10px", border: "2px solid #e2e8f0", fontSize: "1rem", background: "#fff", color: "#2d3748", boxSizing: "border-box", width: "100%" }}
+                            />
+                            <input
+                                type="text"
+                                placeholder="Card Holder Name"
+                                value={paymentInfo.cardHolderName}
+                                onChange={(e) => setPaymentInfo({ ...paymentInfo, cardHolderName: e.target.value })}
+                                style={{ padding: "0.75rem", borderRadius: "10px", border: "2px solid #e2e8f0", fontSize: "1rem", background: "#fff", color: "#2d3748", boxSizing: "border-box", width: "100%" }}
+                            />
+                            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "1rem" }}>
+                                <input
+                                    type="text"
+                                    placeholder="MM/YY"
+                                    value={paymentInfo.expiryDate}
+                                    onChange={(e) => setPaymentInfo({ ...paymentInfo, expiryDate: formatExpiryDate(e.target.value) })}
+                                    maxLength={5}
+                                    style={{ padding: "0.75rem", borderRadius: "10px", border: "2px solid #e2e8f0", fontSize: "1rem", background: "#fff", color: "#2d3748", boxSizing: "border-box", width: "100%" }}
+                                />
+                                <input
+                                    type="text"
+                                    placeholder="CVV"
+                                    value={paymentInfo.cvv}
+                                    onChange={(e) => setPaymentInfo({ ...paymentInfo, cvv: e.target.value.replace(/\D/g, "").slice(0, 3) })}
+                                    maxLength={3}
+                                    style={{ padding: "0.75rem", borderRadius: "10px", border: "2px solid #e2e8f0", fontSize: "1rem", background: "#fff", color: "#2d3748", boxSizing: "border-box", width: "100%" }}
+                                />
+                            </div>
+                            <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer" }}>
+                                <input
+                                    type="checkbox"
+                                    checked={paymentInfo.saveCard}
+                                    onChange={(e) => setPaymentInfo({ ...paymentInfo, saveCard: e.target.checked })}
+                                    style={{ width: "1.2rem", height: "1.2rem", cursor: "pointer" }}
+                                />
+                                <span style={{ fontSize: "0.9rem", color: "#4a5568" }}>Save card for future purchases</span>
+                            </label>
+                        </div>
+                    </div>
+
                     {/* Order Summary */}
                     <div style={{ background: "rgba(255, 255, 255, 0.95)", padding: "2rem", borderRadius: "20px", boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)" }}>
                         <h2 style={{ marginBottom: "1.5rem", color: "#2d3748" }}>Order Summary</h2>
                         <div style={{ marginBottom: "1.5rem" }}>
-                            {cart.items.map((item) => (
-                                <div key={item.productId} style={{ display: "flex", justifyContent: "space-between", padding: "1rem 0", borderBottom: "1px solid #e2e8f0" }}>
-                                    <div>
-                                        <div style={{ fontWeight: 600, marginBottom: "0.25rem" }}>{item.productName}</div>
-                                        <div style={{ fontSize: "0.9rem", color: "#718096" }}>Qty: {item.quantity}</div>
+                            {cart.items && cart.items.length > 0 ? (
+                                cart.items.map((item) => (
+                                    <div key={item.productId} style={{ display: "flex", justifyContent: "space-between", padding: "1rem 0", borderBottom: "1px solid #e2e8f0", gap: "1rem" }}>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ 
+                                                fontWeight: 600, 
+                                                marginBottom: "0.25rem", 
+                                                color: "#2d3748",
+                                                fontSize: "0.95rem",
+                                                wordWrap: "break-word",
+                                                overflowWrap: "break-word",
+                                                lineHeight: "1.4"
+                                            }}>
+                                                {item.productName || `Product ${item.productId}`}
+                                            </div>
+                                            <div style={{ fontSize: "0.85rem", color: "#718096" }}>Qty: {item.quantity}</div>
+                                        </div>
+                                        <div style={{ fontWeight: 600, color: "#667eea", fontSize: "1rem", whiteSpace: "nowrap", marginLeft: "1rem" }}>
+                                            ${(item.subtotal || (item.price || 0) * (item.quantity || 0)).toFixed(2)}
+                                        </div>
                                     </div>
-                                    <div style={{ fontWeight: 600, color: "#667eea" }}>${(item.subtotal || item.price * item.quantity).toFixed(2)}</div>
-                                </div>
-                            ))}
+                                ))
+                            ) : (
+                                <div style={{ padding: "1rem", textAlign: "center", color: "#718096" }}>No items in cart</div>
+                            )}
                         </div>
                         <div style={{ paddingTop: "1rem", borderTop: "2px solid #e2e8f0" }}>
                             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem", fontSize: "1.2rem", fontWeight: 700 }}>
-                                <span>Total:</span>
+                                <span style={{ color: "#4a5568" }}>Total:</span>
                                 <span style={{ color: "#667eea" }}>${totalPrice.toFixed(2)}</span>
                             </div>
                             <button

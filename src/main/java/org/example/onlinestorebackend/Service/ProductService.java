@@ -186,6 +186,10 @@ public class ProductService {
                 .categoryIds(categoryIds)
                 .categoryNames(categories.stream().map(Category::getCategoryName).toList())
                 .popularity(product.getPopularity())
+                .model(product.getModel())
+                .serialNumber(product.getSerialNumber())
+                .warrantyStatus(product.getWarrantyStatus())
+                .distributionInfo(product.getDistributionInfo())
                 .build();
 
         return dto;
@@ -242,10 +246,10 @@ public class ProductService {
     }
 
     public List<ReviewDto> getApprovedReviewsForProduct(String productId) {
+        // Get all reviews (ratings should be visible immediately)
+        // But only show comments if they are approved
         List<Review> reviews = reviewRepository.findByProductId(productId);
         return reviews.stream()
-                .filter(review -> review.getRating() != null || 
-                           (review.getComment() != null && Boolean.TRUE.equals(review.getApproved())))
                 .map(review -> {
                     ReviewDto dto = new ReviewDto();
                     dto.setReviewId(review.getReviewId());
@@ -253,8 +257,15 @@ public class ProductService {
                     dto.setUserId(review.getUserId());
                     dto.setOrderId(review.getOrderId());
                     dto.setRating(review.getRating() != null ? review.getRating() : 0);
-                    dto.setComment(Boolean.TRUE.equals(review.getApproved()) ? review.getComment() : null);
+                    // Only include comment if it's approved
+                    dto.setComment(review.getApproved() != null && review.getApproved() ? review.getComment() : null);
                     dto.setApproved(review.getApproved());
+                    dto.setCreatedAt(review.getCreatedAt());
+                    
+                    // Review'da userId aslında username olarak saklanıyor (authentication.getName() kullanılıyor)
+                    // O yüzden direkt olarak username olarak kullanabiliriz
+                    dto.setUsername(review.getUserId());
+                    
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -291,15 +302,22 @@ public class ProductService {
 
         List<Review> reviews = reviewRepository.findByProductId(productId);
         return reviews.stream()
-                .map(review -> new ReviewDto(
-                        null, // orderId bu akışta dönmüyor
-                        review.getProductId(),
-                        review.getComment(),
-                        review.getRating(),
-                        review.getReviewId(),
-                        review.getUserId(),
-                        review.getApproved()
-                ))
+                .map(review -> {
+                    ReviewDto dto = new ReviewDto();
+                    dto.setOrderId(null);
+                    dto.setProductId(review.getProductId());
+                    dto.setComment(review.getComment());
+                    dto.setRating(review.getRating() != null ? review.getRating() : 0);
+                    dto.setReviewId(review.getReviewId());
+                    dto.setUserId(review.getUserId());
+                    dto.setApproved(review.getApproved());
+                    
+                    // Review'da userId aslında username olarak saklanıyor (authentication.getName() kullanılıyor)
+                    // O yüzden direkt olarak username olarak kullanabiliriz
+                    dto.setUsername(review.getUserId());
+                    
+                    return dto;
+                })
                 .collect(Collectors.toList());
     }
 

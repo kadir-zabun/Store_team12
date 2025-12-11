@@ -11,6 +11,7 @@ export default function InvoicePage() {
     const { success: showSuccess, error: showError } = useToast();
     const [invoiceData, setInvoiceData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [loadingPdf, setLoadingPdf] = useState(false);
 
     useEffect(() => {
         const loadInvoiceData = async () => {
@@ -69,10 +70,39 @@ export default function InvoicePage() {
             </div>
         );
     }
-
+    
     const { order, invoice, shippingInfo } = invoiceData;
     const invoiceDate = invoice?.invoiceDate ? new Date(invoice.invoiceDate).toLocaleDateString() : (order?.orderDate ? new Date(order.orderDate).toLocaleDateString() : new Date().toLocaleDateString());
     const totalAmount = invoice?.total || invoice?.amount || order?.totalPrice || 0;
+
+    const handleViewPdf = async () => {
+        if (!order?.orderId && !order?.id) {
+            showError("Order ID not found");
+            return;
+        }
+        
+        setLoadingPdf(true);
+        try {
+            const orderId = order.orderId || order.id;
+            const response = await paymentApi.getInvoicePdf(orderId);
+            
+            const blob = new Blob([response.data], { type: 'application/pdf' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error("Error loading PDF:", error);
+            showError("Failed to load PDF. Please try again.");
+        } finally {
+            setLoadingPdf(false);
+        }
+    };
 
     return (
         <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", padding: "2rem" }}>
@@ -152,7 +182,7 @@ export default function InvoicePage() {
                     </div>
 
                     {/* Actions */}
-                    <div style={{ display: "flex", gap: "1rem", justifyContent: "center" }}>
+                    <div style={{ display: "flex", gap: "1rem", justifyContent: "center", flexWrap: "wrap" }}>
                         <Link
                             to="/products"
                             style={{
@@ -167,6 +197,22 @@ export default function InvoicePage() {
                         >
                             Continue Shopping
                         </Link>
+                        <button
+                            onClick={handleViewPdf}
+                            disabled={loadingPdf}
+                            style={{
+                                padding: "0.75rem 2rem",
+                                background: loadingPdf ? "#cbd5e0" : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                color: "#fff",
+                                border: "none",
+                                borderRadius: "10px",
+                                fontWeight: 600,
+                                cursor: loadingPdf ? "not-allowed" : "pointer",
+                                transition: "all 0.3s",
+                            }}
+                        >
+                            {loadingPdf ? "Loading..." : "View PDF"}
+                        </button>
                         <button
                             onClick={() => window.print()}
                             style={{

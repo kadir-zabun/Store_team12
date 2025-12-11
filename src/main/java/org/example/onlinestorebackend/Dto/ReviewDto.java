@@ -4,6 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
@@ -17,5 +19,7 @@ public class ReviewDto {
     // Cevap (response) tarafında dönecek ekstra alanlar
     private String reviewId;
     private String userId;
+    private String username;
     private Boolean approved;
+    private LocalDateTime createdAt;
 }

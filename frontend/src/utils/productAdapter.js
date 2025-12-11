@@ -180,10 +180,11 @@ export const generateMultipleProducts = (fakeStoreProducts, targetCount = 200) =
 
 
 export const formatProductForDisplay = (product) => {
-    const finalPrice = product.discount > 0 
-        ? (product.price - product.discount).toFixed(2)
+    // Backend'de: price = originalActualPrice, discount = yüzde olarak (örn: 58)
+    // Frontend'de: finalPrice = price - (price * discount / 100)
+    const finalPrice = product.discount > 0 && product.price > 0
+        ? (product.price - (product.price * product.discount / 100)).toFixed(2)
         : product.price.toFixed(2);
-
 
     const images = product.images && Array.isArray(product.images) && product.images.length > 0
         ? [...product.images]
@@ -194,9 +195,7 @@ export const formatProductForDisplay = (product) => {
         images: images,
         finalPrice: parseFloat(finalPrice),
         hasDiscount: product.discount > 0,
-        discountPercentage: product.discount > 0 
-            ? Math.min(99, Math.round((product.discount / product.price) * 100))
-            : 0,
+        discountPercentage: product.discount > 0 ? Math.round(product.discount) : 0,
     };
 };
 

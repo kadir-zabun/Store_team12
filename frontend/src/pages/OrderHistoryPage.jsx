@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import orderApi from "../api/orderApi";
 import reviewApi from "../api/reviewApi";
 import userApi from "../api/userApi";
+import paymentApi from "../api/paymentApi";
 import { useToast } from "../contexts/ToastContext";
 import { useUserRole } from "../hooks/useUserRole";
 
@@ -109,6 +110,16 @@ export default function OrderHistoryPage() {
                         console.log("Delivered orders data (parsed):", deliveredData);
                         console.log("Delivered orders count:", deliveredData.length);
                         setDeliveredOrders(Array.isArray(deliveredData) ? deliveredData : []);
+                        
+                        // Get user's reviews
+                        try {
+                            const reviewsResponse = await userApi.getMyReviews();
+                            const reviewsData = reviewsResponse.data?.data || reviewsResponse.data || [];
+                            console.log("Loaded reviews:", reviewsData);
+                            setMyReviews(Array.isArray(reviewsData) ? reviewsData : []);
+                        } catch (error) {
+                            console.error("Error loading reviews:", error);
+                        }
                     } catch (error) {
                         console.error("Error getting userId or orders:", error);
                         console.error("Error response:", error.response);
@@ -169,6 +180,7 @@ export default function OrderHistoryPage() {
             try {
                 const reviewsResponse = await userApi.getMyReviews();
                 const reviewsData = reviewsResponse.data?.data || reviewsResponse.data || [];
+                console.log("Reloaded reviews after submit:", reviewsData);
                 setMyReviews(Array.isArray(reviewsData) ? reviewsData : []);
             } catch (error) {
                 console.error("Error reloading reviews:", error);
@@ -298,6 +310,40 @@ export default function OrderHistoryPage() {
                                     <div style={{ fontSize: "1.2rem", fontWeight: 700, color: "#2d3748" }}>
                                         Total: <span style={{ color: "#667eea" }}>${(order.totalPrice || 0).toFixed(2)}</span>
                                     </div>
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                const orderId = order.orderId || order.id;
+                                                const response = await paymentApi.getInvoicePdf(orderId);
+                                                const blob = new Blob([response.data], { type: 'application/pdf' });
+                                                const url = window.URL.createObjectURL(blob);
+                                                const link = document.createElement('a');
+                                                link.href = url;
+                                                link.target = '_blank';
+                                                link.rel = 'noopener noreferrer';
+                                                document.body.appendChild(link);
+                                                link.click();
+                                                document.body.removeChild(link);
+                                                window.URL.revokeObjectURL(url);
+                                            } catch (error) {
+                                                console.error("Error loading PDF:", error);
+                                                showError("Failed to load PDF. Please try again.");
+                                            }
+                                        }}
+                                        style={{
+                                            padding: "0.5rem 1rem",
+                                            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                            color: "#fff",
+                                            border: "none",
+                                            borderRadius: "8px",
+                                            fontWeight: 600,
+                                            fontSize: "0.9rem",
+                                            cursor: "pointer",
+                                            transition: "all 0.3s",
+                                        }}
+                                    >
+                                        View PDF
+                                    </button>
                                 </div>
 
                                 {/* Review Forms for each product */}
@@ -306,21 +352,91 @@ export default function OrderHistoryPage() {
                                         <h3 style={{ marginBottom: "1rem", color: "#2d3748", fontSize: "1.1rem", fontWeight: 600 }}>Review Products:</h3>
                                         {order.items.map((item, itemIndex) => {
                                             // Check if user already reviewed this product
+                                            // Match by productId (string comparison)
                                             const existingReview = myReviews.find(
-                                                r => r.productId === item.productId
+                                                r => r.productId && item.productId && String(r.productId) === String(item.productId)
                                             );
                                             const hasReview = !!existingReview;
+                                            
+                                            // Debug logs
+                                            console.log(`Product ${item.productId}:`, {
+                                                hasReview,
+                                                existingReview,
+                                                allReviews: myReviews.map(r => ({ productId: r.productId, rating: r.rating }))
+                                            });
 
                                             return (
                                             <div key={itemIndex} style={{ marginBottom: "1.5rem" }}>
                                                 <div style={{ marginBottom: "0.75rem", fontWeight: 600, color: "#4a5568", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                                     <span>{item.productName || `Product ${item.productId}`}</span>
-                                                    {hasReview && (
-                                                        <span style={{ fontSize: "0.85rem", color: "#2f855a", fontWeight: 500 }}>
-                                                            ✓ Reviewed
-                                                        </span>
-                                                    )}
                                                 </div>
+                                                
+                                                {/* Show existing review if exists */}
+                                                {hasReview && !(reviewingProduct && reviewingProduct.orderId === (order.orderId || order.id) && reviewingProduct.productId === item.productId) && (
+                                                    <div
+                                                        style={{
+                                                            padding: "1rem",
+                                                            background: "#f7fafc",
+                                                            borderRadius: "12px",
+                                                            border: "1px solid #e2e8f0",
+                                                            marginBottom: "0.75rem",
+                                                        }}
+                                                    >
+                                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                                                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                                                <span style={{ fontWeight: 600, color: "#2d3748" }}>Your Rating:</span>
+                                                                <span style={{ fontSize: "1.2rem", fontWeight: 700, color: "#667eea" }}>
+                                                                    {existingReview.rating}/10
+                                                                </span>
+                                                            </div>
+                                                            <span style={{ fontSize: "0.85rem", color: "#2f855a", fontWeight: 500 }}>
+                                                                ✓ Reviewed
+                                                            </span>
+                                                        </div>
+                                                        {existingReview.comment && (
+                                                            <div style={{ marginTop: "0.75rem" }}>
+                                                                <div style={{ fontSize: "0.9rem", fontWeight: 600, color: "#4a5568", marginBottom: "0.25rem" }}>
+                                                                    Your Comment:
+                                                                </div>
+                                                                <div style={{ 
+                                                                    padding: "0.75rem", 
+                                                                    background: "#fff", 
+                                                                    borderRadius: "8px",
+                                                                    color: "#2d3748",
+                                                                    fontSize: "0.95rem",
+                                                                    lineHeight: "1.5",
+                                                                }}>
+                                                                    {existingReview.comment}
+                                                                </div>
+                                                                <div style={{ marginTop: "0.5rem", fontSize: "0.85rem", color: "#718096" }}>
+                                                                    Status: {existingReview.approved ? (
+                                                                        <span style={{ color: "#2f855a", fontWeight: 600 }}>✓ Approved (Visible)</span>
+                                                                    ) : (
+                                                                        <span style={{ color: "#d69e2e", fontWeight: 600 }}>⏳ Pending Approval</span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        <button
+                                                            onClick={() => handleReviewClick(order.orderId || order.id, item.productId)}
+                                                            style={{
+                                                                marginTop: "0.75rem",
+                                                                padding: "0.5rem 1rem",
+                                                                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                                                color: "#fff",
+                                                                border: "none",
+                                                                borderRadius: "8px",
+                                                                fontWeight: 600,
+                                                                cursor: "pointer",
+                                                                fontSize: "0.9rem",
+                                                            }}
+                                                        >
+                                                            Update Review
+                                                        </button>
+                                                    </div>
+                                                )}
+                                                
+                                                {/* Show review form when editing or writing new review */}
                                                 {reviewingProduct && 
                                                  reviewingProduct.orderId === (order.orderId || order.id) && 
                                                  reviewingProduct.productId === item.productId ? (
@@ -333,7 +449,7 @@ export default function OrderHistoryPage() {
                                                         }}
                                                     >
                                                         <h4 style={{ marginBottom: "1rem", color: "#2d3748" }}>
-                                                            {hasReview ? "Edit Review" : "Write a Review"}
+                                                            {hasReview ? "Update Review" : "Write a Review"}
                                                         </h4>
                                                         <form onSubmit={handleSubmitReview}>
                                                             <div style={{ marginBottom: "1rem" }}>
@@ -401,7 +517,7 @@ export default function OrderHistoryPage() {
                                                                         cursor: "pointer",
                                                                     }}
                                                                 >
-                                                                    Submit Review
+                                                                    {hasReview ? "Update Review" : "Submit Review"}
                                                                 </button>
                                                                 <button
                                                                     type="button"
@@ -424,7 +540,7 @@ export default function OrderHistoryPage() {
                                                             </div>
                                                         </form>
                                                     </div>
-                                                ) : (
+                                                ) : !hasReview && (
                                                     <button
                                                         onClick={() => handleReviewClick(order.orderId || order.id, item.productId)}
                                                         style={{
@@ -438,7 +554,7 @@ export default function OrderHistoryPage() {
                                                             fontSize: "0.9rem",
                                                         }}
                                                     >
-                                                        {hasReview ? "Edit Review" : "Write Review"}
+                                                        Write Review
                                                     </button>
                                                 )}
                                             </div>
