@@ -63,25 +63,50 @@ export default function ProductDetailPage() {
         if (!product) return;
 
         const stock = product.quantity || 0;
-        if (stock < quantity) {
+        
+        // Stock kontrolü - quantity 0 veya daha az ise eklenemez
+        if (stock <= 0) {
+            showError("This product is out of stock and cannot be added to cart.");
+            return;
+        }
+
+        // Seçilen quantity stock'tan fazla ise eklenemez
+        if (quantity > stock) {
             showError(`Only ${stock} items available in stock.`);
             return;
         }
 
+        // Guest cart için mevcut quantity kontrolü
+        const token = localStorage.getItem("access_token");
+        if (!token) {
+            const { cartStorage } = await import("../utils/cartStorage");
+            const guestCart = cartStorage.getCart();
+            const existingItem = guestCart.items.find(item => item.productId === productId);
+            const currentQuantity = existingItem ? existingItem.quantity : 0;
+            const newQuantity = currentQuantity + quantity;
+            
+            if (newQuantity > stock) {
+                showError(`Only ${stock} items available in stock. You already have ${currentQuantity} in your cart.`);
+                return;
+            }
+        }
+
         setAddingToCart(true);
         try {
-            const token = localStorage.getItem("access_token");
             if (token) {
                 await cartApi.addToCart(productId, quantity);
             } else {
-                // Guest cart
+                // Guest cart - indirimli fiyatı kullan
                 const { cartStorage } = await import("../utils/cartStorage");
-                cartStorage.addToCart({
-                    productId: product.productId,
-                    productName: product.productName,
-                    price: product.price,
-                    quantity: quantity,
-                });
+                const finalPrice = product.discount > 0 && product.price > 0
+                    ? product.price - (product.price * product.discount / 100)
+                    : product.price;
+                cartStorage.addItem(
+                    product.productId,
+                    product.productName,
+                    finalPrice,
+                    quantity
+                );
             }
             refreshCartCount();
             showSuccess("Product added to cart successfully!");
@@ -131,8 +156,10 @@ export default function ProductDetailPage() {
 
     const stockStatus = getStockStatus();
     const averageRating = calculateAverageRating();
-    const discountPrice = product.discount && product.discount > 0
-        ? (product.price - product.discount).toFixed(2)
+    // Backend'de: price = originalActualPrice, discount = yüzde olarak
+    // Frontend'de: discountPrice = price - (price * discount / 100)
+    const discountPrice = product.discount && product.discount > 0 && product.price > 0
+        ? (product.price - (product.price * product.discount / 100)).toFixed(2)
         : null;
 
     return (
@@ -217,7 +244,7 @@ export default function ProductDetailPage() {
                                             ${product.price?.toFixed(2)}
                                         </span>
                                         <span style={{ fontSize: "0.9rem", color: "#2f855a", fontWeight: 600 }}>
-                                            {((product.discount / product.price) * 100).toFixed(0)}% OFF
+                                            {Math.round(product.discount)}% OFF
                                         </span>
                                     </div>
                                 ) : (
@@ -227,61 +254,63 @@ export default function ProductDetailPage() {
                                 )}
                             </div>
 
-                            {/* Stock Status */}
-                            <div style={{
-                                marginBottom: "1.5rem",
-                                padding: "0.75rem 1rem",
-                                background: stockStatus.color === "#e53e3e" ? "#fed7d7" : stockStatus.color === "#d69e2e" ? "#feebc8" : "#c6f6d5",
-                                borderRadius: "8px",
-                                display: "inline-block",
-                            }}>
-                                <span style={{ color: stockStatus.color, fontWeight: 600 }}>
-                                    {stockStatus.text}
-                                </span>
-                            </div>
-
-                            {/* Description */}
-                            {product.description && (
-                                <div style={{ marginBottom: "2rem" }}>
-                                    <h3 style={{ fontSize: "1.2rem", fontWeight: 600, color: "#2d3748", marginBottom: "0.5rem" }}>
-                                        Description
-                                    </h3>
-                                    <p style={{ color: "#4a5568", lineHeight: "1.6" }}>
-                                        {product.description}
-                                    </p>
-                                </div>
-                            )}
-
-                            {/* Product Details */}
-                            <div style={{ marginBottom: "2rem", padding: "1rem", background: "#f7fafc", borderRadius: "12px" }}>
-                                <h3 style={{ fontSize: "1.2rem", fontWeight: 600, color: "#2d3748", marginBottom: "1rem" }}>
-                                    Product Details
+                            {/* Product Details - All Required Fields */}
+                            <div style={{ marginBottom: "2rem", padding: "1.5rem", background: "#f7fafc", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
+                                <h3 style={{ fontSize: "1.3rem", fontWeight: 600, color: "#2d3748", marginBottom: "1.5rem" }}>
+                                    Product Information
                                 </h3>
-                                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                                    {product.model && (
-                                        <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                            <span style={{ color: "#718096", fontWeight: 500 }}>Model:</span>
-                                            <span style={{ color: "#2d3748", fontWeight: 600 }}>{product.model}</span>
-                                        </div>
-                                    )}
-                                    {product.serialNumber && (
-                                        <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                            <span style={{ color: "#718096", fontWeight: 500 }}>Serial Number:</span>
-                                            <span style={{ color: "#2d3748", fontWeight: 600 }}>{product.serialNumber}</span>
-                                        </div>
-                                    )}
-                                    {product.warrantyStatus && (
-                                        <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                            <span style={{ color: "#718096", fontWeight: 500 }}>Warranty:</span>
-                                            <span style={{ color: "#2d3748", fontWeight: 600 }}>{product.warrantyStatus}</span>
-                                        </div>
-                                    )}
-                                    {product.distributionInfo && (
-                                        <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                            <span style={{ color: "#718096", fontWeight: 500 }}>Distribution:</span>
-                                            <span style={{ color: "#2d3748", fontWeight: 600 }}>{product.distributionInfo}</span>
-                                        </div>
-                                    )}
+                                <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                                    {/* Name */}
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "0.75rem", borderBottom: "1px solid #e2e8f0" }}>
+                                        <span style={{ color: "#718096", fontWeight: 600, fontSize: "0.95rem" }}>Product Name:</span>
+                                        <span style={{ color: "#2d3748", fontWeight: 600, fontSize: "1rem" }}>{product.productName || "N/A"}</span>
+                                    </div>
+                                    
+                                    {/* Model */}
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "0.75rem", borderBottom: "1px solid #e2e8f0" }}>
+                                        <span style={{ color: "#718096", fontWeight: 600, fontSize: "0.95rem" }}>Model:</span>
+                                        <span style={{ color: "#2d3748", fontWeight: 600, fontSize: "1rem" }}>{product.model || "N/A"}</span>
+                                    </div>
+                                    
+                                    {/* Serial Number */}
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "0.75rem", borderBottom: "1px solid #e2e8f0" }}>
+                                        <span style={{ color: "#718096", fontWeight: 600, fontSize: "0.95rem" }}>Serial Number:</span>
+                                        <span style={{ color: "#2d3748", fontWeight: 600, fontSize: "1rem" }}>{product.serialNumber || "N/A"}</span>
+                                    </div>
+                                    
+                                    {/* Description */}
+                                    <div style={{ paddingBottom: "0.75rem", borderBottom: "1px solid #e2e8f0" }}>
+                                        <span style={{ color: "#718096", fontWeight: 600, fontSize: "0.95rem", display: "block", marginBottom: "0.5rem" }}>Description:</span>
+                                        <p style={{ color: "#2d3748", lineHeight: "1.6", fontSize: "1rem", margin: 0 }}>
+                                            {product.description || "N/A"}
+                                        </p>
+                                    </div>
+                                    
+                                    {/* Quantity in Stock */}
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "0.75rem", borderBottom: "1px solid #e2e8f0" }}>
+                                        <span style={{ color: "#718096", fontWeight: 600, fontSize: "0.95rem" }}>Quantity in Stock:</span>
+                                        <span style={{ color: "#2d3748", fontWeight: 600, fontSize: "1rem" }}>{product.quantity || 0}</span>
+                                    </div>
+                                    
+                                    {/* Price */}
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "0.75rem", borderBottom: "1px solid #e2e8f0" }}>
+                                        <span style={{ color: "#718096", fontWeight: 600, fontSize: "0.95rem" }}>Price:</span>
+                                        <span style={{ color: "#2d3748", fontWeight: 600, fontSize: "1rem" }}>
+                                            ${product.price?.toFixed(2) || "0.00"}
+                                        </span>
+                                    </div>
+                                    
+                                    {/* Warranty Status */}
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "0.75rem", borderBottom: "1px solid #e2e8f0" }}>
+                                        <span style={{ color: "#718096", fontWeight: 600, fontSize: "0.95rem" }}>Warranty Status:</span>
+                                        <span style={{ color: "#2d3748", fontWeight: 600, fontSize: "1rem" }}>{product.warrantyStatus || "N/A"}</span>
+                                    </div>
+                                    
+                                    {/* Distributor Information */}
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                        <span style={{ color: "#718096", fontWeight: 600, fontSize: "0.95rem" }}>Distributor Information:</span>
+                                        <span style={{ color: "#2d3748", fontWeight: 600, fontSize: "1rem" }}>{product.distributionInfo || "N/A"}</span>
+                                    </div>
                                 </div>
                             </div>
 

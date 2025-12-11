@@ -58,10 +58,15 @@ public class OrderService {
             orderItem.setProductId(product.getProductId());
             orderItem.setProductName(product.getProductName());
             orderItem.setQuantity(itemRequest.getQuantity());
-            // İndirimli fiyatı hesapla (price - discount)
-            BigDecimal finalPrice = product.getPrice().subtract(
-                product.getDiscount() != null ? product.getDiscount() : BigDecimal.ZERO
-            );
+            // İndirimli fiyatı hesapla: price - (price * discount / 100)
+            // discount yüzde olarak saklanıyor (örn: 58 = %58)
+            BigDecimal finalPrice = product.getPrice();
+            if (product.getDiscount() != null && product.getDiscount().compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal discountAmount = product.getPrice()
+                    .multiply(product.getDiscount())
+                    .divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+                finalPrice = product.getPrice().subtract(discountAmount);
+            }
             orderItem.setPriceAtPurchase(finalPrice);
 
             orderItems.add(orderItem);
