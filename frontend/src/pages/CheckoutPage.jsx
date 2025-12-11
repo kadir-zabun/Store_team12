@@ -571,19 +571,35 @@ export default function CheckoutPage() {
                     <div style={{ background: "rgba(255, 255, 255, 0.95)", padding: "2rem", borderRadius: "20px", boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)" }}>
                         <h2 style={{ marginBottom: "1.5rem", color: "#2d3748" }}>Order Summary</h2>
                         <div style={{ marginBottom: "1.5rem" }}>
-                            {cart.items.map((item) => (
-                                <div key={item.productId} style={{ display: "flex", justifyContent: "space-between", padding: "1rem 0", borderBottom: "1px solid #e2e8f0" }}>
-                                    <div>
-                                        <div style={{ fontWeight: 600, marginBottom: "0.25rem" }}>{item.productName}</div>
-                                        <div style={{ fontSize: "0.9rem", color: "#718096" }}>Qty: {item.quantity}</div>
+                            {cart.items && cart.items.length > 0 ? (
+                                cart.items.map((item) => (
+                                    <div key={item.productId} style={{ display: "flex", justifyContent: "space-between", padding: "1rem 0", borderBottom: "1px solid #e2e8f0", gap: "1rem" }}>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ 
+                                                fontWeight: 600, 
+                                                marginBottom: "0.25rem", 
+                                                color: "#2d3748",
+                                                fontSize: "0.95rem",
+                                                wordWrap: "break-word",
+                                                overflowWrap: "break-word",
+                                                lineHeight: "1.4"
+                                            }}>
+                                                {item.productName || `Product ${item.productId}`}
+                                            </div>
+                                            <div style={{ fontSize: "0.85rem", color: "#718096" }}>Qty: {item.quantity}</div>
+                                        </div>
+                                        <div style={{ fontWeight: 600, color: "#667eea", fontSize: "1rem", whiteSpace: "nowrap", marginLeft: "1rem" }}>
+                                            ${(item.subtotal || (item.price || 0) * (item.quantity || 0)).toFixed(2)}
+                                        </div>
                                     </div>
-                                    <div style={{ fontWeight: 600, color: "#667eea" }}>${(item.subtotal || item.price * item.quantity).toFixed(2)}</div>
-                                </div>
-                            ))}
+                                ))
+                            ) : (
+                                <div style={{ padding: "1rem", textAlign: "center", color: "#718096" }}>No items in cart</div>
+                            )}
                         </div>
                         <div style={{ paddingTop: "1rem", borderTop: "2px solid #e2e8f0" }}>
                             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem", fontSize: "1.2rem", fontWeight: 700 }}>
-                                <span>Total:</span>
+                                <span style={{ color: "#4a5568" }}>Total:</span>
                                 <span style={{ color: "#667eea" }}>${totalPrice.toFixed(2)}</span>
                             </div>
                             <button

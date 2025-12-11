@@ -346,25 +346,46 @@ export default function OrderManagementPage() {
                                     <div style={{ marginBottom: "1rem" }}>
                                         <h3 style={{ fontSize: "0.95rem", fontWeight: 600, color: "#4a5568", marginBottom: "0.5rem" }}>Items:</h3>
                                         <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                                            {order.items && order.items.map((item, index) => (
-                                                <div
-                                                    key={index}
-                                                    style={{
-                                                        display: "flex",
-                                                        justifyContent: "space-between",
-                                                        padding: "0.5rem",
-                                                        background: "#fff",
-                                                        borderRadius: "6px",
-                                                    }}
-                                                >
-                                                    <div style={{ fontSize: "0.9rem" }}>
-                                                        {item.productName || `Product ${item.productId}`} (Qty: {item.quantity})
-                                                    </div>
-                                                    <div style={{ fontWeight: 600, color: "#667eea" }}>
-                                                        ${((item.priceAtPurchase || item.price || 0) * item.quantity).toFixed(2)}
-                                                    </div>
+                                            {order.items && Array.isArray(order.items) && order.items.length > 0 ? (
+                                                order.items.map((item, index) => {
+                                                    const productName = item.productName || `Product ${item.productId || "Unknown"}`;
+                                                    const productId = item.productId || "N/A";
+                                                    const quantity = item.quantity || 0;
+                                                    const price = item.priceAtPurchase || item.price || 0;
+                                                    const subtotal = price * quantity;
+                                                    
+                                                    return (
+                                                        <div
+                                                            key={index}
+                                                            style={{
+                                                                display: "flex",
+                                                                justifyContent: "space-between",
+                                                                alignItems: "center",
+                                                                padding: "0.75rem",
+                                                                background: "#fff",
+                                                                borderRadius: "6px",
+                                                                border: "1px solid #e2e8f0",
+                                                            }}
+                                                        >
+                                                            <div style={{ flex: 1, fontSize: "0.9rem", color: "#2d3748" }}>
+                                                                <div style={{ fontWeight: 600, marginBottom: "0.25rem" }}>
+                                                                    {productName}
+                                                                </div>
+                                                                <div style={{ fontSize: "0.85rem", color: "#718096" }}>
+                                                                    Product ID: {productId} | Quantity: {quantity}
+                                                                </div>
+                                                            </div>
+                                                            <div style={{ fontWeight: 600, color: "#667eea", fontSize: "1rem", marginLeft: "1rem", whiteSpace: "nowrap" }}>
+                                                                ${subtotal.toFixed(2)}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })
+                                            ) : (
+                                                <div style={{ padding: "0.75rem", background: "#fff", borderRadius: "6px", color: "#718096", fontSize: "0.9rem" }}>
+                                                    No items in this order
                                                 </div>
-                                            ))}
+                                            )}
                                         </div>
                                     </div>
 

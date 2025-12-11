@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import productApi from "../api/productApi";
+import categoryApi from "../api/categoryApi";
 import cartApi from "../api/cartApi";
 import { cartStorage } from "../utils/cartStorage";
 import { formatProductForDisplay } from "../utils/productAdapter";
@@ -60,7 +61,26 @@ export default function ProductsPage() {
 
     useEffect(() => {
         extractUsernameFromToken();
-    }, [location.pathname]);
+        
+        // Load categories
+        const loadCategories = async () => {
+            try {
+                const response = await categoryApi.getAllCategories();
+                const categoriesData = response?.data?.data || response?.data || [];
+                setCategories(Array.isArray(categoriesData) ? categoriesData : []);
+            } catch (error) {
+                console.error("Error loading categories:", error);
+            }
+        };
+        loadCategories();
+        
+        // Check URL for category parameter
+        const urlParams = new URLSearchParams(location.search);
+        const categoryParam = urlParams.get("category");
+        if (categoryParam) {
+            setSelectedCategory(categoryParam);
+        }
+    }, [location.pathname, location.search]);
 
     useEffect(() => {
         const handleClickOutside = (event) => {
@@ -82,6 +102,8 @@ export default function ProductsPage() {
     const [filterInStock, setFilterInStock] = useState(false);
     const [minPrice, setMinPrice] = useState("");
     const [maxPrice, setMaxPrice] = useState("");
+    const [selectedCategory, setSelectedCategory] = useState("");
+    const [categories, setCategories] = useState([]);
 
     useEffect(() => {
         const loadProducts = async () => {
@@ -91,8 +113,17 @@ export default function ProductsPage() {
                 
                 let productsData = null;
                 
+                // If category is selected, use category endpoint
+                if (selectedCategory) {
+                    const response = await productApi.getProductsByCategory(selectedCategory, 0, 200);
+                    productsData = response.data?.data?.content || response.data?.content || response.data?.data || response.data || [];
+                    if (!Array.isArray(productsData)) {
+                        productsData = [];
+                    }
+                    console.log("Category products:", productsData);
+                }
                 // If search query exists, use search endpoint
-                if (searchQuery.trim()) {
+                else if (searchQuery.trim()) {
                     const response = await productApi.searchProducts(searchQuery.trim());
                     // Backend returns {success: true, data: [...], meta: {...}}
                     productsData = response.data?.data || response.data || [];
@@ -100,16 +131,6 @@ export default function ProductsPage() {
                         productsData = [];
                     }
                     console.log("Search results:", productsData);
-                }
-                // If price range is set, use price range endpoint
-                else if (minPrice || maxPrice) {
-                    const min = minPrice ? parseFloat(minPrice) : 0;
-                    const max = maxPrice ? parseFloat(maxPrice) : 999999;
-                    const response = await productApi.getProductsByPriceRange(min, max);
-                    productsData = response.data?.data || response.data || [];
-                    if (!Array.isArray(productsData)) {
-                        productsData = [];
-                    }
                 }
                 // If in stock filter is active, use in stock endpoint
                 else if (filterInStock) {
@@ -120,9 +141,10 @@ export default function ProductsPage() {
                     }
                 }
                 // Otherwise, use normal pagination with sorting
+                // Note: We always fetch all products and filter/sort in frontend to use discounted prices
                 else {
-                    // Backend'de sıralama yapılıyor, daha az ürün çek (performans için)
-                    const response = await productApi.getAllProducts(0, 200, sortBy, sortDir);
+                    // Backend'den tüm ürünleri çek (fiyat filtrelemesi frontend'de yapılacak)
+                    const response = await productApi.getAllProducts(0, 200, sortBy === "price" ? "productName" : sortBy, sortDir);
                     const apiResponse = response.data;
                     
                     if (apiResponse && apiResponse.data) {
@@ -141,40 +163,50 @@ export default function ProductsPage() {
                 if (productsData && productsData.length > 0) {
                     let filteredProducts = productsData.map(formatProductForDisplay);
                     
-                    // Apply in stock filter if active (for search/price range results)
-                    if (filterInStock && (searchQuery.trim() || minPrice || maxPrice)) {
+                    // Apply price range filter based on discounted price (finalPrice)
+                    if (minPrice || maxPrice) {
+                        const min = minPrice ? parseFloat(minPrice) : 0;
+                        const max = maxPrice ? parseFloat(maxPrice) : 999999;
+                        filteredProducts = filteredProducts.filter(p => {
+                            const finalPrice = p.finalPrice || p.price || 0;
+                            return finalPrice >= min && finalPrice <= max;
+                        });
+                    }
+                    
+                    // Apply in stock filter if active
+                    if (filterInStock) {
                         filteredProducts = filteredProducts.filter(p => p.inStock);
                     }
                     
-                    // Apply sorting if not using backend sorting
-                    if (searchQuery.trim() || minPrice || maxPrice || filterInStock) {
-                        filteredProducts.sort((a, b) => {
-                            let aVal, bVal;
-                            switch (sortBy) {
-                                case "productName":
-                                    aVal = a.productName?.toLowerCase() || "";
-                                    bVal = b.productName?.toLowerCase() || "";
-                                    break;
-                                case "price":
-                                    aVal = a.finalPrice || a.price || 0;
-                                    bVal = b.finalPrice || b.price || 0;
-                                    break;
-                                case "popularity":
-                                    aVal = a.popularity || 0;
-                                    bVal = b.popularity || 0;
-                                    break;
-                                default:
-                                    aVal = a.productName?.toLowerCase() || "";
-                                    bVal = b.productName?.toLowerCase() || "";
-                            }
-                            
-                            if (sortDir === "asc") {
-                                return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
-                            } else {
-                                return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
-                            }
-                        });
-                    }
+                    // Always sort in frontend to use discounted price (finalPrice)
+                    // This ensures price sorting uses discounted prices, not original prices
+                    filteredProducts.sort((a, b) => {
+                        let aVal, bVal;
+                        switch (sortBy) {
+                            case "productName":
+                                aVal = a.productName?.toLowerCase() || "";
+                                bVal = b.productName?.toLowerCase() || "";
+                                break;
+                            case "price":
+                                // Use finalPrice (discounted price) for sorting
+                                aVal = a.finalPrice || a.price || 0;
+                                bVal = b.finalPrice || b.price || 0;
+                                break;
+                            case "popularity":
+                                aVal = a.popularity || 0;
+                                bVal = b.popularity || 0;
+                                break;
+                            default:
+                                aVal = a.productName?.toLowerCase() || "";
+                                bVal = b.productName?.toLowerCase() || "";
+                        }
+                        
+                        if (sortDir === "asc") {
+                            return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
+                        } else {
+                            return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
+                        }
+                    });
                     
                     setProducts(filteredProducts);
                     console.log(`✅ Loaded ${filteredProducts.length} products from database`);
@@ -198,7 +230,7 @@ export default function ProductsPage() {
         }, searchQuery.trim() ? 500 : 0); // 500ms delay for search, immediate for other filters
 
         return () => clearTimeout(timeoutId);
-    }, [searchQuery, sortBy, sortDir, filterInStock, minPrice, maxPrice, showError]);
+    }, [searchQuery, sortBy, sortDir, filterInStock, minPrice, maxPrice, selectedCategory, showError]);
 
     const handleLogout = () => {
         localStorage.removeItem("access_token");
@@ -227,6 +259,26 @@ export default function ProductsPage() {
             return;
         }
 
+        // Stock kontrolü - quantity 0 veya daha az ise eklenemez
+        const stock = product.quantity || 0;
+        if (stock <= 0) {
+            showError("This product is out of stock and cannot be added to cart.");
+            return;
+        }
+
+        // Guest cart için mevcut quantity kontrolü
+        if (!token) {
+            const guestCart = cartStorage.getCart();
+            const existingItem = guestCart.items.find(item => item.productId === productId);
+            const currentQuantity = existingItem ? existingItem.quantity : 0;
+            const newQuantity = currentQuantity + 1;
+            
+            if (newQuantity > stock) {
+                showError(`Only ${stock} items available in stock. You already have ${currentQuantity} in your cart.`);
+                return;
+            }
+        }
+
         setAddingToCart({ ...addingToCart, [productId]: true });
         
         try {
@@ -236,10 +288,14 @@ export default function ProductsPage() {
                 refreshCartCount();
                 showSuccess("Product added to cart successfully!");
             } else {
+                // Guest cart için indirimli fiyatı kullan
+                const finalPrice = product.discount > 0 && product.price > 0
+                    ? product.price - (product.price * product.discount / 100)
+                    : product.price;
                 cartStorage.addItem(
                     productId,
                     product.productName,
-                    product.price,
+                    finalPrice,
                     1
                 );
                 window.dispatchEvent(new Event("cartUpdated"));
@@ -612,6 +668,8 @@ export default function ProductsPage() {
                                         setMinPrice("");
                                         setMaxPrice("");
                                         setFilterInStock(false);
+                                        setSelectedCategory("");
+                                        navigate("/products");
                                     }}
                                     style={{
                                         padding: "0.75rem 1.5rem",
@@ -636,6 +694,38 @@ export default function ProductsPage() {
 
                             {/* Sort and Filters */}
                             <div style={{ display: "flex", gap: "1rem", alignItems: "center", flexWrap: "wrap" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                    <label style={{ fontSize: "0.9rem", fontWeight: 600, color: "#4a5568" }}>Category:</label>
+                                    <select
+                                        value={selectedCategory}
+                                        onChange={(e) => {
+                                            setSelectedCategory(e.target.value);
+                                            if (e.target.value) {
+                                                navigate(`/products?category=${e.target.value}`);
+                                            } else {
+                                                navigate("/products");
+                                            }
+                                        }}
+                                        style={{
+                                            padding: "0.5rem 1rem",
+                                            borderRadius: "8px",
+                                            border: "2px solid #e2e8f0",
+                                            fontSize: "0.9rem",
+                                            outline: "none",
+                                            cursor: "pointer",
+                                            background: "#fff",
+                                            color: "#2d3748",
+                                            minWidth: "150px",
+                                        }}
+                                    >
+                                        <option value="">All Categories</option>
+                                        {categories.map(cat => (
+                                            <option key={cat.categoryId} value={cat.categoryId}>
+                                                {cat.categoryName}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                                     <label style={{ fontSize: "0.9rem", fontWeight: 600, color: "#4a5568" }}>Sort by:</label>
                                     <select
@@ -880,33 +970,33 @@ export default function ProductsPage() {
                                                     e.stopPropagation();
                                                     handleAddToCart(product.productId);
                                                 }}
-                                                disabled={!product.inStock || addingToCart[product.productId]}
+                                                disabled={(product.quantity || 0) <= 0 || !product.inStock || addingToCart[product.productId]}
                                                 style={{
                                                     width: "100%",
                                                     padding: "0.75rem",
-                                                    background: product.inStock && !addingToCart[product.productId]
+                                                    background: (product.quantity || 0) > 0 && product.inStock && !addingToCart[product.productId]
                                                         ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
                                                         : "#cbd5e0",
                                                     color: "#fff",
                                                     border: "none",
                                                     borderRadius: "10px",
                                                     fontWeight: 600,
-                                                    cursor: product.inStock && !addingToCart[product.productId] ? "pointer" : "not-allowed",
+                                                    cursor: (product.quantity || 0) > 0 && product.inStock && !addingToCart[product.productId] ? "pointer" : "not-allowed",
                                                     transition: "all 0.2s",
-                                                    opacity: product.inStock && !addingToCart[product.productId] ? 1 : 0.6,
+                                                    opacity: (product.quantity || 0) > 0 && product.inStock && !addingToCart[product.productId] ? 1 : 0.6,
                                                 }}
                                                 onMouseEnter={(e) => {
-                                                    if (product.inStock && !addingToCart[product.productId]) {
+                                                    if ((product.quantity || 0) > 0 && product.inStock && !addingToCart[product.productId]) {
                                                         e.currentTarget.style.transform = "scale(1.02)";
                                                     }
                                                 }}
                                                 onMouseLeave={(e) => {
-                                                    if (product.inStock && !addingToCart[product.productId]) {
+                                                    if ((product.quantity || 0) > 0 && product.inStock && !addingToCart[product.productId]) {
                                                         e.currentTarget.style.transform = "scale(1)";
                                                     }
                                                 }}
                                             >
-                                                {addingToCart[product.productId] ? "Adding..." : product.inStock ? "Add to Cart" : "Out of Stock"}
+                                                {addingToCart[product.productId] ? "Adding..." : (product.quantity || 0) <= 0 ? "Out of Stock" : product.inStock ? "Add to Cart" : "Out of Stock"}
                                             </button>
                                         )}
                                         {userRole === "PRODUCT_OWNER" && (

@@ -11,6 +11,7 @@ export default function InvoicePage() {
     const { success: showSuccess, error: showError } = useToast();
     const [invoiceData, setInvoiceData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [loadingPdf, setLoadingPdf] = useState(false);
 
     useEffect(() => {
         const loadInvoiceData = async () => {
@@ -69,11 +70,10 @@ export default function InvoicePage() {
             </div>
         );
     }
-
+    
     const { order, invoice, shippingInfo } = invoiceData;
     const invoiceDate = invoice?.invoiceDate ? new Date(invoice.invoiceDate).toLocaleDateString() : (order?.orderDate ? new Date(order.orderDate).toLocaleDateString() : new Date().toLocaleDateString());
     const totalAmount = invoice?.total || invoice?.amount || order?.totalPrice || 0;
-    const [loadingPdf, setLoadingPdf] = useState(false);
 
     const handleViewPdf = async () => {
         if (!order?.orderId && !order?.id) {

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import cartApi from "../api/cartApi";
+import productApi from "../api/productApi";
 import { cartStorage } from "../utils/cartStorage";
 import { useCartCount } from "../hooks/useCartCount";
 import { useToast } from "../contexts/ToastContext";
@@ -179,6 +180,27 @@ export default function CartPage() {
         }
 
         const token = localStorage.getItem("access_token");
+        
+        // Stock kontrolü - product bilgisini çek
+        try {
+            const productResponse = await productApi.getProductById(productId);
+            const product = productResponse.data?.data || productResponse.data;
+            const stock = product?.quantity || 0;
+            
+            if (stock <= 0) {
+                showError("This product is out of stock and cannot be added to cart.");
+                return;
+            }
+            
+            if (newQuantity > stock) {
+                showError(`Only ${stock} items available in stock.`);
+                return;
+            }
+        } catch (err) {
+            console.error("Error fetching product info:", err);
+            // Product bilgisi alınamazsa devam et, backend kontrol edecek
+        }
+
         setUpdating({ ...updating, [productId]: true });
         
         try {
