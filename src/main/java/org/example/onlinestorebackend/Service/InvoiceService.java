@@ -17,12 +17,78 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class InvoiceService {
 
     private final ProductRepository productRepository;
+
+    /**
+     * Metni belirli bir genişliğe göre birden fazla satıra böler
+     */
+    private List<String> wrapText(String text, float maxWidth, PDType1Font font, float fontSize) throws IOException {
+        List<String> lines = new ArrayList<>();
+        if (text == null || text.isEmpty()) {
+            return lines;
+        }
+
+        String[] words = text.split("\\s+");
+        StringBuilder currentLine = new StringBuilder();
+
+        for (String word : words) {
+            // Tek kelimenin genişliğini kontrol et
+            float wordWidth = font.getStringWidth(word) / 1000.0f * fontSize;
+            
+            // Eğer tek kelime maxWidth'den büyükse, kelimeyi karakter karakter böl
+            if (wordWidth > maxWidth) {
+                // Mevcut satırı ekle (varsa)
+                if (currentLine.length() > 0) {
+                    lines.add(currentLine.toString());
+                    currentLine = new StringBuilder();
+                }
+                
+                // Uzun kelimeyi karakter karakter böl
+                for (char c : word.toCharArray()) {
+                    String testChar = currentLine.toString() + c;
+                    float charWidth = font.getStringWidth(testChar) / 1000.0f * fontSize;
+                    
+                    if (charWidth > maxWidth && currentLine.length() > 0) {
+                        lines.add(currentLine.toString());
+                        currentLine = new StringBuilder(String.valueOf(c));
+                    } else {
+                        currentLine.append(c);
+                    }
+                }
+            } else {
+                // Normal kelime işleme
+                String testLine = currentLine.length() > 0 
+                    ? currentLine.toString() + " " + word 
+                    : word;
+                
+                // Metnin genişliğini hesapla
+                float textWidth = font.getStringWidth(testLine) / 1000.0f * fontSize;
+                
+                if (textWidth > maxWidth && currentLine.length() > 0) {
+                    // Mevcut satırı ekle ve yeni satıra başla
+                    lines.add(currentLine.toString());
+                    currentLine = new StringBuilder(word);
+                } else {
+                    // Kelimeyi mevcut satıra ekle
+                    currentLine = new StringBuilder(testLine);
+                }
+            }
+        }
+        
+        // Son satırı ekle
+        if (currentLine.length() > 0) {
+            lines.add(currentLine.toString());
+        }
+        
+        return lines;
+    }
 
     public byte[] generateInvoicePdf(String invoiceId,
                                      Order order,
@@ -114,42 +180,17 @@ public class InvoiceService {
                 contentStream.endText();
 
                 yPosition -= lineHeight;
-
-                float tableY = yPosition;
-                float itemX = margin;
-                float qtyX = margin + 300;
-                float priceX = margin + 380;
-                float totalX = margin + 480;
-
-                // Tablo header
-                contentStream.setFont(PDType1Font.HELVETICA_BOLD, 10);
-                contentStream.beginText();
-                contentStream.newLineAtOffset(itemX, tableY);
-                contentStream.showText("Item");
-                contentStream.endText();
-
-                contentStream.beginText();
-                contentStream.newLineAtOffset(qtyX, tableY);
-                contentStream.showText("Qty");
-                contentStream.endText();
-
-                contentStream.beginText();
-                contentStream.newLineAtOffset(priceX, tableY);
-                contentStream.showText("Price");
-                contentStream.endText();
-
-                contentStream.beginText();
-                contentStream.newLineAtOffset(totalX, tableY);
-                contentStream.showText("Total");
-                contentStream.endText();
-
-                tableY -= lineHeight;
+                float currentY = yPosition;
                 contentStream.setFont(PDType1Font.HELVETICA, 10);
+                float fontSize = 10;
+                float maxTextWidth = 450; // Sayfa genişliği - margin'ler (yaklaşık 500 - 50)
 
                 // 1) PaymentRequestDto içinden item geldiyse onları yaz
                 if (items != null && items.length > 0) {
-                    for (PaymentRequestDto.ItemDto item : items) {
-                        if (tableY < 100) {
+                    for (int i = 0; i < items.length; i++) {
+                        PaymentRequestDto.ItemDto item = items[i];
+                        
+                        if (currentY < 100) {
                             break; // sayfa sonuna geldik
                         }
 
@@ -165,33 +206,64 @@ public class InvoiceService {
                         BigDecimal itemTotal = priceVal.multiply(BigDecimal.valueOf(item.getQuantity()));
                         String total = "$" + itemTotal.toPlainString();
 
-                        contentStream.beginText();
-                        contentStream.newLineAtOffset(itemX, tableY);
-                        contentStream.showText(itemName);
-                        contentStream.endText();
+                        // Item bilgilerini alt alta yaz - uzun isimleri birden fazla satıra böl
+                        // "Item: " etiketinin genişliğini hesapla
+                        float itemLabelWidth = PDType1Font.HELVETICA.getStringWidth("Item: ") / 1000.0f * fontSize;
+                        float availableWidth = maxTextWidth - itemLabelWidth;
+                        
+                        // Item name'i wrap et
+                        List<String> itemNameLines = wrapText(itemName, availableWidth, PDType1Font.HELVETICA, fontSize);
+                        
+                        // İlk satırda "Item: " + item name'in ilk kısmı
+                        if (!itemNameLines.isEmpty()) {
+                            if (currentY < 100) break;
+                            contentStream.beginText();
+                            contentStream.newLineAtOffset(margin, currentY);
+                            contentStream.showText("Item: " + itemNameLines.get(0));
+                            contentStream.endText();
+                            currentY -= lineHeight;
+                            
+                            // Sonraki satırlarda sadece item name'in devamı (girintili)
+                            for (int j = 1; j < itemNameLines.size(); j++) {
+                                if (currentY < 100) break;
+                                contentStream.beginText();
+                                contentStream.newLineAtOffset(margin + itemLabelWidth, currentY);
+                                contentStream.showText(itemNameLines.get(j));
+                                contentStream.endText();
+                                currentY -= lineHeight;
+                            }
+                        }
+
+                        if (currentY < 100) break;
 
                         contentStream.beginText();
-                        contentStream.newLineAtOffset(qtyX, tableY);
-                        contentStream.showText(qty);
+                        contentStream.newLineAtOffset(margin, currentY);
+                        contentStream.showText("Qty: " + qty);
                         contentStream.endText();
+                        currentY -= lineHeight;
+
+                        if (currentY < 100) break;
 
                         contentStream.beginText();
-                        contentStream.newLineAtOffset(priceX, tableY);
-                        contentStream.showText(price);
+                        contentStream.newLineAtOffset(margin, currentY);
+                        contentStream.showText("Price: " + price);
                         contentStream.endText();
+                        currentY -= lineHeight;
+
+                        if (currentY < 100) break;
 
                         contentStream.beginText();
-                        contentStream.newLineAtOffset(totalX, tableY);
-                        contentStream.showText(total);
+                        contentStream.newLineAtOffset(margin, currentY);
+                        contentStream.showText("Total: " + total);
                         contentStream.endText();
+                        currentY -= lineHeight * 1.5f; // Item'lar arası boşluk
 
-                        tableY -= lineHeight;
                     }
 
-                    // 2) ItemDto yoksa Order içindeki item’ları yaz
+                    // 2) ItemDto yoksa Order içindeki item'ları yaz
                 } else if (order != null && order.getItems() != null) {
                     for (var item : order.getItems()) {
-                        if (tableY < 100) {
+                        if (currentY < 100) {
                             break;
                         }
 
@@ -209,36 +281,66 @@ public class InvoiceService {
                         BigDecimal itemTotal = priceVal.multiply(BigDecimal.valueOf(item.getQuantity()));
                         String total = "$" + itemTotal.toPlainString();
 
-                        contentStream.beginText();
-                        contentStream.newLineAtOffset(itemX, tableY);
-                        contentStream.showText(itemName);
-                        contentStream.endText();
+                        // Item bilgilerini alt alta yaz - uzun isimleri birden fazla satıra böl
+                        // "Item: " etiketinin genişliğini hesapla
+                        float itemLabelWidth = PDType1Font.HELVETICA.getStringWidth("Item: ") / 1000.0f * fontSize;
+                        float availableWidth = maxTextWidth - itemLabelWidth;
+                        
+                        // Item name'i wrap et
+                        List<String> itemNameLines = wrapText(itemName, availableWidth, PDType1Font.HELVETICA, fontSize);
+                        
+                        // İlk satırda "Item: " + item name'in ilk kısmı
+                        if (!itemNameLines.isEmpty()) {
+                            if (currentY < 100) break;
+                            contentStream.beginText();
+                            contentStream.newLineAtOffset(margin, currentY);
+                            contentStream.showText("Item: " + itemNameLines.get(0));
+                            contentStream.endText();
+                            currentY -= lineHeight;
+                            
+                            // Sonraki satırlarda sadece item name'in devamı (girintili)
+                            for (int j = 1; j < itemNameLines.size(); j++) {
+                                if (currentY < 100) break;
+                                contentStream.beginText();
+                                contentStream.newLineAtOffset(margin + itemLabelWidth, currentY);
+                                contentStream.showText(itemNameLines.get(j));
+                                contentStream.endText();
+                                currentY -= lineHeight;
+                            }
+                        }
+
+                        if (currentY < 100) break;
 
                         contentStream.beginText();
-                        contentStream.newLineAtOffset(qtyX, tableY);
-                        contentStream.showText(qty);
+                        contentStream.newLineAtOffset(margin, currentY);
+                        contentStream.showText("Qty: " + qty);
                         contentStream.endText();
+                        currentY -= lineHeight;
+
+                        if (currentY < 100) break;
 
                         contentStream.beginText();
-                        contentStream.newLineAtOffset(priceX, tableY);
-                        contentStream.showText(price);
+                        contentStream.newLineAtOffset(margin, currentY);
+                        contentStream.showText("Price: " + price);
                         contentStream.endText();
+                        currentY -= lineHeight;
+
+                        if (currentY < 100) break;
 
                         contentStream.beginText();
-                        contentStream.newLineAtOffset(totalX, tableY);
-                        contentStream.showText(total);
+                        contentStream.newLineAtOffset(margin, currentY);
+                        contentStream.showText("Total: " + total);
                         contentStream.endText();
-
-                        tableY -= lineHeight;
+                        currentY -= lineHeight * 1.5f; // Item'lar arası boşluk
                     }
                 }
 
                 // Total
-                tableY -= 20;
+                currentY -= 20;
 
                 contentStream.setFont(PDType1Font.HELVETICA_BOLD, 12);
                 contentStream.beginText();
-                contentStream.newLineAtOffset(totalX - 50, tableY);
+                contentStream.newLineAtOffset(margin, currentY);
                 contentStream.showText("Total: $" +
                         (totalAmount != null ? totalAmount.toPlainString() : "0.00"));
                 contentStream.endText();

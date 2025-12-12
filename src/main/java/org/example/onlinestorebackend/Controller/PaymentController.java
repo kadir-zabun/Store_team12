@@ -178,15 +178,18 @@ public class PaymentController {
             User user = userOpt.get();
             BigDecimal totalAmount = BigDecimal.valueOf(order.getTotalPrice() != null ? order.getTotalPrice() : 0);
             
-            PaymentRequestDto.ItemDto[] itemsArray = order.getItems().stream()
-                    .map(item -> {
-                        PaymentRequestDto.ItemDto dto = new PaymentRequestDto.ItemDto();
-                        dto.setProductId(item.getProductId());
-                        dto.setQuantity(item.getQuantity());
-                        dto.setPrice(item.getPriceAtPurchase());
-                        return dto;
-                    })
-                    .toArray(PaymentRequestDto.ItemDto[]::new);
+            PaymentRequestDto.ItemDto[] itemsArray = new PaymentRequestDto.ItemDto[0];
+            if (order.getItems() != null && !order.getItems().isEmpty()) {
+                itemsArray = order.getItems().stream()
+                        .map(item -> {
+                            PaymentRequestDto.ItemDto dto = new PaymentRequestDto.ItemDto();
+                            dto.setProductId(item.getProductId());
+                            dto.setQuantity(item.getQuantity());
+                            dto.setPrice(item.getPriceAtPurchase());
+                            return dto;
+                        })
+                        .toArray(PaymentRequestDto.ItemDto[]::new);
+            }
             
             byte[] pdfBytes = invoiceService.generateInvoicePdf(
                     invoiceId, order, user, totalAmount, invoiceDate, itemsArray
