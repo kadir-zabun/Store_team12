@@ -363,11 +363,9 @@ public class ProductService {
                     "You can only reject reviews for your own products");
         }
 
-        // Product'ın reviewIds listesinden çıkar
-        product.getReviewIds().remove(reviewId);
-        productRepository.save(product);
+        review.setApproved(false);
+        review.setComment(null);
 
-        // Review'i sil
-        reviewRepository.delete(review);
+        reviewRepository.save(review);
     }
 }
