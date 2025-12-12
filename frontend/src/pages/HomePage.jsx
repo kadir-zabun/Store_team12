@@ -751,6 +751,7 @@ export default function HomePage() {
                                                 transition: "all 0.3s",
                                                 display: "block",
                                                 textAlign: "center",
+                                                overflow: "hidden",
                                             }}
                                             onMouseEnter={(e) => {
                                                 e.currentTarget.style.transform = "translateY(-4px)";
@@ -762,11 +763,26 @@ export default function HomePage() {
                                             }}
                                         >
                                             <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🏷️</div>
-                                            <h3 style={{ fontSize: "1.3rem", fontWeight: 700, marginBottom: "0.5rem" }}>
+                                            <h3 style={{ 
+                                                fontSize: "1.1rem", 
+                                                fontWeight: 700, 
+                                                marginBottom: "0.5rem",
+                                                wordBreak: "break-word",
+                                                overflowWrap: "break-word",
+                                                lineHeight: "1.4",
+                                                hyphens: "auto",
+                                                maxWidth: "100%",
+                                            }}>
                                                 {category.categoryName}
                                             </h3>
                                             {category.description && (
-                                                <p style={{ fontSize: "0.9rem", opacity: 0.9 }}>
+                                                <p style={{ 
+                                                    fontSize: "0.9rem", 
+                                                    opacity: 0.9,
+                                                    wordBreak: "break-word",
+                                                    overflowWrap: "break-word",
+                                                    lineHeight: "1.5",
+                                                }}>
                                                     {category.description}
                                                 </p>
                                             )}
