@@ -24,6 +24,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -150,6 +151,12 @@ public class OrderService {
     }
 
     public Order getOrderById(String orderId) {
+        // First try to find by orderId field (custom field)
+        Optional<Order> orderByOrderId = orderRepository.findByOrderId(orderId);
+        if (orderByOrderId.isPresent()) {
+            return orderByOrderId.get();
+        }
+        // Fallback to MongoDB _id field
         return orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
     }
@@ -211,7 +218,13 @@ public class OrderService {
 
     @Transactional
     public Order updateOrderStatus(String orderId, String status) {
-        Order order = orderRepository.findById(orderId)
+        // First try to find by orderId field (custom field)
+        Optional<Order> orderOpt = orderRepository.findByOrderId(orderId);
+        if (orderOpt.isEmpty()) {
+            // Fallback to MongoDB _id field
+            orderOpt = orderRepository.findById(orderId);
+        }
+        Order order = orderOpt
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
         order.setStatus(status);
         return orderRepository.save(order);

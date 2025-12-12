@@ -29,10 +29,30 @@ public class RestResponseAdvice implements ResponseBodyAdvice<Object> {
                                   org.springframework.http.server.ServerHttpRequest req,
                                   org.springframework.http.server.ServerHttpResponse res) {
 
+        // PDF veya binary response'ları atla (byte array)
+        if (body instanceof byte[] || 
+            (selectedContentType != null && selectedContentType.equals(MediaType.APPLICATION_PDF))) {
+            return body; // PDF response'ları olduğu gibi döndür
+        }
+
+        // ResponseEntity<byte[]> kontrolü
+        if (body instanceof ResponseEntity<?> re) {
+            Object inner = re.getBody();
+            // Eğer içeride byte array varsa (PDF), olduğu gibi döndür
+            if (inner instanceof byte[]) {
+                return re;
+            }
+            // Content-Type PDF ise olduğu gibi döndür
+            if (re.getHeaders().getContentType() != null && 
+                re.getHeaders().getContentType().equals(MediaType.APPLICATION_PDF)) {
+                return re;
+            }
+        }
+
         // 1) Zaten sarılıysa dokunma
         if (body instanceof ApiResponse<?> || body instanceof org.springframework.http.ProblemDetail) return body;
 
-        // 2) ResponseEntity ise: içteki body’yi sar, status/res headers kalsın
+        // 2) ResponseEntity ise: içteki body'yi sar, status/res headers kalsın
         if (body instanceof ResponseEntity<?> re) {
             Object inner = re.getBody();
             if (inner instanceof ApiResponse<?>) return re; // zaten sarılı

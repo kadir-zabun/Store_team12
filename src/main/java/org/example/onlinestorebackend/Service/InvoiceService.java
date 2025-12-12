@@ -200,10 +200,11 @@ public class InvoiceService {
                             itemName = product.getProductName();
                         }
 
-                        String qty = String.valueOf(item.getQuantity());
+                        String qty = String.valueOf(item.getQuantity() != null ? item.getQuantity() : 0);
                         BigDecimal priceVal = item.getPrice() != null ? item.getPrice() : BigDecimal.ZERO;
                         String price = "$" + priceVal.toPlainString();
-                        BigDecimal itemTotal = priceVal.multiply(BigDecimal.valueOf(item.getQuantity()));
+                        Integer quantity = item.getQuantity() != null ? item.getQuantity() : 0;
+                        BigDecimal itemTotal = priceVal.multiply(BigDecimal.valueOf(quantity));
                         String total = "$" + itemTotal.toPlainString();
 
                         // Item bilgilerini alt alta yaz - uzun isimleri birden fazla satıra böl
@@ -273,12 +274,13 @@ public class InvoiceService {
                             itemName = product.getProductName();
                         }
 
-                        String qty = String.valueOf(item.getQuantity());
+                        String qty = String.valueOf(item.getQuantity() != null ? item.getQuantity() : 0);
                         BigDecimal priceVal = item.getPriceAtPurchase() != null
                                 ? item.getPriceAtPurchase()
                                 : BigDecimal.ZERO;
                         String price = "$" + priceVal.toPlainString();
-                        BigDecimal itemTotal = priceVal.multiply(BigDecimal.valueOf(item.getQuantity()));
+                        Integer quantity = item.getQuantity() != null ? item.getQuantity() : 0;
+                        BigDecimal itemTotal = priceVal.multiply(BigDecimal.valueOf(quantity));
                         String total = "$" + itemTotal.toPlainString();
 
                         // Item bilgilerini alt alta yaz - uzun isimleri birden fazla satıra böl
