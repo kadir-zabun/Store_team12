@@ -1,5 +1,6 @@
 package org.example.onlinestorebackend.Entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -19,6 +20,11 @@ public class Invoice{
     private LocalDateTime invoiceDate;
 
     private String pdfUrl;
+
+    // PDF'yi byte array olarak sakla
+    // @JsonIgnore ile API response'larında dönmez (sadece PDF endpoint'inde döner)
+    @JsonIgnore
+    private byte[] pdfBytes;
 
 }
 

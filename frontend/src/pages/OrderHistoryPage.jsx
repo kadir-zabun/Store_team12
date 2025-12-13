@@ -314,19 +314,16 @@ export default function OrderHistoryPage() {
                                         onClick={async () => {
                                             try {
                                                 const orderId = order.orderId || order.id;
+                                                if (!orderId) {
+                                                    showError("Order ID is missing.");
+                                                    return;
+                                                }
                                                 const response = await paymentApi.getInvoicePdf(orderId);
                                                 const blob = new Blob([response.data], { type: 'application/pdf' });
                                                 const url = window.URL.createObjectURL(blob);
-                                                const link = document.createElement('a');
-                                                link.href = url;
-                                                link.target = '_blank';
-                                                link.rel = 'noopener noreferrer';
-                                                document.body.appendChild(link);
-                                                link.click();
-                                                document.body.removeChild(link);
-                                                window.URL.revokeObjectURL(url);
+                                                window.open(url, '_blank');
+                                                setTimeout(() => window.URL.revokeObjectURL(url), 100);
                                             } catch (error) {
-                                                console.error("Error loading PDF:", error);
                                                 showError("Failed to load PDF. Please try again.");
                                             }
                                         }}

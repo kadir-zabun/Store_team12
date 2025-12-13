@@ -100,9 +100,10 @@ public class PaymentController {
         invoiceEntity.setOrderId(request.getOrderId());
         invoiceEntity.setInvoiceDate(now);
         invoiceEntity.setPdfUrl(null);
-        invoiceRepository.save(invoiceEntity);
+        invoiceEntity.setPdfBytes(null); // İlk başta null, sonra generate edilince kaydedilecek
 
-        // 6) USER + MAIL (PDF'li / PDFsiz)
+        // 6) USER + MAIL (PDF'li / PDFsiz) ve PDF'yi DB'ye kaydet
+        byte[] pdfBytes = null;
         if (request.getUserId() != null) {
             Optional<User> userOpt = userRepository.findByUserId(request.getUserId());
             if (userOpt.isPresent()) {
@@ -114,11 +115,14 @@ public class PaymentController {
                                         ? request.getItems().toArray(new PaymentRequestDto.ItemDto[0])
                                         : new PaymentRequestDto.ItemDto[0];
 
-                        byte[] pdfBytes = invoiceService.generateInvoicePdf(
+                        pdfBytes = invoiceService.generateInvoicePdf(
                                 invoiceId, order, user, total, now, itemsArray
                         );
 
+                        // PDF'yi Invoice entity'ye kaydet
+                        invoiceEntity.setPdfBytes(pdfBytes);
                         System.out.println("PDF generated successfully, size: " + pdfBytes.length + " bytes");
+                        
                         mailService.sendInvoiceEmailWithPdf(user.getEmail(), invoiceId, total, now, pdfBytes);
                         System.out.println("Invoice email sent to: " + user.getEmail());
                     } catch (Exception e) {
@@ -134,9 +138,29 @@ public class PaymentController {
                             e2.printStackTrace();
                         }
                     }
+                } else {
+                    // Email yoksa bile PDF'yi generate edip kaydet
+                    try {
+                        PaymentRequestDto.ItemDto[] itemsArray =
+                                request.getItems() != null
+                                        ? request.getItems().toArray(new PaymentRequestDto.ItemDto[0])
+                                        : new PaymentRequestDto.ItemDto[0];
+
+                        pdfBytes = invoiceService.generateInvoicePdf(
+                                invoiceId, order, userOpt.get(), total, now, itemsArray
+                        );
+                        invoiceEntity.setPdfBytes(pdfBytes);
+                        System.out.println("PDF generated and saved to invoice (no email sent), size: " + pdfBytes.length + " bytes");
+                    } catch (Exception e) {
+                        System.err.println("ERROR: Failed to generate PDF for invoice");
+                        e.printStackTrace();
+                    }
                 }
             }
         }
+        
+        // Invoice'ı kaydet (PDF ile birlikte)
+        invoiceRepository.save(invoiceEntity);
 
         // 7) EKRANDA GÖSTERİLECEK DTO
         InvoiceResponseDto invoice = new InvoiceResponseDto(
@@ -162,35 +186,63 @@ public class PaymentController {
             
             String userId = orderService.getUserIdByUsername(username);
             
-            if (!order.getCustomerId().equals(userId)) {
+            if (order.getCustomerId() == null || !order.getCustomerId().equals(userId)) {
                 return ResponseEntity.status(403).build();
             }
             
-            Optional<Invoice> invoiceOpt = Optional.ofNullable(invoiceRepository.findByOrderId(orderId));
-            String invoiceId = invoiceOpt.map(Invoice::getInvoiceId).orElse(orderId);
-            LocalDateTime invoiceDate = invoiceOpt.map(Invoice::getInvoiceDate).orElse(order.getOrderDate());
+            Invoice invoice = invoiceRepository.findByOrderId(orderId);
+            byte[] pdfBytes = null;
+            String invoiceId = orderId;
+            LocalDateTime invoiceDate = order.getOrderDate();
             
-            Optional<User> userOpt = userRepository.findByUserId(userId);
-            if (userOpt.isEmpty()) {
-                return ResponseEntity.status(404).build();
+            if (invoice != null) {
+                invoiceId = invoice.getInvoiceId();
+                invoiceDate = invoice.getInvoiceDate() != null ? invoice.getInvoiceDate() : order.getOrderDate();
+                if (invoice.getPdfBytes() != null && invoice.getPdfBytes().length > 0) {
+                    pdfBytes = invoice.getPdfBytes();
+                }
             }
             
-            User user = userOpt.get();
-            BigDecimal totalAmount = BigDecimal.valueOf(order.getTotalPrice() != null ? order.getTotalPrice() : 0);
-            
-            PaymentRequestDto.ItemDto[] itemsArray = order.getItems().stream()
-                    .map(item -> {
-                        PaymentRequestDto.ItemDto dto = new PaymentRequestDto.ItemDto();
-                        dto.setProductId(item.getProductId());
-                        dto.setQuantity(item.getQuantity());
-                        dto.setPrice(item.getPriceAtPurchase());
-                        return dto;
-                    })
-                    .toArray(PaymentRequestDto.ItemDto[]::new);
-            
-            byte[] pdfBytes = invoiceService.generateInvoicePdf(
-                    invoiceId, order, user, totalAmount, invoiceDate, itemsArray
-            );
+            if (pdfBytes == null || pdfBytes.length == 0) {
+                Optional<User> userOpt = userRepository.findByUserId(userId);
+                if (userOpt.isEmpty()) {
+                    return ResponseEntity.status(404).build();
+                }
+                
+                User user = userOpt.get();
+                BigDecimal totalAmount = BigDecimal.valueOf(order.getTotalPrice() != null ? order.getTotalPrice() : 0);
+                
+                PaymentRequestDto.ItemDto[] itemsArray = new PaymentRequestDto.ItemDto[0];
+                if (order.getItems() != null && !order.getItems().isEmpty()) {
+                    itemsArray = order.getItems().stream()
+                            .filter(item -> item != null && item.getProductId() != null)
+                            .map(item -> {
+                                PaymentRequestDto.ItemDto dto = new PaymentRequestDto.ItemDto();
+                                dto.setProductId(item.getProductId());
+                                dto.setQuantity(item.getQuantity() != null ? item.getQuantity() : 0);
+                                dto.setPrice(item.getPriceAtPurchase() != null ? item.getPriceAtPurchase() : BigDecimal.ZERO);
+                                return dto;
+                            })
+                            .toArray(PaymentRequestDto.ItemDto[]::new);
+                }
+                
+                pdfBytes = invoiceService.generateInvoicePdf(
+                        invoiceId, order, user, totalAmount, invoiceDate, itemsArray
+                );
+                
+                if (pdfBytes == null || pdfBytes.length == 0) {
+                    return ResponseEntity.status(500).build();
+                }
+                
+                if (invoice == null) {
+                    invoice = new Invoice();
+                    invoice.setInvoiceId(invoiceId);
+                    invoice.setOrderId(orderId);
+                    invoice.setInvoiceDate(invoiceDate);
+                }
+                invoice.setPdfBytes(pdfBytes);
+                invoiceRepository.save(invoice);
+            }
             
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_PDF);
@@ -201,9 +253,9 @@ public class PaymentController {
                     .headers(headers)
                     .body(pdfBytes);
                     
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(404).build();
         } catch (Exception e) {
-            System.err.println("Error generating PDF: " + e.getMessage());
-            e.printStackTrace();
             return ResponseEntity.status(500).build();
         }
     }

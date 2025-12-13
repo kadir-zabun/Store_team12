@@ -4,9 +4,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.ByteArrayHttpMessageConverter;
 import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
+
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 
@@ -14,10 +16,14 @@ import java.time.format.DateTimeFormatter;
 public class RestResponseAdvice implements ResponseBodyAdvice<Object> {
 
     private final HttpServletRequest request;
-    public RestResponseAdvice(HttpServletRequest request) { this.request = request; }
+
+    public RestResponseAdvice(HttpServletRequest request) {
+        this.request = request;
+    }
 
     @Override
-    public boolean supports(MethodParameter returnType, Class<? extends HttpMessageConverter<?>> converterType) {
+    public boolean supports(MethodParameter returnType,
+                            Class<? extends HttpMessageConverter<?>> converterType) {
         return true;
     }
 
@@ -29,20 +35,60 @@ public class RestResponseAdvice implements ResponseBodyAdvice<Object> {
                                   org.springframework.http.server.ServerHttpRequest req,
                                   org.springframework.http.server.ServerHttpResponse res) {
 
-        // 1) Zaten sarılıysa dokunma
-        if (body instanceof ApiResponse<?> || body instanceof org.springframework.http.ProblemDetail) return body;
+        // 0) PDF endpoint'lerini tamamen bypass et (en garanti)
+        String path = request.getRequestURI();
+        if (path != null && path.startsWith("/api/payment/invoice/")) {
+            return body;
+        }
 
-        // 2) ResponseEntity ise: içteki body’yi sar, status/res headers kalsın
+        // 1) Byte array converter seçildiyse wrap etme
+        if (selectedConverterType != null &&
+                ByteArrayHttpMessageConverter.class.isAssignableFrom(selectedConverterType)) {
+            return body;
+        }
+
+        // 2) Content-Type PDF ise wrap etme (equals yerine includes)
+        if (selectedContentType != null && MediaType.APPLICATION_PDF.includes(selectedContentType)) {
+            return body;
+        }
+
+        // 3) Body byte[] ise wrap etme
+        if (body instanceof byte[]) {
+            return body;
+        }
+
+        // 4) ResponseEntity içindeki PDF/byte[] ise wrap etme
         if (body instanceof ResponseEntity<?> re) {
             Object inner = re.getBody();
-            if (inner instanceof ApiResponse<?>) return re; // zaten sarılı
+            MediaType ct = re.getHeaders().getContentType();
+
+            if (inner instanceof byte[]) {
+                return re;
+            }
+            if (ct != null && MediaType.APPLICATION_PDF.includes(ct)) {
+                return re;
+            }
+        }
+
+        // 5) Zaten sarılıysa dokunma
+        if (body instanceof ApiResponse<?> || body instanceof org.springframework.http.ProblemDetail) {
+            return body;
+        }
+
+        // 6) ResponseEntity ise: iç body'yi sar, status/headers koru
+        if (body instanceof ResponseEntity<?> re) {
+            Object inner = re.getBody();
+            if (inner instanceof ApiResponse<?>) return re;
+
             ApiResponse.Meta m = baseMeta();
-            return ResponseEntity.status(re.getStatusCode()).headers(re.getHeaders())
+            return ResponseEntity.status(re.getStatusCode())
+                    .headers(re.getHeaders())
                     .body(ApiResponse.ok(inner, m));
         }
 
-        if (body instanceof String s) {
-            return s;
+        // 7) String ise elleme (String converter ile JSON wrapper çakışmasın)
+        if (body instanceof String) {
+            return body;
         }
 
         ApiResponse.Meta m = baseMeta();
