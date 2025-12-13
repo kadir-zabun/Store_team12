@@ -74,11 +74,14 @@ export default function ProductsPage() {
         };
         loadCategories();
         
-        // Check URL for category parameter
+        // Check URL for category parameter and update state immediately
         const urlParams = new URLSearchParams(location.search);
         const categoryParam = urlParams.get("category");
         if (categoryParam) {
             setSelectedCategory(categoryParam);
+        } else {
+            // If no category in URL, clear the selection
+            setSelectedCategory("");
         }
     }, [location.pathname, location.search]);
 
@@ -102,7 +105,12 @@ export default function ProductsPage() {
     const [filterInStock, setFilterInStock] = useState(false);
     const [minPrice, setMinPrice] = useState("");
     const [maxPrice, setMaxPrice] = useState("");
-    const [selectedCategory, setSelectedCategory] = useState("");
+    // Initialize selectedCategory from URL parameter
+    const getInitialCategory = () => {
+        const urlParams = new URLSearchParams(location.search);
+        return urlParams.get("category") || "";
+    };
+    const [selectedCategory, setSelectedCategory] = useState(getInitialCategory);
     const [categories, setCategories] = useState([]);
 
     useEffect(() => {
