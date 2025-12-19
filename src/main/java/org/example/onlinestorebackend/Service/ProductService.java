@@ -121,10 +121,26 @@ public class ProductService {
                 .collect(Collectors.toList());
     }
 
-    // Fiyat aralığına göre arama
+    // Fiyat aralığına göre arama (indirimli fiyata göre)
     public List<ProductResponseDto> getProductsByPriceRange(BigDecimal minPrice, BigDecimal maxPrice) {
-        List<Product> products = productRepository.findByPriceBetween(minPrice, maxPrice);
-        return products.stream()
+        // Tüm ürünleri çek ve indirimli fiyata göre filtrele
+        // MongoDB'de hesaplanmış alan üzerinden filtreleme yapılamadığı için
+        // tüm ürünleri çekip memory'de filtreliyoruz
+        List<Product> allProducts = productRepository.findAll();
+        
+        return allProducts.stream()
+                .filter(product -> {
+                    // İndirimli fiyatı hesapla: price - (price * discount / 100)
+                    BigDecimal price = product.getPrice() != null ? product.getPrice() : BigDecimal.ZERO;
+                    BigDecimal discount = product.getDiscount() != null ? product.getDiscount() : BigDecimal.ZERO;
+                    
+                    // Discount yüzde olarak saklanıyor (örn: 58 = %58)
+                    BigDecimal discountAmount = price.multiply(discount).divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+                    BigDecimal finalPrice = price.subtract(discountAmount);
+                    
+                    // Fiyat aralığı kontrolü
+                    return finalPrice.compareTo(minPrice) >= 0 && finalPrice.compareTo(maxPrice) <= 0;
+                })
                 .map(this::convertToDto)
                 .collect(Collectors.toList());
     }
@@ -363,11 +379,9 @@ public class ProductService {
                     "You can only reject reviews for your own products");
         }
 
-        // Product'ın reviewIds listesinden çıkar
-        product.getReviewIds().remove(reviewId);
-        productRepository.save(product);
+        review.setApproved(false);
+        review.setComment(null);
 
-        // Review'i sil
-        reviewRepository.delete(review);
+        reviewRepository.save(review);
     }
 }

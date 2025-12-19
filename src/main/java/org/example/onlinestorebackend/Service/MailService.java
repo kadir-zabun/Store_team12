@@ -229,4 +229,47 @@ public class MailService {
             }
         }
     }
+
+    public void sendDiscountNotificationEmail(String email,
+                                              String productName,
+                                              java.math.BigDecimal discountPercent) {
+        if (mailSender == null) {
+            log.warn("JavaMailSender not configured. Discount notification for {} -> product={}, discount={}",
+                    email, productName, discountPercent);
+            return;
+        }
+
+        try {
+            Class<?> simpleMailMessageClass = Class.forName("org.springframework.mail.SimpleMailMessage");
+            Object msg = simpleMailMessageClass.getDeclaredConstructor().newInstance();
+
+            Method setFrom = simpleMailMessageClass.getMethod("setFrom", String.class);
+            Method setTo = simpleMailMessageClass.getMethod("setTo", String.class);
+            Method setSubject = simpleMailMessageClass.getMethod("setSubject", String.class);
+            Method setText = simpleMailMessageClass.getMethod("setText", String.class);
+
+            String fromEmail = mailFrom != null && !mailFrom.isEmpty() ? mailFrom : "noreply@teknosu.com";
+            setFrom.invoke(msg, fromEmail);
+            setTo.invoke(msg, email);
+            setSubject.invoke(msg, "Discount Alert - TeknoSU");
+
+            String pct = discountPercent != null ? discountPercent.toPlainString() : "0";
+            String safeName = productName != null ? productName : "a product";
+            setText.invoke(msg,
+                    "Hello,\n\n" +
+                            "Good news! A product in your wish list is now discounted.\n\n" +
+                            "Product: " + safeName + "\n" +
+                            "Discount: " + pct + "%\n\n" +
+                            "Visit the store to see the updated price.\n\n" +
+                            "Best regards,\nTeknoSU Team"
+            );
+
+            Class<?> mailSenderInterface = Class.forName("org.springframework.mail.javamail.JavaMailSender");
+            Method sendMethod = mailSenderInterface.getMethod("send", simpleMailMessageClass);
+            sendMethod.invoke(mailSender, msg);
+        } catch (Exception e) {
+            log.error("Failed to send discount notification email to {}: {}", email, e.getMessage());
+            log.error("Exception details: ", e);
+        }
+    }
 }
