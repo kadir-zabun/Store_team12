@@ -196,6 +196,7 @@ public class ProductService {
                 .quantity(product.getQuantity())
                 .price(product.getPrice())
                 .discount(product.getDiscount())
+                .cost(product.getCost())
                 .description(product.getDescription())
                 .images(product.getImages())
                 .inStock(product.getInStock())
@@ -345,14 +346,6 @@ public class ProductService {
         Product product = productRepository.findById(review.getProductId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
 
-        User owner = userRepository.findByUsername(ownerUsername)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + ownerUsername));
-
-        if (!product.getOwnerId().equals(owner.getUserId())) {
-            throw new org.example.onlinestorebackend.exception.InvalidRequestException(
-                    "You can only approve reviews for your own products");
-        }
-
         review.setApproved(true);
         reviewRepository.save(review);
 
@@ -371,17 +364,34 @@ public class ProductService {
         Product product = productRepository.findById(review.getProductId())
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
 
-        User owner = userRepository.findByUsername(ownerUsername)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + ownerUsername));
-
-        if (!product.getOwnerId().equals(owner.getUserId())) {
-            throw new org.example.onlinestorebackend.exception.InvalidRequestException(
-                    "You can only reject reviews for your own products");
-        }
-
         review.setApproved(false);
         review.setComment(null);
 
         reviewRepository.save(review);
+    }
+
+    // PRODUCT_MANAGER: stock update
+    public ProductResponseDto updateStock(String productId, Integer quantity) {
+        if (quantity == null || quantity < 0) {
+            throw new org.example.onlinestorebackend.exception.InvalidRequestException("quantity must be >= 0");
+        }
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
+
+        product.setQuantity(quantity);
+        product.setInStock(quantity > 0);
+        return convertToDto(productRepository.save(product));
+    }
+
+    // PRODUCT_MANAGER: cost update
+    public ProductResponseDto updateCost(String productId, BigDecimal cost) {
+        if (cost == null || cost.compareTo(BigDecimal.ZERO) < 0) {
+            throw new org.example.onlinestorebackend.exception.InvalidRequestException("cost must be >= 0");
+        }
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
+
+        product.setCost(cost);
+        return convertToDto(productRepository.save(product));
     }
 }

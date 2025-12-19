@@ -97,9 +97,25 @@ public class ProductController {
         return ResponseEntity.ok(products);
     }
 
+    // PRODUCT_MANAGER: stok miktarını set et
+    @PutMapping("/{productId}/stock")
+    @PreAuthorize("hasRole('PRODUCT_MANAGER')")
+    public ResponseEntity<ProductResponseDto> updateStock(@PathVariable String productId,
+                                                         @RequestParam Integer quantity) {
+        return ResponseEntity.ok(productService.updateStock(productId, quantity));
+    }
+
+    // PRODUCT_MANAGER: ürün maliyetini set et
+    @PutMapping("/{productId}/cost")
+    @PreAuthorize("hasRole('PRODUCT_MANAGER')")
+    public ResponseEntity<ProductResponseDto> updateCost(@PathVariable String productId,
+                                                        @RequestParam BigDecimal cost) {
+        return ResponseEntity.ok(productService.updateCost(productId, cost));
+    }
+
     // Yeni ürün oluştur (sadece PRODUCT_OWNER rolü)
     @PostMapping
-    @PreAuthorize("hasRole('PRODUCT_OWNER')")
+    @PreAuthorize("hasRole('PRODUCT_MANAGER')")
     public ResponseEntity<ProductResponseDto> createProduct(
             @RequestBody Product product,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -109,7 +125,7 @@ public class ProductController {
 
     // Giriş yapmış owner'ın kendi ürünlerini getir
     @GetMapping("/my-products")
-    @PreAuthorize("hasRole('PRODUCT_OWNER')")
+    @PreAuthorize("hasRole('PRODUCT_MANAGER')")
     public ResponseEntity<List<ProductResponseDto>> getMyProducts(@AuthenticationPrincipal UserDetails userDetails) {
         List<ProductResponseDto> products = productService.getProductsByOwner(userDetails.getUsername());
         return ResponseEntity.ok(products);
@@ -117,7 +133,7 @@ public class ProductController {
 
     // Owner'ın kendi ürününü silmesi
     @DeleteMapping("/{productId}")
-    @PreAuthorize("hasRole('PRODUCT_OWNER')")
+    @PreAuthorize("hasRole('PRODUCT_MANAGER')")
     public ResponseEntity<Void> deleteProduct(
             @PathVariable String productId,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -127,7 +143,7 @@ public class ProductController {
 
     // Owner'ın kendi ürünlerinin yorumlarını listeleme (onay bekleyenler dahil)
     @GetMapping("/my-products/{productId}/reviews")
-    @PreAuthorize("hasRole('PRODUCT_OWNER')")
+    @PreAuthorize("hasRole('PRODUCT_MANAGER')")
     public ResponseEntity<List<org.example.onlinestorebackend.Dto.ReviewDto>> getProductReviewsForOwner(
             @PathVariable String productId,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -138,7 +154,7 @@ public class ProductController {
 
     // Yorum onaylama (sadece owner)
     @PutMapping("/reviews/{reviewId}/approve")
-    @PreAuthorize("hasRole('PRODUCT_OWNER')")
+    @PreAuthorize("hasRole('PRODUCT_MANAGER')")
     public ResponseEntity<String> approveReview(
             @PathVariable String reviewId,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -148,7 +164,7 @@ public class ProductController {
 
     // Yorum reddetme (sadece owner)
     @DeleteMapping("/reviews/{reviewId}")
-    @PreAuthorize("hasRole('PRODUCT_OWNER')")
+    @PreAuthorize("hasRole('PRODUCT_MANAGER')")
     public ResponseEntity<String> rejectReview(
             @PathVariable String reviewId,
             @AuthenticationPrincipal UserDetails userDetails) {

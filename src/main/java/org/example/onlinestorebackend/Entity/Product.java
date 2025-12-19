@@ -35,6 +35,13 @@ public class Product {
     @Indexed
     private BigDecimal discount;
 
+    /**
+     * Optional product unit cost used for profit/loss calculations.
+     * If null, the system defaults to 50% of the sale price at purchase time.
+     */
+    @Indexed
+    private BigDecimal cost;
+
     private String description;
 
     private List<String> images;

@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -69,6 +70,11 @@ public class OrderService {
                 finalPrice = product.getPrice().subtract(discountAmount);
             }
             orderItem.setPriceAtPurchase(finalPrice);
+            // costAtPurchase: product.cost varsa onu kullan, yoksa finalPrice * 0.5
+            BigDecimal unitCost = product.getCost() != null
+                    ? product.getCost()
+                    : finalPrice.multiply(BigDecimal.valueOf(0.5)).setScale(2, RoundingMode.HALF_UP);
+            orderItem.setCostAtPurchase(unitCost);
 
             orderItems.add(orderItem);
 
@@ -110,6 +116,12 @@ public class OrderService {
             orderItem.setProductName(product.getProductName());
             orderItem.setQuantity(cartItem.getQuantity());
             orderItem.setPriceAtPurchase(cartItem.getPrice());
+            BigDecimal unitCost = product.getCost() != null
+                    ? product.getCost()
+                    : (cartItem.getPrice() != null
+                        ? cartItem.getPrice().multiply(BigDecimal.valueOf(0.5)).setScale(2, RoundingMode.HALF_UP)
+                        : BigDecimal.ZERO);
+            orderItem.setCostAtPurchase(unitCost);
 
             orderItems.add(orderItem);
 
