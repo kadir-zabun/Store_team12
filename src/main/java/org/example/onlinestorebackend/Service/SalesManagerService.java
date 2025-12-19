@@ -1,7 +1,7 @@
 package org.example.onlinestorebackend.Service;
 
 import lombok.RequiredArgsConstructor;
-import org.example.onlinestorebackend.Dto.SalesMetricsResponse;
+import org.example.onlinestorebackend.Dto.SalesMetricResponse;
 import org.example.onlinestorebackend.Entity.Invoice;
 import org.example.onlinestorebackend.Entity.Order;
 import org.example.onlinestorebackend.Entity.OrderItem;
@@ -88,7 +88,7 @@ public class SalesManagerService {
         return invoiceRepository.findByInvoiceDateBetween(from, to);
     }
 
-    public SalesMetricsResponse getMetrics(LocalDateTime from, LocalDateTime to) {
+    public SalesMetricResponse getMetrics(LocalDateTime from, LocalDateTime to) {
         List<Invoice> invoices = getInvoices(from, to);
 
         Map<LocalDate, Totals> byDay = new TreeMap<>();
@@ -126,13 +126,13 @@ public class SalesManagerService {
             t.cost = t.cost.add(cost);
         }
 
-        List<SalesMetricsResponse.Point> points = new ArrayList<>();
+        List<SalesMetricResponse.Point> points = new ArrayList<>();
         for (Map.Entry<LocalDate, Totals> e : byDay.entrySet()) {
             BigDecimal profit = e.getValue().revenue.subtract(e.getValue().cost);
-            points.add(new SalesMetricsResponse.Point(e.getKey(), e.getValue().revenue, e.getValue().cost, profit));
+            points.add(new SalesMetricResponse.Point(e.getKey(), e.getValue().revenue, e.getValue().cost, profit));
         }
 
-        SalesMetricsResponse resp = new SalesMetricsResponse();
+        SalesMetricResponse resp = new SalesMetricResponse();
         resp.setTotalRevenue(totalRevenue);
         resp.setTotalCost(totalCost);
         resp.setTotalProfit(totalRevenue.subtract(totalCost));

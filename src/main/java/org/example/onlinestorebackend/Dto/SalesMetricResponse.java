@@ -12,7 +12,7 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class SalesMetricsResponse {
+public class SalesMetricResponse {
 
     private BigDecimal totalRevenue = BigDecimal.ZERO;
     private BigDecimal totalCost = BigDecimal.ZERO;
