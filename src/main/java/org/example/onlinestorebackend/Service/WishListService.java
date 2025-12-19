@@ -67,3 +67,5 @@ public class WishListService {
                 .orElseThrow(() -> new ResourceNotFoundException("Wishlist not found for userId: " + userId));
     }
 }
+
+// This is a unit test by Ege
