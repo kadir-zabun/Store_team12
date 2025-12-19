@@ -9,8 +9,10 @@ import org.example.onlinestorebackend.exception.InsufficientStockException;
 import org.example.onlinestorebackend.exception.InvalidRequestException;
 import org.example.onlinestorebackend.exception.ResourceNotFoundException;
 import org.example.onlinestorebackend.Repository.CartRepository;
+import org.example.onlinestorebackend.Repository.DeliveryRepository;
 import org.example.onlinestorebackend.Repository.OrderRepository;
 import org.example.onlinestorebackend.Repository.ProductRepository;
+import org.example.onlinestorebackend.Repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,7 +21,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -41,6 +42,12 @@ class OrderServiceTest {
 
     @Mock
     private CartRepository cartRepository;
+
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private DeliveryRepository deliveryRepository;
 
     @InjectMocks
     private OrderService orderService;
@@ -149,6 +156,8 @@ class OrderServiceTest {
             order.setOrderId(UUID.randomUUID().toString());
             return order;
         });
+        when(deliveryRepository.save(any(org.example.onlinestorebackend.Entity.Delivery.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
         when(cartRepository.save(any(Cart.class))).thenReturn(cart);
 
         // When
@@ -186,7 +195,7 @@ class OrderServiceTest {
         Order order = new Order();
         order.setOrderId(orderId);
         order.setCustomerId(customerId);
-        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.findByOrderId(orderId)).thenReturn(Optional.of(order));
 
         // When
         Order result = orderService.getOrderById(orderId);
@@ -194,13 +203,14 @@ class OrderServiceTest {
         // Then
         assertNotNull(result);
         assertEquals(orderId, result.getOrderId());
-        verify(orderRepository).findById(orderId);
+        verify(orderRepository).findByOrderId(orderId);
     }
 
     @Test
     void getOrderById_invalidId_throwsResourceNotFoundException() {
         // Given
         String invalidId = "invalid-id";
+        when(orderRepository.findByOrderId(invalidId)).thenReturn(Optional.empty());
         when(orderRepository.findById(invalidId)).thenReturn(Optional.empty());
 
         // When & Then
@@ -209,6 +219,7 @@ class OrderServiceTest {
         });
 
         assertTrue(exception.getMessage().contains("Order not found"));
+        verify(orderRepository).findByOrderId(invalidId);
         verify(orderRepository).findById(invalidId);
     }
 
@@ -220,7 +231,7 @@ class OrderServiceTest {
         Order order = new Order();
         order.setOrderId(orderId);
         order.setStatus("PROCESSING");
-        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
+        when(orderRepository.findByOrderId(orderId)).thenReturn(Optional.of(order));
         when(orderRepository.save(any(Order.class))).thenReturn(order);
 
         // When
@@ -229,7 +240,7 @@ class OrderServiceTest {
         // Then
         assertNotNull(result);
         assertEquals(newStatus, result.getStatus());
-        verify(orderRepository).findById(orderId);
+        verify(orderRepository).findByOrderId(orderId);
         verify(orderRepository).save(any(Order.class));
     }
 

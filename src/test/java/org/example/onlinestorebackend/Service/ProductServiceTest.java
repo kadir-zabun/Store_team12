@@ -134,21 +134,56 @@ class ProductServiceTest {
     @Test
     void createProductForOwner_validProduct_returnsProductResponseDto() {
         // Given
-        String ownerId = UUID.randomUUID().toString();
+        String ownerUsername = owner.getUsername();
         product.setCategoryIds(Arrays.asList(category.getCategoryId()));
+        when(userRepository.findByUsername(ownerUsername)).thenReturn(Optional.of(owner));
         when(categoryRepository.findAllById(anyList())).thenReturn(Arrays.asList(category));
         when(productRepository.save(any(Product.class))).thenReturn(product);
         when(productCategoryRelationService.getCategoryIdsForProduct(anyString()))
                 .thenReturn(Arrays.asList(category.getCategoryId()));
 
         // When
-        ProductResponseDto result = productService.createProductForOwner(product, ownerId);
+        ProductResponseDto result = productService.createProductForOwner(product, ownerUsername);
 
         // Then
         assertNotNull(result);
-        assertEquals(ownerId, product.getOwnerId());
+        assertEquals(owner.getUserId(), product.getOwnerId());
         verify(productRepository).save(any(Product.class));
         verify(productCategoryRelationService).syncProductCategories(anyString(), anyList());
+    }
+
+    @Test
+    void updateStock_setsQuantityAndInStock() {
+        // Given
+        when(productRepository.findById(product.getProductId())).thenReturn(Optional.of(product));
+        when(productCategoryRelationService.getCategoryIdsForProduct(anyString()))
+                .thenReturn(Collections.emptyList());
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // When
+        ProductResponseDto dto = productService.updateStock(product.getProductId(), 0);
+
+        // Then
+        assertEquals(0, dto.getQuantity());
+        assertFalse(dto.getInStock());
+        verify(productRepository).save(any(Product.class));
+    }
+
+    @Test
+    void updateCost_setsCost() {
+        // Given
+        when(productRepository.findById(product.getProductId())).thenReturn(Optional.of(product));
+        when(productCategoryRelationService.getCategoryIdsForProduct(anyString()))
+                .thenReturn(Collections.emptyList());
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // When
+        BigDecimal cost = new BigDecimal("12.34");
+        ProductResponseDto dto = productService.updateCost(product.getProductId(), cost);
+
+        // Then
+        assertEquals(cost, dto.getCost());
+        verify(productRepository).save(any(Product.class));
     }
 
     @Test

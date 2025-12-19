@@ -6,14 +6,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationContext;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+
 
 @ExtendWith(MockitoExtension.class)
 class MailServiceTest {
@@ -104,6 +102,13 @@ class MailServiceTest {
         // When & Then
         assertDoesNotThrow(() -> {
             mailService.sendInvoiceEmail(email, invoiceId, amount, invoiceDate);
+        });
+    }
+
+    @Test
+    void sendDiscountNotificationEmail_mailSenderNull_doesNotThrow() {
+        assertDoesNotThrow(() -> {
+            mailService.sendDiscountNotificationEmail(email, "Test Product", new BigDecimal("10"));
         });
     }
 }
