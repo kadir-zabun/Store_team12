@@ -6,6 +6,7 @@ import org.example.onlinestorebackend.Entity.Category;
 import org.example.onlinestorebackend.Service.CategoryService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -44,8 +45,16 @@ public class CategoryController {
 
     // Yeni kategori oluştur (Admin için - şimdilik public)
     @PostMapping
+    @PreAuthorize("hasRole('PRODUCT_MANAGER')")
     public ResponseEntity<CategoryResponseDto> createCategory(@RequestBody Category category) {
         CategoryResponseDto createdCategory = categoryService.createCategory(category);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdCategory);
+    }
+
+    @DeleteMapping("/{categoryId}")
+    @PreAuthorize("hasRole('PRODUCT_MANAGER')")
+    public ResponseEntity<Void> deleteCategory(@PathVariable String categoryId) {
+        categoryService.deleteCategory(categoryId);
+        return ResponseEntity.noContent().build();
     }
 }

@@ -60,7 +60,7 @@ public class OrderController {
 
     // Get orders for product owner (only their products' orders) - Only PRODUCT_OWNER
     @GetMapping
-    @PreAuthorize("hasRole('PRODUCT_OWNER')")
+    @PreAuthorize("hasRole('PRODUCT_MANAGER')")
     public ResponseEntity<List<Order>> getOrdersForOwner(
             @RequestParam(required = false) String status,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -70,7 +70,7 @@ public class OrderController {
 
     // Update order status - Only PRODUCT_OWNER
     @PutMapping("/{orderId}/status")
-    @PreAuthorize("hasRole('PRODUCT_OWNER')")
+    @PreAuthorize("hasRole('PRODUCT_MANAGER')")
     public ResponseEntity<Order> updateOrderStatus(
             @PathVariable String orderId,
             @Valid @RequestBody UpdateOrderStatusRequest request

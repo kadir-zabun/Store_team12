@@ -13,8 +13,12 @@ public class RegisterDto {
     /**
      * İsteğe bağlı kullanıcı tipi:
      * - "CUSTOMER" (varsayılan)
-     * - "PRODUCT_OWNER"
-     * Frontend giriş ekranında seçilecektir.
+     * - "PRODUCT_MANAGER"
+     * - "SALES_MANAGER"
+     * - "SUPPORT_AGENT"
+     *
+     * Backwards compatibility:
+     * - "PRODUCT_OWNER" -> "PRODUCT_MANAGER"
      */
     private String role;
 }

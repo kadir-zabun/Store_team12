@@ -61,6 +61,8 @@ public class SecurityConfig {
                                 "/api/auth/password-reset",
                                 "/api/auth/reset-password"
                         ).permitAll()
+                        // Support (guest can start chat / upload / download via token; role checks done at method level)
+                        .requestMatchers("/api/support/**").permitAll()
                         // Product endpoints (public - herkes görebilir)
                         .requestMatchers(HttpMethod.GET,
                                 "/api/products",

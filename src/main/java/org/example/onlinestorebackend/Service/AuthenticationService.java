@@ -5,6 +5,7 @@ import org.example.onlinestorebackend.Dto.LoginDto;
 import org.example.onlinestorebackend.Dto.RegisterDto;
 import org.example.onlinestorebackend.Entity.User;
 import org.example.onlinestorebackend.Repository.UserRepository;
+import org.example.onlinestorebackend.Security.Role;
 import org.example.onlinestorebackend.Util.JwtUtil;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -70,12 +71,16 @@ public class AuthenticationService {
         user.setName(input.getName());
         user.setOrderNo(new ArrayList<>());
 
-        // Rol bilgisi gelmemişse varsayılan CUSTOMER olsun
-        String role = input.getRole();
-        if (role == null || role.isBlank()) {
-            role = "CUSTOMER";
+        // Role validation + backwards compatibility (e.g. PRODUCT_OWNER -> PRODUCT_MANAGER)
+        try {
+            Role role = Role.from(input.getRole());
+            user.setRole(role.name());
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Invalid role. Allowed roles: CUSTOMER, SALES_MANAGER, PRODUCT_MANAGER, SUPPORT_AGENT"
+            );
         }
-        user.setRole(role.toUpperCase());
 
         return userRepository.save(user);
     }

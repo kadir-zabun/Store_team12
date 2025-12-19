@@ -2,6 +2,7 @@ package org.example.onlinestorebackend.Service;
 
 import org.example.onlinestorebackend.Entity.User;
 import org.example.onlinestorebackend.Repository.UserRepository;
+import org.example.onlinestorebackend.Security.Role;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -25,13 +26,13 @@ public class UserDetailsServiceImpl implements UserDetailsService {
                 .or(() -> userRepository.findByEmail(usernameOrEmail))
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with username or email: " + usernameOrEmail));
 
-        // Basit rol bazlı yetki: CUSTOMER / PRODUCT_OWNER
-        String role = user.getRole() != null ? user.getRole() : "CUSTOMER";
+        // Role normalization + backwards compatibility
+        Role role = Role.from(user.getRole());
 
         return org.springframework.security.core.userdetails.User
                 .withUsername(usernameOrEmail)
                 .password(user.getPassword())
-                .authorities("ROLE_" + role.toUpperCase())
+                .authorities("ROLE_" + role.name())
                 .build();
     }
 }

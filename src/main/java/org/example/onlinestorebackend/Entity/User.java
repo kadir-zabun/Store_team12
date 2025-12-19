@@ -37,7 +37,9 @@ public class User {
     /**
      * Kullanıcı rolü:
      * - CUSTOMER: normal müşteri
-     * - PRODUCT_OWNER: ürün yöneten / yorum onaylayan kullanıcı
+     * - PRODUCT_MANAGER: ürün/kategori/stok/delivery yöneten kullanıcı
+     * - SALES_MANAGER: fiyat/indirim/fatura/rapor yöneten kullanıcı
+     * - SUPPORT_AGENT: canlı destek temsilcisi
      */
     private String role = "CUSTOMER";
 

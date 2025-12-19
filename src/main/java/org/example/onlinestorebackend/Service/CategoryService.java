@@ -45,6 +45,12 @@ public class CategoryService {
         return convertToDto(savedCategory);
     }
 
+    public void deleteCategory(String categoryId) {
+        Category category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + categoryId));
+        categoryRepository.delete(category);
+    }
+
     // Entity -> DTO dönüşümü
     private CategoryResponseDto convertToDto(Category category) {
         return CategoryResponseDto.builder()
