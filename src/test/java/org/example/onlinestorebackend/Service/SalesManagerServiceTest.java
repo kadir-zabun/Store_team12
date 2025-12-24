@@ -1,6 +1,6 @@
 package org.example.onlinestorebackend.Service;
 
-import org.example.onlinestorebackend.Dto.SalesMetricsResponse;
+import org.example.onlinestorebackend.Dto.SalesMetricResponse;
 import org.example.onlinestorebackend.Entity.Invoice;
 import org.example.onlinestorebackend.Entity.Order;
 import org.example.onlinestorebackend.Entity.OrderItem;
@@ -104,7 +104,7 @@ class SalesManagerServiceTest {
         when(invoiceRepository.findByInvoiceDateBetween(from, to)).thenReturn(List.of(inv));
         when(orderRepository.findByOrderId("o1")).thenReturn(Optional.of(order));
 
-        SalesMetricsResponse resp = salesManagerService.getMetrics(from, to);
+        SalesMetricResponse resp = salesManagerService.getMetrics(from, to);
 
         assertEquals(new BigDecimal("100.00"), resp.getTotalRevenue().setScale(2));
         assertEquals(new BigDecimal("40.00"), resp.getTotalCost().setScale(2));
@@ -135,7 +135,7 @@ class SalesManagerServiceTest {
         when(invoiceRepository.findByInvoiceDateBetween(from, to)).thenReturn(List.of(inv));
         when(orderRepository.findByOrderId("o1")).thenReturn(Optional.of(order));
 
-        SalesMetricsResponse resp = salesManagerService.getMetrics(from, to);
+        SalesMetricResponse resp = salesManagerService.getMetrics(from, to);
 
         assertEquals(new BigDecimal("100.00"), resp.getTotalRevenue().setScale(2));
         assertEquals(new BigDecimal("50.00"), resp.getTotalCost().setScale(2));
