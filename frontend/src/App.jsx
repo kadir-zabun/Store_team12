@@ -17,6 +17,7 @@ import ResetPasswordPage from "./pages/ResetPassword";
 import OwnerDashboard from "./pages/OwnerDashboard";
 import ProductDetailPage from "./pages/ProductDetailPage";
 import SalesManagerDashboard from "./pages/SalesManagerDashboard";
+import WishlistPage from "./pages/WishlistPage";
 
 function App() {
     return (
@@ -39,6 +40,7 @@ function App() {
                     <Route path="/reset-password" element={<ResetPasswordPage />} />
                     <Route path="/owner-dashboard" element={<OwnerDashboard />} />
                     <Route path="/sales-manager" element={<SalesManagerDashboard />} />
+                    <Route path="/wishlist" element={<WishlistPage />} />
                 </Routes>
                 <Toast />
             </BrowserRouter>

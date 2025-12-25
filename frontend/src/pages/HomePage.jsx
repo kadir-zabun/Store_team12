@@ -284,6 +284,29 @@ export default function HomePage() {
                             )}
                         </Link>
                         )}
+                        {userRole === "CUSTOMER" && (
+                            <Link
+                                to="/wishlist"
+                                style={{
+                                    color: "#4a5568",
+                                    textDecoration: "none",
+                                    padding: "0.5rem 1rem",
+                                    borderRadius: "8px",
+                                    fontWeight: 500,
+                                    transition: "all 0.2s",
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = "#f7fafc";
+                                    e.currentTarget.style.color = "#667eea";
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = "transparent";
+                                    e.currentTarget.style.color = "#4a5568";
+                                }}
+                            >
+                                Wishlist
+                            </Link>
+                        )}
                         {userRole === "PRODUCT_OWNER" && (
                             <Link
                                 to="/owner-dashboard"
@@ -394,6 +417,7 @@ export default function HomePage() {
                                     }}
                                 >
                                     {userRole === "CUSTOMER" && (
+                                    <>
                                     <Link
                                         to="/cart"
                                         onClick={() => setShowDropdown(false)}
@@ -418,6 +442,31 @@ export default function HomePage() {
                                         <span>🛒</span>
                                         <span>My Cart</span>
                                     </Link>
+                                    <Link
+                                        to="/wishlist"
+                                        onClick={() => setShowDropdown(false)}
+                                        style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: "0.8rem",
+                                            padding: "0.9rem 1.2rem",
+                                            color: "#2d3748",
+                                            textDecoration: "none",
+                                            fontSize: "0.95rem",
+                                            borderBottom: "1px solid #f1f5f9",
+                                            transition: "background 0.2s",
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = "#f7fafc";
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = "#fff";
+                                        }}
+                                    >
+                                        <span>❤️</span>
+                                        <span>My Wishlist</span>
+                                    </Link>
+                                    </>
                                     )}
                                     {userRole === "PRODUCT_OWNER" && (
                                         <Link
