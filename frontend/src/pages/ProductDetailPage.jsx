@@ -2,6 +2,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import productApi from "../api/productApi";
 import cartApi from "../api/cartApi";
+import wishlistApi from "../api/wishlistApi";
 import { useCartCount } from "../hooks/useCartCount";
 import { useToast } from "../contexts/ToastContext";
 import { useUserRole } from "../hooks/useUserRole";
@@ -13,10 +14,27 @@ export default function ProductDetailPage() {
     const [reviews, setReviews] = useState([]);
     const [loading, setLoading] = useState(true);
     const [addingToCart, setAddingToCart] = useState(false);
+    const [addingToWishlist, setAddingToWishlist] = useState(false);
+    const [isInWishlist, setIsInWishlist] = useState(false);
     const [quantity, setQuantity] = useState(1);
     const { cartCount, refreshCartCount } = useCartCount();
     const { success: showSuccess, error: showError } = useToast();
     const userRole = useUserRole();
+
+    const checkWishlistStatus = async () => {
+        const token = localStorage.getItem("access_token");
+        if (!token || userRole !== "CUSTOMER") return;
+
+        try {
+            const response = await wishlistApi.getWishlist();
+            const wishlistData = response.data?.data || response.data;
+            if (wishlistData && wishlistData.productIds) {
+                setIsInWishlist(wishlistData.productIds.includes(productId));
+            }
+        } catch (error) {
+            console.error("Error checking wishlist status:", error);
+        }
+    };
 
     useEffect(() => {
         const loadProduct = async () => {
@@ -45,6 +63,12 @@ export default function ProductDetailPage() {
                 setProduct(productData);
                 console.log("Loaded reviews:", reviewsData);
                 setReviews(Array.isArray(reviewsData) ? reviewsData : []);
+
+                // Check if product is in wishlist (only for logged-in CUSTOMER)
+                const token = localStorage.getItem("access_token");
+                if (token && userRole === "CUSTOMER") {
+                    await checkWishlistStatus();
+                }
             } catch (error) {
                 console.error("Error loading product:", error);
                 showError("Failed to load product. Please try again.");
@@ -57,7 +81,7 @@ export default function ProductDetailPage() {
         if (productId) {
             loadProduct();
         }
-    }, [productId, navigate, showError]);
+    }, [productId, navigate, showError, userRole]);
 
     const handleAddToCart = async () => {
         if (!product) return;
@@ -115,6 +139,38 @@ export default function ProductDetailPage() {
             showError(error.response?.data?.message || "Failed to add product to cart.");
         } finally {
             setAddingToCart(false);
+        }
+    };
+
+    const handleWishlistToggle = async () => {
+        const token = localStorage.getItem("access_token");
+        if (!token) {
+            showError("Please login to add products to your wishlist.");
+            navigate("/login");
+            return;
+        }
+
+        if (userRole !== "CUSTOMER") {
+            showError("Only customers can add products to wishlist.");
+            return;
+        }
+
+        setAddingToWishlist(true);
+        try {
+            if (isInWishlist) {
+                await wishlistApi.removeFromWishlist(productId);
+                setIsInWishlist(false);
+                showSuccess("Product removed from wishlist!");
+            } else {
+                await wishlistApi.addToWishlist(productId);
+                setIsInWishlist(true);
+                showSuccess("Product added to wishlist!");
+            }
+        } catch (error) {
+            console.error("Error toggling wishlist:", error);
+            showError(error.response?.data?.message || "Failed to update wishlist.");
+        } finally {
+            setAddingToWishlist(false);
         }
     };
 
@@ -314,51 +370,91 @@ export default function ProductDetailPage() {
                                 </div>
                             </div>
 
-                            {/* Add to Cart */}
-                            <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                    <label style={{ color: "#4a5568", fontWeight: 600 }}>Quantity:</label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        max={product.quantity || 1}
-                                        value={quantity}
-                                        onChange={(e) => {
-                                            const val = parseInt(e.target.value) || 1;
-                                            setQuantity(Math.max(1, Math.min(val, product.quantity || 1)));
-                                        }}
+                            {/* Add to Cart and Wishlist */}
+                            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                                <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                        <label style={{ color: "#4a5568", fontWeight: 600 }}>Quantity:</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            max={product.quantity || 1}
+                                            value={quantity}
+                                            onChange={(e) => {
+                                                const val = parseInt(e.target.value) || 1;
+                                                setQuantity(Math.max(1, Math.min(val, product.quantity || 1)));
+                                            }}
+                                            style={{
+                                                width: "80px",
+                                                padding: "0.5rem",
+                                                borderRadius: "8px",
+                                                border: "2px solid #e2e8f0",
+                                                fontSize: "1rem",
+                                                background: "#fff",
+                                                color: "#2d3748",
+                                                textAlign: "center",
+                                            }}
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={handleAddToCart}
+                                        disabled={addingToCart || (product.quantity || 0) === 0}
                                         style={{
-                                            width: "80px",
-                                            padding: "0.5rem",
-                                            borderRadius: "8px",
-                                            border: "2px solid #e2e8f0",
-                                            fontSize: "1rem",
-                                            background: "#fff",
-                                            color: "#2d3748",
-                                            textAlign: "center",
+                                            flex: 1,
+                                            padding: "1rem 2rem",
+                                            background: (product.quantity || 0) === 0
+                                                ? "#cbd5e0"
+                                                : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                            color: "#fff",
+                                            border: "none",
+                                            borderRadius: "12px",
+                                            fontSize: "1.1rem",
+                                            fontWeight: 600,
+                                            cursor: (product.quantity || 0) === 0 ? "not-allowed" : "pointer",
+                                            transition: "all 0.3s",
                                         }}
-                                    />
+                                    >
+                                        {addingToCart ? "Adding..." : (product.quantity || 0) === 0 ? "Out of Stock" : "Add to Cart"}
+                                    </button>
                                 </div>
-                                <button
-                                    onClick={handleAddToCart}
-                                    disabled={addingToCart || (product.quantity || 0) === 0}
-                                    style={{
-                                        flex: 1,
-                                        padding: "1rem 2rem",
-                                        background: (product.quantity || 0) === 0
-                                            ? "#cbd5e0"
-                                            : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                                        color: "#fff",
-                                        border: "none",
-                                        borderRadius: "12px",
-                                        fontSize: "1.1rem",
-                                        fontWeight: 600,
-                                        cursor: (product.quantity || 0) === 0 ? "not-allowed" : "pointer",
-                                        transition: "all 0.3s",
-                                    }}
-                                >
-                                    {addingToCart ? "Adding..." : (product.quantity || 0) === 0 ? "Out of Stock" : "Add to Cart"}
-                                </button>
+                                {userRole === "CUSTOMER" && (
+                                    <button
+                                        onClick={handleWishlistToggle}
+                                        disabled={addingToWishlist}
+                                        style={{
+                                            width: "100%",
+                                            padding: "0.75rem 2rem",
+                                            background: isInWishlist
+                                                ? "#e53e3e"
+                                                : "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
+                                            color: "#fff",
+                                            border: "none",
+                                            borderRadius: "12px",
+                                            fontSize: "1rem",
+                                            fontWeight: 600,
+                                            cursor: addingToWishlist ? "not-allowed" : "pointer",
+                                            transition: "all 0.3s",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            gap: "0.5rem",
+                                        }}
+                                    >
+                                        {addingToWishlist ? (
+                                            "Processing..."
+                                        ) : isInWishlist ? (
+                                            <>
+                                                <span>❤️</span>
+                                                <span>Remove from Wishlist</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span>🤍</span>
+                                                <span>Add to Wishlist</span>
+                                            </>
+                                        )}
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
