@@ -232,7 +232,9 @@ public class MailService {
 
     public void sendDiscountNotificationEmail(String email,
                                               String productName,
-                                              java.math.BigDecimal discountPercent) {
+                                              java.math.BigDecimal discountPercent,
+                                              java.math.BigDecimal originalPrice,
+                                              java.math.BigDecimal discountedPrice) {
         if (mailSender == null) {
             log.warn("JavaMailSender not configured. Discount notification for {} -> product={}, discount={}",
                     email, productName, discountPercent);
@@ -255,11 +257,16 @@ public class MailService {
 
             String pct = discountPercent != null ? discountPercent.toPlainString() : "0";
             String safeName = productName != null ? productName : "a product";
+            String originalPriceStr = originalPrice != null ? originalPrice.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString() : "0.00";
+            String discountedPriceStr = discountedPrice != null ? discountedPrice.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString() : "0.00";
+            
             setText.invoke(msg,
                     "Hello,\n\n" +
                             "Good news! A product in your wish list is now discounted.\n\n" +
                             "Product: " + safeName + "\n" +
-                            "Discount: " + pct + "%\n\n" +
+                            "Original Price: $" + originalPriceStr + "\n" +
+                            "Discounted Price: $" + discountedPriceStr + "\n" +
+                            "Discount Rate: " + pct + "%\n\n" +
                             "Visit the store to see the updated price.\n\n" +
                             "Best regards,\nTeknoSU Team"
             );

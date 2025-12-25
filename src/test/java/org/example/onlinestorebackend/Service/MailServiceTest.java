@@ -108,7 +108,13 @@ class MailServiceTest {
     @Test
     void sendDiscountNotificationEmail_mailSenderNull_doesNotThrow() {
         assertDoesNotThrow(() -> {
-            mailService.sendDiscountNotificationEmail(email, "Test Product", new BigDecimal("10"));
+            mailService.sendDiscountNotificationEmail(
+                    email,
+                    "Test Product",
+                    new BigDecimal("10"),
+                    new BigDecimal("100"),
+                    new BigDecimal("90")
+            );
         });
     }
 }

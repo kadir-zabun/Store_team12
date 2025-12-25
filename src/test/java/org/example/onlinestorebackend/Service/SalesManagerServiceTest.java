@@ -78,7 +78,13 @@ class SalesManagerServiceTest {
 
         assertEquals(1, updated.size());
         assertEquals(new BigDecimal("15"), updated.get(0).getDiscount());
-        verify(mailService).sendDiscountNotificationEmail(eq("u1@example.com"), eq("Phone"), eq(new BigDecimal("15")));
+        verify(mailService).sendDiscountNotificationEmail(
+                eq("u1@example.com"),
+                eq("Phone"),
+                eq(new BigDecimal("15")),
+                eq(new BigDecimal("100")),
+                eq(new BigDecimal("85"))
+        );
     }
 
     @Test

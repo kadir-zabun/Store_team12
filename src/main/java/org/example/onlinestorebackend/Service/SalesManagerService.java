@@ -50,11 +50,26 @@ public class SalesManagerService {
 
             // Notify users who have this product in their wishlist
             List<WishList> wishLists = wishListService.findWishListsContainingProduct(productId);
+            BigDecimal originalPrice = p.getPrice();
+            BigDecimal discountedPrice = originalPrice;
+            if (originalPrice != null && discountPercent != null && discountPercent.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal discountAmount = originalPrice
+                        .multiply(discountPercent)
+                        .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+                discountedPrice = originalPrice.subtract(discountAmount);
+            }
+            
             for (WishList wl : wishLists) {
                 try {
                     String email = userService.getEmailByUserId(wl.getUserId());
                     if (email != null && !email.isBlank()) {
-                        mailService.sendDiscountNotificationEmail(email, p.getProductName(), discountPercent);
+                        mailService.sendDiscountNotificationEmail(
+                                email,
+                                p.getProductName(),
+                                discountPercent,
+                                originalPrice,
+                                discountedPrice
+                        );
                     }
                 } catch (Exception ignored) {
                     // Best-effort notification
