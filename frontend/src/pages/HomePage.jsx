@@ -307,6 +307,29 @@ export default function HomePage() {
                                 Dashboard
                             </Link>
                         )}
+                        {userRole === "SALES_MANAGER" && (
+                            <Link
+                                to="/sales-manager"
+                                style={{
+                                    color: "#4a5568",
+                                    textDecoration: "none",
+                                    padding: "0.5rem 1rem",
+                                    borderRadius: "8px",
+                                    fontWeight: 500,
+                                    transition: "all 0.2s",
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = "#f7fafc";
+                                    e.currentTarget.style.color = "#667eea";
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = "transparent";
+                                    e.currentTarget.style.color = "#4a5568";
+                                }}
+                            >
+                                Sales Manager
+                            </Link>
+                        )}
                     </div>
                 </div>
 
@@ -420,6 +443,32 @@ export default function HomePage() {
                                         >
                                             <span>📊</span>
                                             <span>Dashboard</span>
+                                        </Link>
+                                    )}
+                                    {userRole === "SALES_MANAGER" && (
+                                        <Link
+                                            to="/sales-manager"
+                                            onClick={() => setShowDropdown(false)}
+                                            style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: "0.8rem",
+                                                padding: "0.9rem 1.2rem",
+                                                color: "#2d3748",
+                                                textDecoration: "none",
+                                                fontSize: "0.95rem",
+                                                borderBottom: "1px solid #f1f5f9",
+                                                transition: "background 0.2s",
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.background = "#f7fafc";
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.background = "#fff";
+                                        }}
+                                        >
+                                            <span>💰</span>
+                                            <span>Sales Manager</span>
                                         </Link>
                                     )}
                                     <Link
