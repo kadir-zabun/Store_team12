@@ -6,8 +6,11 @@ import org.example.onlinestorebackend.Dto.SetDiscountRequest;
 import org.example.onlinestorebackend.Dto.SetPriceRequest;
 import org.example.onlinestorebackend.Entity.Invoice;
 import org.example.onlinestorebackend.Entity.Product;
+import org.example.onlinestorebackend.Entity.RefundRequest;
 import org.example.onlinestorebackend.Repository.InvoiceRepository;
+import org.example.onlinestorebackend.Dto.RefundDecisionDto;
 import org.example.onlinestorebackend.Service.SalesManagerService;
+import org.example.onlinestorebackend.Service.RefundService;
 import org.example.onlinestorebackend.exception.ResourceNotFoundException;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
@@ -16,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -27,6 +31,7 @@ public class SalesManagerController {
 
     private final SalesManagerService salesManagerService;
     private final InvoiceRepository invoiceRepository;
+    private final RefundService refundService;
 
     @PutMapping("/products/discount")
     public ResponseEntity<List<Product>> setDiscount(@RequestBody SetDiscountRequest request) {
@@ -73,6 +78,19 @@ public class SalesManagerController {
             @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to
     ) {
         return ResponseEntity.ok(salesManagerService.getMetrics(from, to));
+    }
+
+    @GetMapping("/refunds/pending")
+    public ResponseEntity<List<RefundRequest>> getPendingRefunds() {
+        return ResponseEntity.ok(refundService.getPendingRefunds());
+    }
+
+    @PutMapping("/refunds/{refundId}/decision")
+    public ResponseEntity<RefundRequest> decideRefund(
+            @PathVariable String refundId,
+            @RequestBody @Valid RefundDecisionDto dto) {
+        dto.setRefundId(refundId);
+        return ResponseEntity.ok(refundService.decideRefund(dto));
     }
 }
 
