@@ -46,6 +46,11 @@ public class OrderService {
             throw new InvalidRequestException("Order must contain at least one item");
         }
 
+        // Müşteri adresini çek (teslimat kaydında kullanılacak)
+        User customer = userRepository.findByUserId(request.getCustomerId())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + request.getCustomerId()));
+        String deliveryAddress = customer.getHomeAddress();
+
         List<OrderItem> orderItems = new ArrayList<>();
         BigDecimal totalPrice = BigDecimal.ZERO;
 
@@ -89,7 +94,23 @@ public class OrderService {
         order.setStatus("PROCESSING");
         order.setTotalPrice(totalPrice.doubleValue());
 
-        return orderRepository.save(order);
+        Order savedOrder = orderRepository.save(order);
+
+        // Teslimat kayıtlarını oluştur (adres dahil)
+        for (OrderItem item : orderItems) {
+            Delivery delivery = new Delivery();
+            delivery.setDeliveryId(UUID.randomUUID().toString());
+            delivery.setOrderId(savedOrder.getOrderId());
+            delivery.setCustomerId(savedOrder.getCustomerId());
+            delivery.setProductId(item.getProductId());
+            delivery.setQuantity(item.getQuantity());
+            delivery.setTotalPrice(item.getPriceAtPurchase().multiply(BigDecimal.valueOf(item.getQuantity())).doubleValue());
+            delivery.setDeliveryAddress(deliveryAddress);
+            delivery.setCompleted(false);
+            deliveryRepository.save(delivery);
+        }
+
+        return savedOrder;
     }
 
     @Transactional
@@ -100,6 +121,11 @@ public class OrderService {
         if (cart.getItems() == null || cart.getItems().isEmpty()) {
             throw new InvalidRequestException("Cart is empty, cannot create order");
         }
+
+        // Müşteri adresini çek (teslimat kaydında kullanılacak)
+        User customer = userRepository.findByUserId(customerId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + customerId));
+        String deliveryAddress = customer.getHomeAddress();
 
         List<OrderItem> orderItems = new ArrayList<>();
         BigDecimal totalPrice = BigDecimal.ZERO;
@@ -150,6 +176,7 @@ public class OrderService {
             delivery.setProductId(item.getProductId());
             delivery.setQuantity(item.getQuantity());
             delivery.setTotalPrice(item.getPriceAtPurchase().multiply(BigDecimal.valueOf(item.getQuantity())).doubleValue());
+            delivery.setDeliveryAddress(deliveryAddress);
             delivery.setCompleted(false);
             deliveryRepository.save(delivery);
         }
