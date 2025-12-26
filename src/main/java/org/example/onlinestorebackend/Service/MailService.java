@@ -259,7 +259,7 @@ public class MailService {
             String safeName = productName != null ? productName : "a product";
             String originalPriceStr = originalPrice != null ? originalPrice.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString() : "0.00";
             String discountedPriceStr = discountedPrice != null ? discountedPrice.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString() : "0.00";
-            
+
             setText.invoke(msg,
                     "Hello,\n\n" +
                             "Good news! A product in your wish list is now discounted.\n\n" +
@@ -276,6 +276,61 @@ public class MailService {
             sendMethod.invoke(mailSender, msg);
         } catch (Exception e) {
             log.error("Failed to send discount notification email to {}: {}", email, e.getMessage());
+            log.error("Exception details: ", e);
+        }
+    }
+
+    /**
+     * Refund onayı/red bilgisi.
+     */
+    public void sendRefundNotificationEmail(String email,
+                                            String productName,
+                                            java.math.BigDecimal refundAmount,
+                                            boolean approved,
+                                            String reason,
+                                            String decisionNote) {
+        if (mailSender == null) {
+            log.warn("JavaMailSender not configured. Refund notification for {} -> product={}, approved={}, amount={}",
+                    email, productName, approved, refundAmount);
+            return;
+        }
+
+        try {
+            Class<?> simpleMailMessageClass = Class.forName("org.springframework.mail.SimpleMailMessage");
+            Object msg = simpleMailMessageClass.getDeclaredConstructor().newInstance();
+
+            Method setFrom = simpleMailMessageClass.getMethod("setFrom", String.class);
+            Method setTo = simpleMailMessageClass.getMethod("setTo", String.class);
+            Method setSubject = simpleMailMessageClass.getMethod("setSubject", String.class);
+            Method setText = simpleMailMessageClass.getMethod("setText", String.class);
+
+            String fromEmail = mailFrom != null && !mailFrom.isEmpty() ? mailFrom : "noreply@teknosu.com";
+            setFrom.invoke(msg, fromEmail);
+            setTo.invoke(msg, email);
+            setSubject.invoke(msg, approved ? "Refund Approved - TeknoSU" : "Refund Rejected - TeknoSU");
+
+            String safeName = productName != null ? productName : "your product";
+            StringBuilder body = new StringBuilder();
+            body.append("Hello,\n\n")
+                    .append("Refund request for ").append(safeName).append(" has been ")
+                    .append(approved ? "APPROVED" : "REJECTED").append(".\n\n")
+                    .append("Amount: $").append(refundAmount != null ? refundAmount.setScale(2, java.math.RoundingMode.HALF_UP) : "0.00").append("\n");
+
+            if (reason != null && !reason.isBlank()) {
+                body.append("Your reason: ").append(reason).append("\n");
+            }
+            if (decisionNote != null && !decisionNote.isBlank()) {
+                body.append("Manager note: ").append(decisionNote).append("\n");
+            }
+
+            body.append("\nBest regards,\nTeknoSU Team");
+            setText.invoke(msg, body.toString());
+
+            Class<?> mailSenderInterface = Class.forName("org.springframework.mail.javamail.JavaMailSender");
+            Method sendMethod = mailSenderInterface.getMethod("send", simpleMailMessageClass);
+            sendMethod.invoke(mailSender, msg);
+        } catch (Exception e) {
+            log.error("Failed to send refund notification email to {}: {}", email, e.getMessage());
             log.error("Exception details: ", e);
         }
     }
