@@ -9,6 +9,8 @@ public class RegisterDto {
     private String confirmPassword;
     private String email;
     private String username;
+    private String taxId;
+    private String homeAddress;
 
     /**
      * İsteğe bağlı kullanıcı tipi:

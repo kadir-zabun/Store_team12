@@ -70,6 +70,8 @@ public class AuthenticationService {
         user.setPassword(passwordEncoder.encode(input.getPassword()));
         user.setName(input.getName());
         user.setOrderNo(new ArrayList<>());
+        user.setTaxId(input.getTaxId());
+        user.setHomeAddress(input.getHomeAddress());
 
         // Role validation + backwards compatibility (e.g. PRODUCT_OWNER -> PRODUCT_MANAGER)
         try {

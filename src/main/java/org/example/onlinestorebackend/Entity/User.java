@@ -32,6 +32,16 @@ public class User {
     @Indexed                 // e-posta ile arama için index
     private String email;
 
+    /**
+     * Vergi kimlik numarası (zorunlu alan).
+     */
+    private String taxId;
+
+    /**
+     * Müşterinin teslimat/ev adresi (zorunlu alan).
+     */
+    private String homeAddress;
+
     private List<String> orderNo = new ArrayList<>();
 
     /**
