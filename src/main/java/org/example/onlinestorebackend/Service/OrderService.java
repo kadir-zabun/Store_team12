@@ -65,8 +65,8 @@ public class OrderService {
             BigDecimal finalPrice = product.getPrice();
             if (product.getDiscount() != null && product.getDiscount().compareTo(BigDecimal.ZERO) > 0) {
                 BigDecimal discountAmount = product.getPrice()
-                    .multiply(product.getDiscount())
-                    .divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+                        .multiply(product.getDiscount())
+                        .divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
                 finalPrice = product.getPrice().subtract(discountAmount);
             }
             orderItem.setPriceAtPurchase(finalPrice);
@@ -119,8 +119,8 @@ public class OrderService {
             BigDecimal unitCost = product.getCost() != null
                     ? product.getCost()
                     : (cartItem.getPrice() != null
-                        ? cartItem.getPrice().multiply(BigDecimal.valueOf(0.5)).setScale(2, RoundingMode.HALF_UP)
-                        : BigDecimal.ZERO);
+                    ? cartItem.getPrice().multiply(BigDecimal.valueOf(0.5)).setScale(2, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO);
             orderItem.setCostAtPurchase(unitCost);
 
             orderItems.add(orderItem);
@@ -239,6 +239,38 @@ public class OrderService {
         Order order = orderOpt
                 .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
         order.setStatus(status);
+        return orderRepository.save(order);
+    }
+
+    @Transactional
+    public Order cancelOrder(String orderId, String username) {
+        Order order = orderRepository.findByOrderId(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + username));
+
+        if (!user.getUserId().equals(order.getCustomerId())) {
+            throw new InvalidRequestException("You can only cancel your own orders.");
+        }
+
+        if (!"PROCESSING".equalsIgnoreCase(order.getStatus())) {
+            throw new InvalidRequestException("Only orders in PROCESSING status can be cancelled.");
+        }
+
+        // Put stock back
+        if (order.getItems() != null) {
+            for (OrderItem item : order.getItems()) {
+                Product product = productRepository.findById(item.getProductId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + item.getProductId()));
+                int newQty = (product.getQuantity() != null ? product.getQuantity() : 0) + (item.getQuantity() != null ? item.getQuantity() : 0);
+                product.setQuantity(newQty);
+                product.setInStock(newQty > 0);
+                productRepository.save(product);
+            }
+        }
+
+        order.setStatus("CANCELLED");
         return orderRepository.save(order);
     }
 

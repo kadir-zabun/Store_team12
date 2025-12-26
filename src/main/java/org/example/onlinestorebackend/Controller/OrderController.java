@@ -4,8 +4,11 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.example.onlinestorebackend.Dto.CreateOrderRequest;
 import org.example.onlinestorebackend.Dto.UpdateOrderStatusRequest;
+import org.example.onlinestorebackend.Dto.RefundRequestDto;
 import org.example.onlinestorebackend.Entity.Order;
+import org.example.onlinestorebackend.Entity.RefundRequest;
 import org.example.onlinestorebackend.Service.OrderService;
+import org.example.onlinestorebackend.Service.RefundService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,6 +24,7 @@ import java.util.List;
 public class OrderController {
 
     private final OrderService orderService;
+    private final RefundService refundService;
 
     @PostMapping
     public ResponseEntity<Order> createOrder(@Valid @RequestBody CreateOrderRequest request) {
@@ -43,6 +47,33 @@ public class OrderController {
     public ResponseEntity<Order> getOrderById(@PathVariable String orderId) {
         Order order = orderService.getOrderById(orderId);
         return ResponseEntity.ok(order);
+    }
+
+    @PostMapping("/{orderId}/cancel")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<Order> cancelOrder(
+            @PathVariable String orderId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        Order order = orderService.cancelOrder(orderId, userDetails.getUsername());
+        return ResponseEntity.ok(order);
+    }
+
+    @PostMapping("/{orderId}/refund")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<RefundRequest> requestRefund(
+            @PathVariable String orderId,
+            @Valid @RequestBody RefundRequestDto request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        request.setOrderId(orderId);
+        RefundRequest refund = refundService.requestRefund(userDetails.getUsername(), request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(refund);
+    }
+
+    @GetMapping("/refunds/me")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<List<RefundRequest>> myRefunds(@AuthenticationPrincipal UserDetails userDetails) {
+        List<RefundRequest> refunds = refundService.getRefundsForUser(userDetails.getUsername());
+        return ResponseEntity.ok(refunds);
     }
 
     @GetMapping("/customer/{customerId}")
