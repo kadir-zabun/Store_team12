@@ -1,6 +1,7 @@
 package org.example.onlinestorebackend.Service;
 
 import org.example.onlinestorebackend.Dto.ReviewDto;
+import org.example.onlinestorebackend.Dto.ProfileResponseDto;
 import org.example.onlinestorebackend.Entity.Order;
 import org.example.onlinestorebackend.Entity.OrderItem;
 import org.example.onlinestorebackend.Entity.Review;
@@ -34,6 +35,16 @@ public class UserService {
     public Optional<User> findByUsernameOrEmail(String usernameOrEmail) {
         return userRepository.findByUsername(usernameOrEmail)
                 .or(() -> userRepository.findByEmail(usernameOrEmail));
+    }
+
+    public ProfileResponseDto getMyProfile(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found with username: " + username));
+        return ProfileResponseDto.builder()
+                .name(user.getName())
+                .email(user.getEmail())
+                .homeAddress(user.getHomeAddress())
+                .build();
     }
 
     public String getUsernameByUserId(String userId) {

@@ -2,6 +2,7 @@ package org.example.onlinestorebackend.Controller;
 
 import lombok.Data;
 import org.example.onlinestorebackend.Dto.ReviewDto;
+import org.example.onlinestorebackend.Dto.ProfileResponseDto;
 import org.example.onlinestorebackend.Entity.User;
 import org.example.onlinestorebackend.Service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +22,15 @@ public class UserController {
     @GetMapping
     public ResponseEntity<List<User>> getAllUsers() {
         return ResponseEntity.ok(userService.getAllUsers());
+    }
+
+    @GetMapping("/me/profile")
+    public ResponseEntity<ProfileResponseDto> getMyProfile(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null) {
+            return ResponseEntity.status(401).build();
+        }
+        ProfileResponseDto profile = userService.getMyProfile(authentication.getName());
+        return ResponseEntity.ok(profile);
     }
 
     @GetMapping("/find")
