@@ -29,8 +29,10 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         // Role normalization + backwards compatibility
         Role role = Role.from(user.getRole());
 
+        String principalUsername = user.getUsername();
+
         return org.springframework.security.core.userdetails.User
-                .withUsername(usernameOrEmail)
+                .withUsername(principalUsername)
                 .password(user.getPassword())
                 .authorities("ROLE_" + role.name())
                 .build();
