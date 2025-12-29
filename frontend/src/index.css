@@ -42,7 +42,6 @@ button {
   font-size: 1em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
   cursor: pointer;
   transition: border-color 0.25s;
 }
@@ -62,7 +61,21 @@ button:focus-visible {
   a:hover {
     color: #747bff;
   }
-  button {
-    background-color: #f9f9f9;
-  }
+}
+
+/* Ensure option elements have consistent colors */
+select option {
+  background-color: #fff;
+  color: #2d3748;
+}
+
+/* Select hover effects */
+select:hover {
+  border-color: #667eea;
+}
+
+select:focus {
+  border-color: #667eea;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }

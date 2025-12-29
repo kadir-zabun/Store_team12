@@ -1,11 +1,11 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import orderApi from "../api/orderApi";
 import { useToast } from "../contexts/ToastContext";
 import { useUserRole } from "../hooks/useUserRole";
+import CustomSelect from "../components/CustomSelect";
 
 export default function OrderManagementPage() {
-    const [userName, setUserName] = useState(null);
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
     const [statusFilter, setStatusFilter] = useState("");
@@ -14,8 +14,6 @@ export default function OrderManagementPage() {
     const navigate = useNavigate();
     const { success: showSuccess, error: showError } = useToast();
     const userRole = useUserRole();
-    const dropdownRef = useRef(null);
-    const [showDropdown, setShowDropdown] = useState(false);
 
     useEffect(() => {
         const token = localStorage.getItem("access_token");
@@ -33,21 +31,13 @@ export default function OrderManagementPage() {
             return; // Still loading
         }
 
-        if (currentRole !== "PRODUCT_OWNER") {
+        if (currentRole !== "PRODUCT_MANAGER") {
             navigate("/");
             return;
         }
 
         const loadData = async () => {
             try {
-                // Get username
-                const payloadBase64 = token.split(".")[1];
-                const normalized = payloadBase64.replace(/-/g, "+").replace(/_/g, "/");
-                const payloadJson = atob(normalized);
-                const payload = JSON.parse(payloadJson);
-                const username = payload.sub || payload.name || payload.username;
-                setUserName(username);
-
                 // Load orders
                 await loadOrders();
             } catch (error) {
@@ -63,7 +53,7 @@ export default function OrderManagementPage() {
 
     const loadOrders = async () => {
         try {
-            // Backend endpoint /api/orders returns orders for the authenticated product owner
+            // Backend endpoint /api/orders returns orders for the authenticated product manager
             // It uses JWT to get username and filters orders by owner's products
             console.log("Fetching orders with status filter:", statusFilter || null);
             const response = await orderApi.getAllOrders(statusFilter || null);
@@ -116,18 +106,6 @@ export default function OrderManagementPage() {
         }
     };
 
-    const handleLogout = () => {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("user_role");
-        setUserName(null);
-        setShowDropdown(false);
-        navigate("/login");
-    };
-
-    const toggleDropdown = () => {
-        setShowDropdown(!showDropdown);
-    };
-
     const getStatusColor = (status) => {
         switch (status) {
             case "DELIVERED":
@@ -156,151 +134,39 @@ export default function OrderManagementPage() {
         );
     }
 
-    // If not PRODUCT_OWNER, show message (will redirect in useEffect)
-    if (currentRole !== "PRODUCT_OWNER") {
+    // If not PRODUCT_MANAGER, show message (will redirect in useEffect)
+    if (currentRole !== "PRODUCT_MANAGER") {
         return (
             <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <div style={{ background: "rgba(255, 255, 255, 0.95)", padding: "2rem", borderRadius: "20px", textAlign: "center" }}>
                     <h2 style={{ color: "#2d3748" }}>Access Denied</h2>
-                    <p style={{ color: "#718096" }}>This page is only accessible to Product Owners.</p>
+                    <p style={{ color: "#718096" }}>This page is only accessible to Product Managers.</p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}>
-            <nav
-                style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "1.2rem 4rem",
-                    background: "rgba(255, 255, 255, 0.95)",
-                    backdropFilter: "blur(10px)",
-                    boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-                    position: "sticky",
-                    top: 0,
-                    zIndex: 100,
-                }}
-            >
-                <div style={{ display: "flex", alignItems: "center", gap: "3rem" }}>
-                    <Link
-                        to="/"
-                        style={{
-                            fontSize: "1.5rem",
-                            fontWeight: 700,
-                            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                            WebkitBackgroundClip: "text",
-                            WebkitTextFillColor: "transparent",
-                            textDecoration: "none",
-                        }}
-                    >
-                        🛍️ TeknoSU
-                    </Link>
-                    <div style={{ display: "flex", alignItems: "center", gap: "2rem" }}>
-                        <Link to="/owner-dashboard" style={{ color: "#4a5568", textDecoration: "none", padding: "0.5rem 1rem", borderRadius: "8px", fontWeight: 500 }}>
-                            Dashboard
-                        </Link>
-                        <Link to="/owner/products" style={{ color: "#4a5568", textDecoration: "none", padding: "0.5rem 1rem", borderRadius: "8px", fontWeight: 500 }}>
-                            Products
-                        </Link>
-                        <Link to="/owner/orders" style={{ color: "#667eea", textDecoration: "none", padding: "0.5rem 1rem", borderRadius: "8px", fontWeight: 600, background: "#f7fafc" }}>
-                            Orders
-                        </Link>
-                        <Link to="/owner/reviews" style={{ color: "#4a5568", textDecoration: "none", padding: "0.5rem 1rem", borderRadius: "8px", fontWeight: 500 }}>
-                            Reviews
-                        </Link>
-                    </div>
-                </div>
-
-                <div style={{ display: "flex", alignItems: "center", gap: "1rem", position: "relative" }}>
-                    {userName && (
-                        <div ref={dropdownRef} style={{ position: "relative" }}>
-                            <button
-                                onClick={toggleDropdown}
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "0.6rem",
-                                    padding: "0.6rem 1.2rem",
-                                    borderRadius: "10px",
-                                    border: "none",
-                                    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                                    color: "#fff",
-                                    fontSize: "0.95rem",
-                                    fontWeight: 600,
-                                    cursor: "pointer",
-                                }}
-                            >
-                                <span>{userName}</span>
-                                <span style={{ fontSize: "0.7rem" }}>{showDropdown ? "▲" : "▼"}</span>
-                            </button>
-                            {showDropdown && (
-                                <div
-                                    style={{
-                                        position: "absolute",
-                                        top: "100%",
-                                        right: 0,
-                                        marginTop: "0.8rem",
-                                        background: "#fff",
-                                        border: "1px solid #e2e8f0",
-                                        borderRadius: "12px",
-                                        boxShadow: "0 10px 25px rgba(0, 0, 0, 0.15)",
-                                        minWidth: "200px",
-                                        zIndex: 1000,
-                                    }}
-                                >
-                                    <button
-                                        onClick={handleLogout}
-                                        style={{
-                                            width: "100%",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "0.8rem",
-                                            textAlign: "left",
-                                            padding: "0.9rem 1.2rem",
-                                            color: "#e53e3e",
-                                            fontSize: "0.95rem",
-                                            border: "none",
-                                            background: "transparent",
-                                            cursor: "pointer",
-                                        }}
-                                    >
-                                        <span>🚪</span>
-                                        <span>Logout</span>
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-            </nav>
-
+        <div style={{ minHeight: "calc(100vh - 80px)", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}>
             <div style={{ padding: "2rem", maxWidth: "1400px", margin: "0 auto" }}>
-                <div style={{ background: "rgba(255, 255, 255, 0.95)", padding: "2rem", borderRadius: "20px", boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)" }}>
+                <div style={{ background: "rgba(255, 255, 255, 0.95)", padding: "2rem", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
-                        <h1 style={{ fontSize: "2.5rem", fontWeight: 700, color: "#2d3748" }}>Order Management</h1>
+                        <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "#2d3748" }}>Order Management</h1>
                         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                            <label style={{ fontWeight: 600, color: "#4a5568" }}>Filter by Status:</label>
-                            <select
+                            <label style={{ fontWeight: 600, color: "#4a5568", fontSize: "0.85rem" }}>Filter by Status:</label>
+                            <CustomSelect
                                 value={statusFilter}
                                 onChange={(e) => setStatusFilter(e.target.value)}
-                                style={{
-                                    padding: "0.5rem 1rem",
-                                    borderRadius: "8px",
-                                    border: "2px solid #e2e8f0",
-                                    fontSize: "1rem",
-                                    background: "#fff",
-                                    cursor: "pointer",
-                                }}
-                            >
-                                <option value="">All Orders</option>
-                                <option value="PROCESSING">Processing</option>
-                                <option value="IN_TRANSIT">In Transit</option>
-                                <option value="DELIVERED">Delivered</option>
-                                <option value="CANCELLED">Cancelled</option>
-                            </select>
+                                options={[
+                                    { value: "", label: "All Orders" },
+                                    { value: "PROCESSING", label: "Processing" },
+                                    { value: "IN_TRANSIT", label: "In Transit" },
+                                    { value: "DELIVERED", label: "Delivered" },
+                                    { value: "CANCELLED", label: "Cancelled" }
+                                ]}
+                                placeholder="All Orders"
+                                minWidth="150px"
+                            />
                         </div>
                     </div>
 
@@ -316,16 +182,16 @@ export default function OrderManagementPage() {
                                     style={{
                                         padding: "1.5rem",
                                         background: "#f7fafc",
-                                        borderRadius: "12px",
-                                        border: "1px solid #e2e8f0",
+                                        borderRadius: "4px",
+                                        border: "2px solid #e2e8f0",
                                     }}
                                 >
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
                                         <div>
-                                            <div style={{ fontSize: "1.1rem", fontWeight: 600, color: "#2d3748", marginBottom: "0.25rem" }}>
+                                            <div style={{ fontSize: "1rem", fontWeight: 600, color: "#2d3748", marginBottom: "0.25rem" }}>
                                                 Order #{order.orderId || order.id}
                                             </div>
-                                            <div style={{ fontSize: "0.9rem", color: "#718096" }}>
+                                            <div style={{ fontSize: "0.85rem", color: "#718096" }}>
                                                 Customer ID: {order.customerId} | Date: {order.orderDate ? new Date(order.orderDate).toLocaleDateString() : "N/A"}
                                             </div>
                                         </div>
@@ -334,9 +200,9 @@ export default function OrderManagementPage() {
                                                 padding: "0.5rem 1rem",
                                                 background: getStatusColor(order.status),
                                                 color: "#fff",
-                                                borderRadius: "8px",
+                                                borderRadius: "4px",
                                                 fontWeight: 600,
-                                                fontSize: "0.9rem",
+                                                fontSize: "0.85rem",
                                             }}
                                         >
                                             {order.status || "PROCESSING"}
@@ -344,7 +210,7 @@ export default function OrderManagementPage() {
                                     </div>
 
                                     <div style={{ marginBottom: "1rem" }}>
-                                        <h3 style={{ fontSize: "0.95rem", fontWeight: 600, color: "#4a5568", marginBottom: "0.5rem" }}>Items:</h3>
+                                        <h3 style={{ fontSize: "0.85rem", fontWeight: 600, color: "#4a5568", marginBottom: "0.5rem" }}>Items:</h3>
                                         <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                                             {order.items && Array.isArray(order.items) && order.items.length > 0 ? (
                                                 order.items.map((item, index) => {
@@ -359,30 +225,71 @@ export default function OrderManagementPage() {
                                                             key={index}
                                                             style={{
                                                                 display: "flex",
-                                                                justifyContent: "space-between",
                                                                 alignItems: "center",
+                                                                gap: "1rem",
                                                                 padding: "0.75rem",
                                                                 background: "#fff",
-                                                                borderRadius: "6px",
-                                                                border: "1px solid #e2e8f0",
+                                                                borderRadius: "4px",
+                                                                border: "2px solid #e2e8f0",
                                                             }}
                                                         >
-                                                            <div style={{ flex: 1, fontSize: "0.9rem", color: "#2d3748" }}>
+                                                            {/* Product Image */}
+                                                            <div style={{ flexShrink: 0 }}>
+                                                                {item.imageUrl ? (
+                                                                    <img
+                                                                        src={item.imageUrl}
+                                                                        alt={productName}
+                                                                        style={{
+                                                                            width: "60px",
+                                                                            height: "60px",
+                                                                            objectFit: "cover",
+                                                                            borderRadius: "4px",
+                                                                            border: "1px solid #e2e8f0",
+                                                                        }}
+                                                                        onError={(e) => {
+                                                                            e.target.style.display = "none";
+                                                                            if (e.target.nextSibling) {
+                                                                                e.target.nextSibling.style.display = "flex";
+                                                                            }
+                                                                        }}
+                                                                    />
+                                                                ) : (
+                                                                    <div
+                                                                        style={{
+                                                                            width: "60px",
+                                                                            height: "60px",
+                                                                            background: "#f7fafc",
+                                                                            borderRadius: "4px",
+                                                                            border: "1px solid #e2e8f0",
+                                                                            display: "flex",
+                                                                            alignItems: "center",
+                                                                            justifyContent: "center",
+                                                                            fontSize: "1.5rem",
+                                                                            color: "#cbd5e0",
+                                                                        }}
+                                                                    >
+                                                                        📦
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            {/* Product Info */}
+                                                            <div style={{ flex: 1, fontSize: "0.85rem", color: "#2d3748" }}>
                                                                 <div style={{ fontWeight: 600, marginBottom: "0.25rem" }}>
                                                                     {productName}
                                                                 </div>
-                                                                <div style={{ fontSize: "0.85rem", color: "#718096" }}>
+                                                                <div style={{ fontSize: "0.8rem", color: "#718096" }}>
                                                                     Product ID: {productId} | Quantity: {quantity}
                                                                 </div>
                                                             </div>
-                                                            <div style={{ fontWeight: 600, color: "#667eea", fontSize: "1rem", marginLeft: "1rem", whiteSpace: "nowrap" }}>
+                                                            {/* Price */}
+                                                            <div style={{ fontWeight: 600, color: "#667eea", fontSize: "0.9rem", marginLeft: "1rem", whiteSpace: "nowrap" }}>
                                                                 ${subtotal.toFixed(2)}
                                                             </div>
                                                         </div>
                                                     );
                                                 })
                                             ) : (
-                                                <div style={{ padding: "0.75rem", background: "#fff", borderRadius: "6px", color: "#718096", fontSize: "0.9rem" }}>
+                                                <div style={{ padding: "0.75rem", background: "#fff", borderRadius: "4px", color: "#718096", fontSize: "0.85rem" }}>
                                                     No items in this order
                                                 </div>
                                             )}
@@ -390,27 +297,21 @@ export default function OrderManagementPage() {
                                     </div>
 
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: "1rem", borderTop: "2px solid #e2e8f0" }}>
-                                        <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "#2d3748" }}>
+                                        <div style={{ fontSize: "1rem", fontWeight: 700, color: "#2d3748" }}>
                                             Total: <span style={{ color: "#667eea" }}>${(order.totalPrice || 0).toFixed(2)}</span>
                                         </div>
                                         <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-                                            <select
+                                            <CustomSelect
                                                 value={selectedStatus[order.orderId || order.id] || order.status}
                                                 onChange={(e) => setSelectedStatus({ ...selectedStatus, [order.orderId || order.id]: e.target.value })}
-                                                style={{
-                                                    padding: "0.5rem 1rem",
-                                                    borderRadius: "8px",
-                                                    border: "2px solid #e2e8f0",
-                                                    fontSize: "0.9rem",
-                                                    background: "#fff",
-                                                    cursor: "pointer",
-                                                }}
-                                            >
-                                                <option value="PROCESSING">Processing</option>
-                                                <option value="IN_TRANSIT">In Transit</option>
-                                                <option value="DELIVERED">Delivered</option>
-                                                <option value="CANCELLED">Cancelled</option>
-                                            </select>
+                                                options={[
+                                                    { value: "PROCESSING", label: "Processing" },
+                                                    { value: "IN_TRANSIT", label: "In Transit" },
+                                                    { value: "DELIVERED", label: "Delivered" },
+                                                    { value: "CANCELLED", label: "Cancelled" }
+                                                ]}
+                                                minWidth="140px"
+                                            />
                                             <button
                                                 onClick={() => handleUpdateStatus(order.orderId || order.id)}
                                                 disabled={updatingStatus[order.orderId || order.id] || (selectedStatus[order.orderId || order.id] || order.status) === order.status}
@@ -418,15 +319,32 @@ export default function OrderManagementPage() {
                                                     padding: "0.5rem 1rem",
                                                     background: updatingStatus[order.orderId || order.id] || (selectedStatus[order.orderId || order.id] || order.status) === order.status
                                                         ? "#cbd5e0"
-                                                        : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                                                    color: "#fff",
-                                                    border: "none",
-                                                    borderRadius: "8px",
+                                                        : "#fff",
+                                                    color: updatingStatus[order.orderId || order.id] || (selectedStatus[order.orderId || order.id] || order.status) === order.status
+                                                        ? "#718096"
+                                                        : "#667eea",
+                                                    border: updatingStatus[order.orderId || order.id] || (selectedStatus[order.orderId || order.id] || order.status) === order.status
+                                                        ? "2px solid #cbd5e0"
+                                                        : "2px solid #667eea",
+                                                    borderRadius: "4px",
                                                     fontWeight: 600,
                                                     cursor: updatingStatus[order.orderId || order.id] || (selectedStatus[order.orderId || order.id] || order.status) === order.status
                                                         ? "not-allowed"
                                                         : "pointer",
-                                                    fontSize: "0.9rem",
+                                                    fontSize: "0.85rem",
+                                                    transition: "all 0.2s",
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    if (!updatingStatus[order.orderId || order.id] && (selectedStatus[order.orderId || order.id] || order.status) !== order.status) {
+                                                        e.currentTarget.style.background = "#667eea";
+                                                        e.currentTarget.style.color = "#fff";
+                                                    }
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    if (!updatingStatus[order.orderId || order.id] && (selectedStatus[order.orderId || order.id] || order.status) !== order.status) {
+                                                        e.currentTarget.style.background = "#fff";
+                                                        e.currentTarget.style.color = "#667eea";
+                                                    }
                                                 }}
                                             >
                                                 {updatingStatus[order.orderId || order.id] ? "Updating..." : "Update Status"}

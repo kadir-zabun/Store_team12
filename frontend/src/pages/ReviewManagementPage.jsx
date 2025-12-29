@@ -1,11 +1,10 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import productApi from "../api/productApi";
 import { useToast } from "../contexts/ToastContext";
 import { useUserRole } from "../hooks/useUserRole";
 
 export default function ReviewManagementPage() {
-    const [userName, setUserName] = useState(null);
     const [products, setProducts] = useState([]);
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [reviews, setReviews] = useState([]);
@@ -14,8 +13,6 @@ export default function ReviewManagementPage() {
     const navigate = useNavigate();
     const { success: showSuccess, error: showError } = useToast();
     const userRole = useUserRole();
-    const dropdownRef = useRef(null);
-    const [showDropdown, setShowDropdown] = useState(false);
 
     useEffect(() => {
         const token = localStorage.getItem("access_token");
@@ -33,21 +30,13 @@ export default function ReviewManagementPage() {
             return; // Still loading
         }
 
-        if (currentRole !== "PRODUCT_OWNER") {
+        if (currentRole !== "PRODUCT_MANAGER") {
             navigate("/");
             return;
         }
 
         const loadData = async () => {
             try {
-                // Get username
-                const payloadBase64 = token.split(".")[1];
-                const normalized = payloadBase64.replace(/-/g, "+").replace(/_/g, "/");
-                const payloadJson = atob(normalized);
-                const payload = JSON.parse(payloadJson);
-                const username = payload.sub || payload.name || payload.username;
-                setUserName(username);
-
                 // Load products
                 const productsRes = await productApi.getMyProducts();
                 // Backend returns {success: true, data: [...], meta: {...}} or direct array
@@ -117,18 +106,6 @@ export default function ReviewManagementPage() {
         }
     };
 
-    const handleLogout = () => {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("user_role");
-        setUserName(null);
-        setShowDropdown(false);
-        navigate("/login");
-    };
-
-    const toggleDropdown = () => {
-        setShowDropdown(!showDropdown);
-    };
-
     // Check role from localStorage directly if hook hasn't loaded yet
     const storedRole = localStorage.getItem("user_role");
     const currentRole = userRole || storedRole;
@@ -142,127 +119,20 @@ export default function ReviewManagementPage() {
         );
     }
 
-    // If not PRODUCT_OWNER, show message (will redirect in useEffect)
-    if (currentRole !== "PRODUCT_OWNER") {
+    // If not PRODUCT_MANAGER, show message (will redirect in useEffect)
+    if (currentRole !== "PRODUCT_MANAGER") {
         return (
             <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <div style={{ background: "rgba(255, 255, 255, 0.95)", padding: "2rem", borderRadius: "20px", textAlign: "center" }}>
                     <h2 style={{ color: "#2d3748" }}>Access Denied</h2>
-                    <p style={{ color: "#718096" }}>This page is only accessible to Product Owners.</p>
+                    <p style={{ color: "#718096" }}>This page is only accessible to Product Managers.</p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}>
-            <nav
-                style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "1.2rem 4rem",
-                    background: "rgba(255, 255, 255, 0.95)",
-                    backdropFilter: "blur(10px)",
-                    boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-                    position: "sticky",
-                    top: 0,
-                    zIndex: 100,
-                }}
-            >
-                <div style={{ display: "flex", alignItems: "center", gap: "3rem" }}>
-                    <Link
-                        to="/"
-                        style={{
-                            fontSize: "1.5rem",
-                            fontWeight: 700,
-                            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                            WebkitBackgroundClip: "text",
-                            WebkitTextFillColor: "transparent",
-                            textDecoration: "none",
-                        }}
-                    >
-                        🛍️ TeknoSU
-                    </Link>
-                    <div style={{ display: "flex", alignItems: "center", gap: "2rem" }}>
-                        <Link to="/owner-dashboard" style={{ color: "#4a5568", textDecoration: "none", padding: "0.5rem 1rem", borderRadius: "8px", fontWeight: 500 }}>
-                            Dashboard
-                        </Link>
-                        <Link to="/owner/products" style={{ color: "#4a5568", textDecoration: "none", padding: "0.5rem 1rem", borderRadius: "8px", fontWeight: 500 }}>
-                            Products
-                        </Link>
-                        <Link to="/owner/orders" style={{ color: "#4a5568", textDecoration: "none", padding: "0.5rem 1rem", borderRadius: "8px", fontWeight: 500 }}>
-                            Orders
-                        </Link>
-                        <Link to="/owner/reviews" style={{ color: "#667eea", textDecoration: "none", padding: "0.5rem 1rem", borderRadius: "8px", fontWeight: 600, background: "#f7fafc" }}>
-                            Reviews
-                        </Link>
-                    </div>
-                </div>
-
-                <div style={{ display: "flex", alignItems: "center", gap: "1rem", position: "relative" }}>
-                    {userName && (
-                        <div ref={dropdownRef} style={{ position: "relative" }}>
-                            <button
-                                onClick={toggleDropdown}
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "0.6rem",
-                                    padding: "0.6rem 1.2rem",
-                                    borderRadius: "10px",
-                                    border: "none",
-                                    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                                    color: "#fff",
-                                    fontSize: "0.95rem",
-                                    fontWeight: 600,
-                                    cursor: "pointer",
-                                }}
-                            >
-                                <span>{userName}</span>
-                                <span style={{ fontSize: "0.7rem" }}>{showDropdown ? "▲" : "▼"}</span>
-                            </button>
-                            {showDropdown && (
-                                <div
-                                    style={{
-                                        position: "absolute",
-                                        top: "100%",
-                                        right: 0,
-                                        marginTop: "0.8rem",
-                                        background: "#fff",
-                                        border: "1px solid #e2e8f0",
-                                        borderRadius: "12px",
-                                        boxShadow: "0 10px 25px rgba(0, 0, 0, 0.15)",
-                                        minWidth: "200px",
-                                        zIndex: 1000,
-                                    }}
-                                >
-                                    <button
-                                        onClick={handleLogout}
-                                        style={{
-                                            width: "100%",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "0.8rem",
-                                            textAlign: "left",
-                                            padding: "0.9rem 1.2rem",
-                                            color: "#e53e3e",
-                                            fontSize: "0.95rem",
-                                            border: "none",
-                                            background: "transparent",
-                                            cursor: "pointer",
-                                        }}
-                                    >
-                                        <span>🚪</span>
-                                        <span>Logout</span>
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-            </nav>
-
+        <div style={{ minHeight: "calc(100vh - 80px)", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}>
             <div style={{ padding: "2rem", maxWidth: "1400px", margin: "0 auto" }}>
                 <div style={{ background: "rgba(255, 255, 255, 0.95)", padding: "2rem", borderRadius: "20px", boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)" }}>
                     <h1 style={{ fontSize: "2.5rem", fontWeight: 700, color: "#2d3748", marginBottom: "2rem" }}>Review Management</h1>

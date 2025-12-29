@@ -19,6 +19,11 @@ export default function OrderHistoryPage() {
         rating: 0,
         comment: "",
     });
+    const [refundingItem, setRefundingItem] = useState(null);
+    const [refundForm, setRefundForm] = useState({
+        quantity: 1,
+        reason: "",
+    });
     const navigate = useNavigate();
     const { success: showSuccess, error: showError } = useToast();
     const userRole = useUserRole();
@@ -30,7 +35,7 @@ export default function OrderHistoryPage() {
             return;
         }
 
-        if (userRole === "PRODUCT_OWNER") {
+        if (userRole === "PRODUCT_MANAGER") {
             navigate("/owner-dashboard");
             return;
         }
@@ -279,30 +284,84 @@ export default function OrderHistoryPage() {
                                 <div style={{ marginBottom: "1rem" }}>
                                     <h3 style={{ fontSize: "1rem", fontWeight: 600, color: "#4a5568", marginBottom: "0.75rem" }}>Items:</h3>
                                     <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                                        {order.items && order.items.map((item, index) => (
-                                            <div
-                                                key={index}
-                                                style={{
-                                                    display: "flex",
-                                                    justifyContent: "space-between",
-                                                    padding: "0.75rem",
-                                                    background: "#f7fafc",
-                                                    borderRadius: "8px",
-                                                }}
-                                            >
-                                                <div>
-                                                    <div style={{ fontWeight: 600, color: "#2d3748" }}>
-                                                        {item.productName || `Product ${item.productId}`}
+                                        {order.items && order.items.map((item, index) => {
+                                            const orderDate = order.orderDate ? new Date(order.orderDate) : null;
+                                            const daysSincePurchase = orderDate ? Math.floor((new Date() - orderDate) / (1000 * 60 * 60 * 24)) : null;
+                                            const canRefund = order.status === "DELIVERED" && daysSincePurchase !== null && daysSincePurchase <= 30;
+                                            
+                                            return (
+                                                <div
+                                                    key={index}
+                                                    style={{
+                                                        display: "flex",
+                                                        justifyContent: "space-between",
+                                                        alignItems: "center",
+                                                        padding: "0.75rem",
+                                                        background: "#f7fafc",
+                                                        borderRadius: "8px",
+                                                    }}
+                                                >
+                                                    <div style={{ flex: 1 }}>
+                                                        <div style={{ fontWeight: 600, color: "#2d3748" }}>
+                                                            {item.productName || `Product ${item.productId}`}
+                                                        </div>
+                                                        <div style={{ fontSize: "0.9rem", color: "#718096" }}>
+                                                            Qty: {item.quantity} × ${(item.priceAtPurchase || item.price || 0).toFixed(2)}
+                                                        </div>
+                                                        {order.status === "DELIVERED" && (
+                                                            <div style={{ fontSize: "0.85rem", color: daysSincePurchase !== null && daysSincePurchase <= 30 ? "#2f855a" : "#e53e3e", marginTop: "0.25rem" }}>
+                                                                {daysSincePurchase !== null ? (
+                                                                    daysSincePurchase <= 30 
+                                                                        ? `${30 - daysSincePurchase} days left for refund`
+                                                                        : "Refund window expired"
+                                                                ) : ""}
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                    <div style={{ fontSize: "0.9rem", color: "#718096" }}>
-                                                        Qty: {item.quantity} × ${(item.priceAtPurchase || item.price || 0).toFixed(2)}
+                                                    <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                                                        <div style={{ fontWeight: 600, color: "#667eea" }}>
+                                                            ${((item.priceAtPurchase || item.price || 0) * item.quantity).toFixed(2)}
+                                                        </div>
+                                                        {canRefund && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    setRefundingItem({
+                                                                        orderId: order.orderId || order.id,
+                                                                        productId: item.productId,
+                                                                        productName: item.productName,
+                                                                        maxQuantity: item.quantity,
+                                                                        priceAtPurchase: item.priceAtPurchase || item.price || 0,
+                                                                    });
+                                                                    setRefundForm({
+                                                                        quantity: 1,
+                                                                        reason: "",
+                                                                    });
+                                                                }}
+                                                                style={{
+                                                                    padding: "0.5rem 1rem",
+                                                                    background: "#d69e2e",
+                                                                    color: "#fff",
+                                                                    border: "none",
+                                                                    borderRadius: "8px",
+                                                                    fontWeight: 600,
+                                                                    fontSize: "0.85rem",
+                                                                    cursor: "pointer",
+                                                                    transition: "all 0.2s",
+                                                                }}
+                                                                onMouseEnter={(e) => {
+                                                                    e.currentTarget.style.background = "#b7791f";
+                                                                }}
+                                                                onMouseLeave={(e) => {
+                                                                    e.currentTarget.style.background = "#d69e2e";
+                                                                }}
+                                                            >
+                                                                Request Refund
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
-                                                <div style={{ fontWeight: 600, color: "#667eea" }}>
-                                                    ${((item.priceAtPurchase || item.price || 0) * item.quantity).toFixed(2)}
-                                                </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 </div>
 
@@ -310,37 +369,127 @@ export default function OrderHistoryPage() {
                                     <div style={{ fontSize: "1.2rem", fontWeight: 700, color: "#2d3748" }}>
                                         Total: <span style={{ color: "#667eea" }}>${(order.totalPrice || 0).toFixed(2)}</span>
                                     </div>
-                                    <button
-                                        onClick={async () => {
-                                            try {
-                                                const orderId = order.orderId || order.id;
-                                                if (!orderId) {
-                                                    showError("Order ID is missing.");
-                                                    return;
+                                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                                        {order.status === "PROCESSING" && (
+                                            <button
+                                                onClick={async () => {
+                                                    try {
+                                                        const orderId = order.orderId || order.id;
+                                                        if (!orderId) {
+                                                            showError("Order ID is missing.");
+                                                            return;
+                                                        }
+                                                        if (!window.confirm("Are you sure you want to cancel this order?")) {
+                                                            return;
+                                                        }
+                                                        await orderApi.cancelOrder(orderId);
+                                                        showSuccess("Order cancelled successfully!");
+                                                        // Reload orders
+                                                        const ordersResponse = await orderApi.getOrdersByCustomer(userId);
+                                                        const ordersData = ordersResponse.data?.data || ordersResponse.data || [];
+                                                        setOrders(Array.isArray(ordersData) ? ordersData : []);
+                                                    } catch (error) {
+                                                        showError(error.response?.data?.message || "Failed to cancel order. Please try again.");
+                                                    }
+                                                }}
+                                                style={{
+                                                    padding: "0.5rem 1rem",
+                                                    background: "#e53e3e",
+                                                    color: "#fff",
+                                                    border: "none",
+                                                    borderRadius: "8px",
+                                                    fontWeight: 600,
+                                                    fontSize: "0.9rem",
+                                                    cursor: "pointer",
+                                                    transition: "all 0.3s",
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.background = "#c53030";
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.background = "#e53e3e";
+                                                }}
+                                            >
+                                                Cancel Order
+                                            </button>
+                                        )}
+                                        {order.status === "DELIVERED" && (
+                                            <button
+                                                onClick={async () => {
+                                                    try {
+                                                        const orderId = order.orderId || order.id;
+                                                        if (!orderId || !order.items || order.items.length === 0) {
+                                                            showError("Order information is incomplete.");
+                                                            return;
+                                                        }
+                                                        // For simplicity, request refund for first item
+                                                        // In a real app, user would select which items to refund
+                                                        const firstItem = order.items[0];
+                                                        const refundData = {
+                                                            orderId: orderId,
+                                                            productId: firstItem.productId,
+                                                            quantity: firstItem.quantity,
+                                                            reason: "Customer requested refund",
+                                                        };
+                                                        await orderApi.requestRefund(orderId, refundData);
+                                                        showSuccess("Refund request submitted successfully!");
+                                                    } catch (error) {
+                                                        showError(error.response?.data?.message || "Failed to request refund. Please try again.");
+                                                    }
+                                                }}
+                                                style={{
+                                                    padding: "0.5rem 1rem",
+                                                    background: "#d69e2e",
+                                                    color: "#fff",
+                                                    border: "none",
+                                                    borderRadius: "8px",
+                                                    fontWeight: 600,
+                                                    fontSize: "0.9rem",
+                                                    cursor: "pointer",
+                                                    transition: "all 0.3s",
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.background = "#b7791f";
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.background = "#d69e2e";
+                                                }}
+                                            >
+                                                Request Refund
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={async () => {
+                                                try {
+                                                    const orderId = order.orderId || order.id;
+                                                    if (!orderId) {
+                                                        showError("Order ID is missing.");
+                                                        return;
+                                                    }
+                                                    const response = await paymentApi.getInvoicePdf(orderId);
+                                                    const blob = new Blob([response.data], { type: 'application/pdf' });
+                                                    const url = window.URL.createObjectURL(blob);
+                                                    window.open(url, '_blank');
+                                                    setTimeout(() => window.URL.revokeObjectURL(url), 100);
+                                                } catch (error) {
+                                                    showError("Failed to load PDF. Please try again.");
                                                 }
-                                                const response = await paymentApi.getInvoicePdf(orderId);
-                                                const blob = new Blob([response.data], { type: 'application/pdf' });
-                                                const url = window.URL.createObjectURL(blob);
-                                                window.open(url, '_blank');
-                                                setTimeout(() => window.URL.revokeObjectURL(url), 100);
-                                            } catch (error) {
-                                                showError("Failed to load PDF. Please try again.");
-                                            }
-                                        }}
-                                        style={{
-                                            padding: "0.5rem 1rem",
-                                            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                                            color: "#fff",
-                                            border: "none",
-                                            borderRadius: "8px",
-                                            fontWeight: 600,
-                                            fontSize: "0.9rem",
-                                            cursor: "pointer",
-                                            transition: "all 0.3s",
-                                        }}
-                                    >
-                                        View PDF
-                                    </button>
+                                            }}
+                                            style={{
+                                                padding: "0.5rem 1rem",
+                                                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                                color: "#fff",
+                                                border: "none",
+                                                borderRadius: "8px",
+                                                fontWeight: 600,
+                                                fontSize: "0.9rem",
+                                                cursor: "pointer",
+                                                transition: "all 0.3s",
+                                            }}
+                                        >
+                                            View PDF
+                                        </button>
+                                    </div>
                                 </div>
 
                                 {/* Review Forms for each product */}
@@ -562,6 +711,156 @@ export default function OrderHistoryPage() {
 
                             </div>
                         ))}
+                    </div>
+                )}
+
+                {/* Refund Request Modal */}
+                {refundingItem && (
+                    <div
+                        style={{
+                            position: "fixed",
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            background: "rgba(0, 0, 0, 0.5)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            zIndex: 1000,
+                        }}
+                        onClick={() => setRefundingItem(null)}
+                    >
+                        <div
+                            style={{
+                                background: "#fff",
+                                borderRadius: "8px",
+                                padding: "2rem",
+                                maxWidth: "500px",
+                                width: "90%",
+                                boxShadow: "0 8px 24px rgba(0, 0, 0, 0.3)",
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <h2 style={{ fontSize: "1.5rem", fontWeight: 700, color: "#2d3748", marginBottom: "1rem" }}>
+                                Request Refund
+                            </h2>
+                            <div style={{ marginBottom: "1rem" }}>
+                                <div style={{ fontSize: "0.9rem", color: "#718096", marginBottom: "0.5rem" }}>Product:</div>
+                                <div style={{ fontWeight: 600, color: "#2d3748" }}>{refundingItem.productName}</div>
+                            </div>
+                            <div style={{ marginBottom: "1rem" }}>
+                                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600, color: "#4a5568", fontSize: "0.85rem" }}>
+                                    Quantity (Max: {refundingItem.maxQuantity})
+                                </label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max={refundingItem.maxQuantity}
+                                    value={refundForm.quantity}
+                                    onChange={(e) => setRefundForm({ ...refundForm, quantity: parseInt(e.target.value) || 1 })}
+                                    style={{
+                                        width: "100%",
+                                        padding: "0.75rem",
+                                        border: "1px solid #cbd5e0",
+                                        borderRadius: "4px",
+                                        fontSize: "0.9rem",
+                                        boxSizing: "border-box",
+                                    }}
+                                />
+                            </div>
+                            <div style={{ marginBottom: "1rem" }}>
+                                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600, color: "#4a5568", fontSize: "0.85rem" }}>
+                                    Reason (Optional)
+                                </label>
+                                <textarea
+                                    value={refundForm.reason}
+                                    onChange={(e) => setRefundForm({ ...refundForm, reason: e.target.value })}
+                                    placeholder="Please provide a reason for the refund..."
+                                    rows={4}
+                                    style={{
+                                        width: "100%",
+                                        padding: "0.75rem",
+                                        border: "1px solid #cbd5e0",
+                                        borderRadius: "4px",
+                                        fontSize: "0.9rem",
+                                        boxSizing: "border-box",
+                                        resize: "vertical",
+                                    }}
+                                />
+                            </div>
+                            <div style={{ marginBottom: "1.5rem", padding: "1rem", background: "#f7fafc", borderRadius: "4px" }}>
+                                <div style={{ fontSize: "0.85rem", color: "#718096", marginBottom: "0.25rem" }}>Refund Amount:</div>
+                                <div style={{ fontSize: "1.25rem", fontWeight: 700, color: "#667eea" }}>
+                                    ${(refundingItem.priceAtPurchase * refundForm.quantity).toFixed(2)}
+                                </div>
+                                <div style={{ fontSize: "0.85rem", color: "#718096", marginTop: "0.25rem" }}>
+                                    (Price at purchase: ${refundingItem.priceAtPurchase.toFixed(2)})
+                                </div>
+                            </div>
+                            <div style={{ display: "flex", gap: "1rem" }}>
+                                <button
+                                    onClick={async () => {
+                                        try {
+                                            const refundData = {
+                                                orderId: refundingItem.orderId,
+                                                productId: refundingItem.productId,
+                                                quantity: refundForm.quantity,
+                                                reason: refundForm.reason || null,
+                                            };
+                                            await orderApi.requestRefund(refundingItem.orderId, refundData);
+                                            showSuccess("Refund request submitted successfully!");
+                                            setRefundingItem(null);
+                                            setRefundForm({ quantity: 1, reason: "" });
+                                            // Reload orders
+                                            const ordersResponse = await orderApi.getOrdersByCustomer(userId);
+                                            const ordersData = ordersResponse.data?.data || ordersResponse.data || [];
+                                            setOrders(Array.isArray(ordersData) ? ordersData : []);
+                                        } catch (error) {
+                                            showError(error.response?.data?.message || "Failed to request refund. Please try again.");
+                                        }
+                                    }}
+                                    style={{
+                                        flex: 1,
+                                        padding: "0.75rem 1.5rem",
+                                        background: "#667eea",
+                                        color: "#fff",
+                                        border: "none",
+                                        borderRadius: "4px",
+                                        fontWeight: 600,
+                                        fontSize: "0.9rem",
+                                        cursor: "pointer",
+                                        transition: "all 0.2s",
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = "#764ba2";
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = "#667eea";
+                                    }}
+                                >
+                                    Submit Request
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setRefundingItem(null);
+                                        setRefundForm({ quantity: 1, reason: "" });
+                                    }}
+                                    style={{
+                                        padding: "0.75rem 1.5rem",
+                                        background: "#e2e8f0",
+                                        color: "#4a5568",
+                                        border: "none",
+                                        borderRadius: "4px",
+                                        fontWeight: 600,
+                                        fontSize: "0.9rem",
+                                        cursor: "pointer",
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>

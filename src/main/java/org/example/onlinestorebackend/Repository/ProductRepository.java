@@ -1,7 +1,6 @@
 package org.example.onlinestorebackend.Repository;
 
 import org.example.onlinestorebackend.Entity.Product;
-import org.example.onlinestorebackend.Entity.User;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -30,7 +29,4 @@ public interface ProductRepository extends MongoRepository<Product, String> {
 
     @Query("{ 'productId' : ?0 }")
     Optional<Product> findByProductId(String productId);
-
-    // Belirli bir owner'a ait ürünler
-    List<Product> findByOwnerId(String ownerId);
 }

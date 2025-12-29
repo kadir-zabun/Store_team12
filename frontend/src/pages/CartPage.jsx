@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
-import { useEffect, useState, useRef } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import cartApi from "../api/cartApi";
 import productApi from "../api/productApi";
 import { cartStorage } from "../utils/cartStorage";
@@ -10,78 +10,21 @@ import { useUserRole } from "../hooks/useUserRole";
 import { getErrorMessage } from "../utils/errorHandler";
 
 export default function CartPage() {
-    const [userName, setUserName] = useState(null);
-    const [showDropdown, setShowDropdown] = useState(false);
     const [cart, setCart] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [updating, setUpdating] = useState({});
-    const dropdownRef = useRef(null);
     const navigate = useNavigate();
-    const location = useLocation();
-    const { cartCount, refreshCartCount } = useCartCount();
-    const { success: showSuccess, error: showError, info: showInfo } = useToast();
+    const { refreshCartCount } = useCartCount();
+    const { success: showSuccess, error: showError } = useToast();
     const userRole = useUserRole();
 
-    // Redirect PRODUCT_OWNER to dashboard
+    // Redirect PRODUCT_MANAGER to dashboard
     useEffect(() => {
-        if (userRole === "PRODUCT_OWNER") {
+        if (userRole === "PRODUCT_MANAGER") {
             navigate("/owner-dashboard");
         }
     }, [userRole, navigate]);
-
-    const extractUsernameFromToken = () => {
-        const token = localStorage.getItem("access_token");
-        if (!token) {
-            setUserName(null);
-            return;
-        }
-        try {
-            const payloadBase64 = token.split(".")[1];
-            const normalized = payloadBase64.replace(/-/g, "+").replace(/_/g, "/");
-            const payloadJson = atob(normalized);
-            const payload = JSON.parse(payloadJson);
-            const nameFromToken = payload.sub || payload.name || payload.username;
-            setUserName(nameFromToken || null);
-        } catch (e) {
-            setUserName(null);
-        }
-    };
-
-    useEffect(() => {
-        extractUsernameFromToken();
-        const intervalId = setInterval(() => {
-            extractUsernameFromToken();
-        }, 200);
-        const timeoutId = setTimeout(() => {
-            clearInterval(intervalId);
-            setInterval(() => {
-                extractUsernameFromToken();
-            }, 2000);
-        }, 10000);
-        return () => {
-            clearInterval(intervalId);
-            clearTimeout(timeoutId);
-        };
-    }, []);
-
-    useEffect(() => {
-        extractUsernameFromToken();
-    }, [location.pathname]);
-
-    useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-                setShowDropdown(false);
-            }
-        };
-        if (showDropdown) {
-            document.addEventListener("mousedown", handleClickOutside);
-        }
-        return () => {
-            document.removeEventListener("mousedown", handleClickOutside);
-        };
-    }, [showDropdown]);
 
     useEffect(() => {
         loadCart();
@@ -305,18 +248,6 @@ export default function CartPage() {
         }
     };
 
-    const handleLogout = () => {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("user_role");
-        setUserName(null);
-        setShowDropdown(false);
-        navigate("/login");
-    };
-
-    const toggleDropdown = () => {
-        setShowDropdown(!showDropdown);
-    };
-
     const formatPrice = (price) => {
         if (typeof price === "number") {
             return price.toFixed(2);
@@ -331,239 +262,7 @@ export default function CartPage() {
     const totalPrice = cart?.totalPrice || 0;
 
     return (
-        <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}>
-            <nav
-                style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "1.2rem 4rem",
-                    background: "rgba(255, 255, 255, 0.95)",
-                    backdropFilter: "blur(10px)",
-                    boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-                    position: "sticky",
-                    top: 0,
-                    zIndex: 100,
-                }}
-            >
-                <div style={{ display: "flex", alignItems: "center", gap: "3rem" }}>
-                    <Link
-                        to="/"
-                        style={{
-                            fontSize: "1.5rem",
-                            fontWeight: 700,
-                            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                            WebkitBackgroundClip: "text",
-                            WebkitTextFillColor: "transparent",
-                            textDecoration: "none",
-                        }}
-                    >
-                        🛍️ TeknoSU
-                    </Link>
-                    <div style={{ display: "flex", alignItems: "center", gap: "2rem" }}>
-                        <Link
-                            to="/"
-                            style={{
-                                color: "#4a5568",
-                                textDecoration: "none",
-                                padding: "0.5rem 1rem",
-                                borderRadius: "8px",
-                                fontWeight: 500,
-                                transition: "all 0.2s",
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.background = "#f7fafc";
-                                e.currentTarget.style.color = "#667eea";
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.background = "transparent";
-                                e.currentTarget.style.color = "#4a5568";
-                            }}
-                        >
-                            Home
-                        </Link>
-                        <Link
-                            to="/products"
-                            style={{
-                                color: "#4a5568",
-                                textDecoration: "none",
-                                padding: "0.5rem 1rem",
-                                borderRadius: "8px",
-                                fontWeight: 500,
-                                transition: "all 0.2s",
-                            }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.background = "#f7fafc";
-                                e.currentTarget.style.color = "#667eea";
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.background = "transparent";
-                                e.currentTarget.style.color = "#4a5568";
-                            }}
-                        >
-                            Products
-                        </Link>
-                        <Link
-                            to="/cart"
-                            style={{
-                                color: "#667eea",
-                                textDecoration: "none",
-                                padding: "0.5rem 1rem",
-                                borderRadius: "8px",
-                                fontWeight: 600,
-                                background: "#f7fafc",
-                                transition: "all 0.2s",
-                                position: "relative",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "0.5rem",
-                            }}
-                        >
-                            <span>Cart</span>
-                            {cartCount > 0 && (
-                                <span
-                                    style={{
-                                        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                                        color: "#fff",
-                                        borderRadius: "50%",
-                                        minWidth: "20px",
-                                        height: "20px",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        fontSize: "0.75rem",
-                                        fontWeight: 700,
-                                        padding: "0 0.25rem",
-                                    }}
-                                >
-                                    {cartCount > 99 ? "99+" : cartCount}
-                                </span>
-                            )}
-                        </Link>
-                    </div>
-                </div>
-
-                <div style={{ display: "flex", alignItems: "center", gap: "1rem", position: "relative" }}>
-                    {userName ? (
-                        <div ref={dropdownRef} style={{ position: "relative" }}>
-                            <button
-                                onClick={toggleDropdown}
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "0.6rem",
-                                    padding: "0.6rem 1.2rem",
-                                    borderRadius: "10px",
-                                    border: "none",
-                                    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                                    color: "#fff",
-                                    fontSize: "0.95rem",
-                                    fontWeight: 600,
-                                    cursor: "pointer",
-                                    transition: "all 0.3s",
-                                    boxShadow: "0 2px 4px rgba(102, 126, 234, 0.3)",
-                                }}
-                            >
-                                <span style={{ fontSize: "1.2rem" }}>👤</span>
-                                <span>{userName}</span>
-                                <span style={{ fontSize: "0.7rem" }}>{showDropdown ? "▲" : "▼"}</span>
-                            </button>
-                            {showDropdown && (
-                                <div
-                                    style={{
-                                        position: "absolute",
-                                        top: "100%",
-                                        right: 0,
-                                        marginTop: "0.8rem",
-                                        background: "#fff",
-                                        border: "1px solid #e2e8f0",
-                                        borderRadius: "12px",
-                                        boxShadow: "0 10px 25px rgba(0, 0, 0, 0.15)",
-                                        minWidth: "200px",
-                                        zIndex: 1000,
-                                    }}
-                                >
-                                    <Link
-                                        to="/cart"
-                                        onClick={() => setShowDropdown(false)}
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "0.8rem",
-                                            padding: "0.9rem 1.2rem",
-                                            color: "#2d3748",
-                                            textDecoration: "none",
-                                            fontSize: "0.95rem",
-                                            borderBottom: "1px solid #f1f5f9",
-                                        }}
-                                    >
-                                        <span>🛒</span>
-                                        <span>My Cart</span>
-                                    </Link>
-                                    <Link
-                                        to="/orders"
-                                        onClick={() => setShowDropdown(false)}
-                                        style={{
-                                            width: "100%",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "0.8rem",
-                                            textAlign: "left",
-                                            padding: "0.9rem 1.2rem",
-                                            color: "#2d3748",
-                                            fontSize: "0.95rem",
-                                            border: "none",
-                                            background: "transparent",
-                                            cursor: "pointer",
-                                            borderBottom: "1px solid #f1f5f9",
-                                            textDecoration: "none",
-                                        }}
-                                    >
-                                        <span>📋</span>
-                                        <span>Order History</span>
-                                    </Link>
-                                    <button
-                                        onClick={handleLogout}
-                                        style={{
-                                            width: "100%",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "0.8rem",
-                                            textAlign: "left",
-                                            padding: "0.9rem 1.2rem",
-                                            color: "#e53e3e",
-                                            fontSize: "0.95rem",
-                                            border: "none",
-                                            background: "transparent",
-                                            cursor: "pointer",
-                                        }}
-                                    >
-                                        <span>🚪</span>
-                                        <span>Logout</span>
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        <Link
-                            to="/login"
-                            style={{
-                                color: "#fff",
-                                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                                textDecoration: "none",
-                                padding: "0.6rem 1.5rem",
-                                borderRadius: "10px",
-                                fontWeight: 600,
-                                transition: "all 0.3s",
-                                boxShadow: "0 2px 4px rgba(102, 126, 234, 0.3)",
-                            }}
-                        >
-                            Login
-                        </Link>
-                    )}
-                </div>
-            </nav>
-
+        <div style={{ minHeight: "calc(100vh - 80px)", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}>
             <div
                 style={{
                     minHeight: "calc(100vh - 80px)",
@@ -623,8 +322,18 @@ export default function CartPage() {
                     </div>
 
                     {loading ? (
-                        <div style={{ textAlign: "center", padding: "3rem", color: "#a0aec0", fontSize: "1.1rem" }}>
-                            Loading your cart...
+                        <div style={{ textAlign: "center", padding: "3rem", display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
+                            <div
+                                style={{
+                                    width: "50px",
+                                    height: "50px",
+                                    border: "4px solid #e2e8f0",
+                                    borderTop: "4px solid #667eea",
+                                    borderRadius: "50%",
+                                    animation: "spin 1s linear infinite",
+                                }}
+                            />
+                            <div style={{ color: "#a0aec0", fontSize: "1.1rem" }}>Loading your cart...</div>
                         </div>
                     ) : error ? (
                         <div style={{ textAlign: "center", padding: "3rem" }}>
@@ -876,6 +585,12 @@ export default function CartPage() {
                     )}
                 </div>
             </div>
+            <style>{`
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            `}</style>
         </div>
     );
 }

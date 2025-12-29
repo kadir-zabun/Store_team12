@@ -16,5 +16,10 @@ public class OrderItem {
      * If null for legacy orders, services may fallback to 50% of priceAtPurchase.
      */
     private BigDecimal costAtPurchase;
+    /**
+     * Product image URL captured at purchase time.
+     * First image from product.images list, or null if no images available.
+     */
+    private String imageUrl;
 
 }

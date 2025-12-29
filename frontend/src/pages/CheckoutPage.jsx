@@ -21,6 +21,8 @@ export default function CheckoutPage() {
         zipCode: "",
         phone: "",
     });
+    const [savedAddresses, setSavedAddresses] = useState([]);
+    const [selectedAddressId, setSelectedAddressId] = useState("");
     const [paymentInfo, setPaymentInfo] = useState({
         cardNumber: "",
         cardHolderName: "",
@@ -35,13 +37,42 @@ export default function CheckoutPage() {
     const userRole = useUserRole();
 
     useEffect(() => {
+        // Load saved addresses
+        const savedAddressesData = localStorage.getItem("user_addresses");
+        if (savedAddressesData) {
+            try {
+                const addresses = JSON.parse(savedAddressesData);
+                setSavedAddresses(addresses);
+            } catch (e) {
+                console.error("Error loading addresses:", e);
+            }
+        }
+    }, []);
+
+    useEffect(() => {
+        // Load selected address
+        if (selectedAddressId && savedAddresses.length > 0) {
+            const selectedAddress = savedAddresses.find((addr) => addr.id === selectedAddressId);
+            if (selectedAddress) {
+                setShippingInfo({
+                    fullName: selectedAddress.fullName,
+                    address: selectedAddress.address,
+                    city: selectedAddress.city,
+                    zipCode: selectedAddress.zipCode,
+                    phone: selectedAddress.phone,
+                });
+            }
+        }
+    }, [selectedAddressId, savedAddresses]);
+
+    useEffect(() => {
         const token = localStorage.getItem("access_token");
         if (!token) {
             navigate("/login");
             return;
         }
 
-        if (userRole === "PRODUCT_OWNER") {
+        if (userRole === "PRODUCT_MANAGER") {
             navigate("/owner-dashboard");
             return;
         }
@@ -273,6 +304,31 @@ export default function CheckoutPage() {
             
             console.log("Payment processed, invoice:", invoice);
 
+            // Save address if not already saved
+            const addressExists = savedAddresses.some(
+                (addr) =>
+                    addr.fullName === shippingInfo.fullName &&
+                    addr.address === shippingInfo.address &&
+                    addr.city === shippingInfo.city &&
+                    addr.zipCode === shippingInfo.zipCode &&
+                    addr.phone === shippingInfo.phone
+            );
+            
+            if (!addressExists) {
+                const addressId = Date.now().toString();
+                const newAddress = {
+                    id: addressId,
+                    fullName: shippingInfo.fullName,
+                    address: shippingInfo.address,
+                    city: shippingInfo.city,
+                    zipCode: shippingInfo.zipCode,
+                    phone: shippingInfo.phone,
+                };
+                const updatedAddresses = [...savedAddresses, newAddress];
+                localStorage.setItem("user_addresses", JSON.stringify(updatedAddresses));
+                setSavedAddresses(updatedAddresses);
+            }
+
             // Navigate to invoice page with order ID
             navigate(`/invoice/${orderId}`, {
                 state: {
@@ -457,19 +513,58 @@ export default function CheckoutPage() {
                     {/* Shipping Information */}
                     <div style={{ background: "rgba(255, 255, 255, 0.95)", padding: "2rem", borderRadius: "20px", boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)" }}>
                         <h2 style={{ marginBottom: "1.5rem", color: "#2d3748" }}>Shipping Information</h2>
+                        {savedAddresses.length > 0 && (
+                            <div style={{ marginBottom: "1rem" }}>
+                                <label style={{ display: "block", fontSize: "0.9rem", fontWeight: 600, color: "#4a5568", marginBottom: "0.5rem" }}>
+                                    Select Saved Address
+                                </label>
+                                <select
+                                    value={selectedAddressId}
+                                    onChange={(e) => {
+                                        setSelectedAddressId(e.target.value);
+                                        if (e.target.value === "") {
+                                            setShippingInfo({ fullName: "", address: "", city: "", zipCode: "", phone: "" });
+                                        }
+                                    }}
+                                    style={{
+                                        padding: "0.75rem",
+                                        borderRadius: "10px",
+                                        border: "2px solid #e2e8f0",
+                                        fontSize: "1rem",
+                                        background: "#fff",
+                                        color: "#2d3748",
+                                        width: "100%",
+                                        marginBottom: "1rem",
+                                    }}
+                                >
+                                    <option value="">-- Select or enter new address --</option>
+                                    {savedAddresses.map((addr) => (
+                                        <option key={addr.id} value={addr.id}>
+                                            {addr.fullName} - {addr.address}, {addr.city}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
                         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                             <input
                                 type="text"
                                 placeholder="Full Name"
                                 value={shippingInfo.fullName}
-                                onChange={(e) => setShippingInfo({ ...shippingInfo, fullName: e.target.value })}
+                                onChange={(e) => {
+                                    setShippingInfo({ ...shippingInfo, fullName: e.target.value });
+                                    setSelectedAddressId("");
+                                }}
                                 style={{ padding: "0.75rem", borderRadius: "10px", border: "2px solid #e2e8f0", fontSize: "1rem", background: "#fff", color: "#2d3748", boxSizing: "border-box", width: "100%" }}
                             />
                             <input
                                 type="text"
                                 placeholder="Address"
                                 value={shippingInfo.address}
-                                onChange={(e) => setShippingInfo({ ...shippingInfo, address: e.target.value })}
+                                onChange={(e) => {
+                                    setShippingInfo({ ...shippingInfo, address: e.target.value });
+                                    setSelectedAddressId("");
+                                }}
                                 style={{ padding: "0.75rem", borderRadius: "10px", border: "2px solid #e2e8f0", fontSize: "1rem", background: "#fff", color: "#2d3748", boxSizing: "border-box", width: "100%" }}
                             />
                             <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "1rem" }}>
@@ -477,14 +572,20 @@ export default function CheckoutPage() {
                                     type="text"
                                     placeholder="City"
                                     value={shippingInfo.city}
-                                    onChange={(e) => setShippingInfo({ ...shippingInfo, city: e.target.value })}
+                                    onChange={(e) => {
+                                        setShippingInfo({ ...shippingInfo, city: e.target.value });
+                                        setSelectedAddressId("");
+                                    }}
                                     style={{ padding: "0.75rem", borderRadius: "10px", border: "2px solid #e2e8f0", fontSize: "1rem", background: "#fff", color: "#2d3748", boxSizing: "border-box", width: "100%" }}
                                 />
                                 <input
                                     type="text"
                                     placeholder="ZIP Code"
                                     value={shippingInfo.zipCode}
-                                    onChange={(e) => setShippingInfo({ ...shippingInfo, zipCode: e.target.value })}
+                                    onChange={(e) => {
+                                        setShippingInfo({ ...shippingInfo, zipCode: e.target.value });
+                                        setSelectedAddressId("");
+                                    }}
                                     style={{ padding: "0.75rem", borderRadius: "10px", border: "2px solid #e2e8f0", fontSize: "1rem", background: "#fff", color: "#2d3748", boxSizing: "border-box", width: "100%" }}
                                 />
                             </div>
@@ -492,7 +593,10 @@ export default function CheckoutPage() {
                                 type="tel"
                                 placeholder="Phone Number"
                                 value={shippingInfo.phone}
-                                onChange={(e) => setShippingInfo({ ...shippingInfo, phone: e.target.value })}
+                                onChange={(e) => {
+                                    setShippingInfo({ ...shippingInfo, phone: e.target.value });
+                                    setSelectedAddressId("");
+                                }}
                                 style={{ padding: "0.75rem", borderRadius: "10px", border: "2px solid #e2e8f0", fontSize: "1rem", background: "#fff", color: "#2d3748", boxSizing: "border-box", width: "100%" }}
                             />
                         </div>
