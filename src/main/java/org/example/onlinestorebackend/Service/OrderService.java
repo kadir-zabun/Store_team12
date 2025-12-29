@@ -78,6 +78,10 @@ public class OrderService {
                     ? product.getCost()
                     : finalPrice.multiply(BigDecimal.valueOf(0.5)).setScale(2, RoundingMode.HALF_UP);
             orderItem.setCostAtPurchase(unitCost);
+            // Set product image URL (first image if available)
+            if (product.getImages() != null && !product.getImages().isEmpty()) {
+                orderItem.setImageUrl(product.getImages().get(0));
+            }
 
             orderItems.add(orderItem);
 
@@ -146,6 +150,10 @@ public class OrderService {
                     ? cartItem.getPrice().multiply(BigDecimal.valueOf(0.5)).setScale(2, RoundingMode.HALF_UP)
                     : BigDecimal.ZERO);
             orderItem.setCostAtPurchase(unitCost);
+            // Set product image URL (first image if available)
+            if (product.getImages() != null && !product.getImages().isEmpty()) {
+                orderItem.setImageUrl(product.getImages().get(0));
+            }
 
             orderItems.add(orderItem);
 

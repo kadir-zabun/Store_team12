@@ -14,6 +14,30 @@ const salesApi = {
             productIds,
             discountPercent,
         }),
+
+    // Faturaları tarih aralığına göre getir
+    getInvoices: (from, to) =>
+        axiosClient.get("/api/sales/invoices", {
+            params: {
+                from: from.toISOString(),
+                to: to.toISOString(),
+            },
+        }),
+
+    // Fatura PDF'ini indir
+    getInvoicePdf: (invoiceId) =>
+        axiosClient.get(`/api/sales/invoices/${invoiceId}/pdf`, {
+            responseType: "blob",
+        }),
+
+    // Gelir ve kar/zarar metriklerini getir
+    getMetrics: (from, to) =>
+        axiosClient.get("/api/sales/metrics", {
+            params: {
+                from: from.toISOString(),
+                to: to.toISOString(),
+            },
+        }),
 };
 
 export default salesApi;

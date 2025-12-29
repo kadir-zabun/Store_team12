@@ -84,6 +84,11 @@ export default function ProductDetailPage() {
     }, [productId, navigate, showError, userRole]);
 
     const handleAddToCart = async () => {
+        // PRODUCT_MANAGER, SALES_MANAGER, and SUPPORT_AGENT cannot add to cart
+        if (userRole === "PRODUCT_MANAGER" || userRole === "SALES_MANAGER" || userRole === "SUPPORT_AGENT") {
+            showError("You do not have permission to add products to cart.");
+            return;
+        }
         if (!product) return;
 
         const stock = product.quantity || 0;
@@ -396,26 +401,47 @@ export default function ProductDetailPage() {
                                             }}
                                         />
                                     </div>
-                                    <button
-                                        onClick={handleAddToCart}
-                                        disabled={addingToCart || (product.quantity || 0) === 0}
-                                        style={{
-                                            flex: 1,
-                                            padding: "1rem 2rem",
-                                            background: (product.quantity || 0) === 0
-                                                ? "#cbd5e0"
-                                                : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                                            color: "#fff",
-                                            border: "none",
-                                            borderRadius: "12px",
-                                            fontSize: "1.1rem",
-                                            fontWeight: 600,
-                                            cursor: (product.quantity || 0) === 0 ? "not-allowed" : "pointer",
-                                            transition: "all 0.3s",
-                                        }}
-                                    >
-                                        {addingToCart ? "Adding..." : (product.quantity || 0) === 0 ? "Out of Stock" : "Add to Cart"}
-                                    </button>
+                                    {(userRole !== "PRODUCT_MANAGER" && userRole !== "SALES_MANAGER" && userRole !== "SUPPORT_AGENT") && (
+                                        <button
+                                            onClick={handleAddToCart}
+                                            disabled={addingToCart || (product.quantity || 0) === 0}
+                                            style={{
+                                                flex: 1,
+                                                padding: "1rem 2rem",
+                                                background: (product.quantity || 0) === 0
+                                                    ? "#cbd5e0"
+                                                    : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                                color: "#fff",
+                                                border: "none",
+                                                borderRadius: "4px",
+                                                fontSize: "0.9rem",
+                                                fontWeight: 600,
+                                                cursor: (product.quantity || 0) === 0 ? "not-allowed" : "pointer",
+                                                transition: "all 0.3s",
+                                            }}
+                                        >
+                                            {addingToCart ? "Adding..." : (product.quantity || 0) === 0 ? "Out of Stock" : "Add to Cart"}
+                                        </button>
+                                    )}
+                                    {(userRole === "PRODUCT_MANAGER" || userRole === "SALES_MANAGER" || userRole === "SUPPORT_AGENT") && (
+                                        <div
+                                            style={{
+                                                flex: 1,
+                                                padding: "1rem 2rem",
+                                                background: "#e2e8f0",
+                                                color: "#4a5568",
+                                                border: "none",
+                                                borderRadius: "4px",
+                                                fontSize: "0.9rem",
+                                                fontWeight: 600,
+                                                textAlign: "center",
+                                            }}
+                                        >
+                                            {userRole === "PRODUCT_MANAGER" && "Product Manager View"}
+                                            {userRole === "SALES_MANAGER" && "Sales Manager View"}
+                                            {userRole === "SUPPORT_AGENT" && "Support Agent View"}
+                                        </div>
+                                    )}
                                 </div>
                                 {userRole === "CUSTOMER" && (
                                     <button

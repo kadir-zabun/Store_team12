@@ -254,9 +254,9 @@ export default function ProductsPage() {
     };
 
     const handleAddToCart = async (productId) => {
-        // PRODUCT_MANAGER cannot add to cart
-        if (userRole === "PRODUCT_MANAGER") {
-            showError("Product managers cannot add products to cart.");
+        // PRODUCT_MANAGER, SALES_MANAGER, and SUPPORT_AGENT cannot add to cart
+        if (userRole === "PRODUCT_MANAGER" || userRole === "SALES_MANAGER" || userRole === "SUPPORT_AGENT") {
+            showError("You do not have permission to add products to cart.");
             return;
         }
 
@@ -354,20 +354,26 @@ export default function ProductsPage() {
                         <Link
                             to="/"
                             style={{
-                                color: "#4a5568",
-                                textDecoration: "none",
+                                color: location.pathname === "/" ? "#667eea" : "#4a5568",
+                                textDecoration: location.pathname === "/" ? "underline" : "none",
+                                textDecorationThickness: location.pathname === "/" ? "2px" : "0",
+                                textUnderlineOffset: location.pathname === "/" ? "4px" : "0",
                                 padding: "0.5rem 1rem",
-                                borderRadius: "8px",
-                                fontWeight: 500,
+                                borderRadius: "4px",
+                                fontWeight: location.pathname === "/" ? 600 : 500,
                                 transition: "all 0.2s",
                             }}
                             onMouseEnter={(e) => {
-                                e.currentTarget.style.background = "#f7fafc";
-                                e.currentTarget.style.color = "#667eea";
+                                if (location.pathname !== "/") {
+                                    e.currentTarget.style.background = "#f7fafc";
+                                    e.currentTarget.style.color = "#667eea";
+                                }
                             }}
                             onMouseLeave={(e) => {
-                                e.currentTarget.style.background = "transparent";
-                                e.currentTarget.style.color = "#4a5568";
+                                if (location.pathname !== "/") {
+                                    e.currentTarget.style.background = "transparent";
+                                    e.currentTarget.style.color = "#4a5568";
+                                }
                             }}
                         >
                             Home
@@ -375,26 +381,70 @@ export default function ProductsPage() {
                         <Link
                             to="/products"
                             style={{
-                                color: "#667eea",
-                                textDecoration: "none",
+                                color: location.pathname === "/products" ? "#667eea" : "#4a5568",
+                                textDecoration: location.pathname === "/products" ? "underline" : "none",
+                                textDecorationThickness: location.pathname === "/products" ? "2px" : "0",
+                                textUnderlineOffset: location.pathname === "/products" ? "4px" : "0",
                                 padding: "0.5rem 1rem",
-                                borderRadius: "8px",
-                                fontWeight: 600,
-                                background: "#f7fafc",
+                                borderRadius: "4px",
+                                fontWeight: location.pathname === "/products" ? 600 : 500,
                                 transition: "all 0.2s",
+                            }}
+                            onMouseEnter={(e) => {
+                                if (location.pathname !== "/products") {
+                                    e.currentTarget.style.background = "#f7fafc";
+                                    e.currentTarget.style.color = "#667eea";
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                if (location.pathname !== "/products") {
+                                    e.currentTarget.style.background = "transparent";
+                                    e.currentTarget.style.color = "#4a5568";
+                                }
                             }}
                         >
                             Products
                         </Link>
-                        {userRole !== "PRODUCT_MANAGER" && (
+                        {userRole === "SALES_MANAGER" && (
+                            <Link
+                                to="/sales-manager"
+                                style={{
+                                    color: location.pathname === "/sales-manager" ? "#667eea" : "#4a5568",
+                                    textDecoration: location.pathname === "/sales-manager" ? "underline" : "none",
+                                    textDecorationThickness: location.pathname === "/sales-manager" ? "2px" : "0",
+                                    textUnderlineOffset: location.pathname === "/sales-manager" ? "4px" : "0",
+                                    padding: "0.5rem 1rem",
+                                    borderRadius: "4px",
+                                    fontWeight: location.pathname === "/sales-manager" ? 600 : 500,
+                                    transition: "all 0.2s",
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (location.pathname !== "/sales-manager") {
+                                        e.currentTarget.style.background = "#f7fafc";
+                                        e.currentTarget.style.color = "#667eea";
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (location.pathname !== "/sales-manager") {
+                                        e.currentTarget.style.background = "transparent";
+                                        e.currentTarget.style.color = "#4a5568";
+                                    }
+                                }}
+                            >
+                                Sales Manager
+                            </Link>
+                        )}
+                        {(userRole !== "PRODUCT_MANAGER" && userRole !== "SALES_MANAGER" && userRole !== "SUPPORT_AGENT") && (
                             <Link
                                 to="/cart"
                                 style={{
-                                    color: "#4a5568",
-                                    textDecoration: "none",
+                                    color: location.pathname === "/cart" ? "#667eea" : "#4a5568",
+                                    textDecoration: location.pathname === "/cart" ? "underline" : "none",
+                                    textDecorationThickness: location.pathname === "/cart" ? "2px" : "0",
+                                    textUnderlineOffset: location.pathname === "/cart" ? "4px" : "0",
                                     padding: "0.5rem 1rem",
-                                    borderRadius: "8px",
-                                    fontWeight: 500,
+                                    borderRadius: "4px",
+                                    fontWeight: location.pathname === "/cart" ? 600 : 500,
                                     transition: "all 0.2s",
                                     position: "relative",
                                     display: "flex",
@@ -402,12 +452,16 @@ export default function ProductsPage() {
                                     gap: "0.5rem",
                                 }}
                                 onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = "#f7fafc";
-                                    e.currentTarget.style.color = "#667eea";
+                                    if (location.pathname !== "/cart") {
+                                        e.currentTarget.style.background = "#f7fafc";
+                                        e.currentTarget.style.color = "#667eea";
+                                    }
                                 }}
                                 onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = "transparent";
-                                    e.currentTarget.style.color = "#4a5568";
+                                    if (location.pathname !== "/cart") {
+                                        e.currentTarget.style.background = "transparent";
+                                        e.currentTarget.style.color = "#4a5568";
+                                    }
                                 }}
                             >
                                 <span>Cart</span>
@@ -436,20 +490,26 @@ export default function ProductsPage() {
                             <Link
                                 to="/owner-dashboard"
                                 style={{
-                                    color: "#4a5568",
-                                    textDecoration: "none",
+                                    color: location.pathname === "/owner-dashboard" ? "#667eea" : "#4a5568",
+                                    textDecoration: location.pathname === "/owner-dashboard" ? "underline" : "none",
+                                    textDecorationThickness: location.pathname === "/owner-dashboard" ? "2px" : "0",
+                                    textUnderlineOffset: location.pathname === "/owner-dashboard" ? "4px" : "0",
                                     padding: "0.5rem 1rem",
-                                    borderRadius: "8px",
-                                    fontWeight: 500,
+                                    borderRadius: "4px",
+                                    fontWeight: location.pathname === "/owner-dashboard" ? 600 : 500,
                                     transition: "all 0.2s",
                                 }}
                                 onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = "#f7fafc";
-                                    e.currentTarget.style.color = "#667eea";
+                                    if (location.pathname !== "/owner-dashboard") {
+                                        e.currentTarget.style.background = "#f7fafc";
+                                        e.currentTarget.style.color = "#667eea";
+                                    }
                                 }}
                                 onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = "transparent";
-                                    e.currentTarget.style.color = "#4a5568";
+                                    if (location.pathname !== "/owner-dashboard") {
+                                        e.currentTarget.style.background = "transparent";
+                                        e.currentTarget.style.color = "#4a5568";
+                                    }
                                 }}
                             >
                                 Dashboard
@@ -460,28 +520,44 @@ export default function ProductsPage() {
 
                 <div style={{ display: "flex", alignItems: "center", gap: "1rem", position: "relative" }}>
                     {userName ? (
-                        <div ref={dropdownRef} style={{ position: "relative" }}>
+                        <div 
+                            ref={dropdownRef} 
+                            style={{ position: "relative" }}
+                            onMouseEnter={() => setShowDropdown(true)}
+                            onMouseLeave={() => setShowDropdown(false)}
+                        >
                             <button
-                                onClick={toggleDropdown}
                                 style={{
                                     display: "flex",
                                     alignItems: "center",
                                     gap: "0.6rem",
-                                    padding: "0.6rem 1.2rem",
-                                    borderRadius: "10px",
+                                    padding: "0.5rem 1rem",
+                                    borderRadius: "4px",
                                     border: "none",
-                                    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                                    color: "#fff",
+                                    background: showDropdown ? "#f7fafc" : "transparent",
+                                    color: showDropdown ? "#667eea" : "#4a5568",
                                     fontSize: "0.95rem",
-                                    fontWeight: 600,
+                                    fontWeight: 500,
                                     cursor: "pointer",
-                                    transition: "all 0.3s",
-                                    boxShadow: "0 2px 4px rgba(102, 126, 234, 0.3)",
+                                    transition: "all 0.2s",
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = "#f7fafc";
+                                    e.currentTarget.style.color = "#667eea";
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!showDropdown) {
+                                        e.currentTarget.style.background = "transparent";
+                                        e.currentTarget.style.color = "#4a5568";
+                                    } else {
+                                        e.currentTarget.style.background = "#f7fafc";
+                                        e.currentTarget.style.color = "#667eea";
+                                    }
                                 }}
                             >
-                                <span style={{ fontSize: "1.2rem" }}>👤</span>
+                                <span style={{ fontSize: "1rem" }}>👤</span>
                                 <span>{userName}</span>
-                                <span style={{ fontSize: "0.7rem" }}>{showDropdown ? "▲" : "▼"}</span>
+                                <span style={{ fontSize: "0.7rem" }}>▼</span>
                             </button>
                             {showDropdown && (
                                 <div
@@ -489,16 +565,25 @@ export default function ProductsPage() {
                                         position: "absolute",
                                         top: "100%",
                                         right: 0,
-                                        marginTop: "0.8rem",
-                                        background: "#fff",
-                                        border: "1px solid #e2e8f0",
-                                        borderRadius: "12px",
-                                        boxShadow: "0 10px 25px rgba(0, 0, 0, 0.15)",
-                                        minWidth: "200px",
+                                        marginTop: "0",
+                                        paddingTop: "0.25rem",
+                                        background: "transparent",
                                         zIndex: 1000,
                                     }}
+                                    onMouseEnter={() => setShowDropdown(true)}
+                                    onMouseLeave={() => setShowDropdown(false)}
                                 >
-                                    {userRole !== "PRODUCT_MANAGER" && (
+                                    <div
+                                        style={{
+                                            background: "#fff",
+                                            border: "1px solid #e2e8f0",
+                                            borderRadius: "4px",
+                                            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
+                                            minWidth: "180px",
+                                            overflow: "hidden",
+                                        }}
+                                    >
+                                    {(userRole !== "PRODUCT_MANAGER" && userRole !== "SALES_MANAGER" && userRole !== "SUPPORT_AGENT") && (
                                         <Link
                                             to="/cart"
                                             onClick={() => setShowDropdown(false)}
@@ -506,11 +591,21 @@ export default function ProductsPage() {
                                                 display: "flex",
                                                 alignItems: "center",
                                                 gap: "0.8rem",
-                                                padding: "0.9rem 1.2rem",
-                                                color: "#2d3748",
+                                                padding: "0.75rem 1rem",
+                                                color: "#4a5568",
                                                 textDecoration: "none",
-                                                fontSize: "0.95rem",
+                                                fontSize: "0.9rem",
                                                 borderBottom: "1px solid #f1f5f9",
+                                                background: "transparent",
+                                                transition: "all 0.2s",
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.background = "#667eea";
+                                                e.currentTarget.style.color = "#fff";
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.background = "transparent";
+                                                e.currentTarget.style.color = "#4a5568";
                                             }}
                                         >
                                             <span>🛒</span>
@@ -525,11 +620,21 @@ export default function ProductsPage() {
                                                 display: "flex",
                                                 alignItems: "center",
                                                 gap: "0.8rem",
-                                                padding: "0.9rem 1.2rem",
-                                                color: "#2d3748",
+                                                padding: "0.75rem 1rem",
+                                                color: "#4a5568",
                                                 textDecoration: "none",
-                                                fontSize: "0.95rem",
+                                                fontSize: "0.9rem",
                                                 borderBottom: "1px solid #f1f5f9",
+                                                background: "transparent",
+                                                transition: "all 0.2s",
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.background = "#667eea";
+                                                e.currentTarget.style.color = "#fff";
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.background = "transparent";
+                                                e.currentTarget.style.color = "#4a5568";
                                             }}
                                         >
                                             <span>📊</span>
@@ -545,11 +650,21 @@ export default function ProductsPage() {
                                             alignItems: "center",
                                             gap: "0.8rem",
                                             textAlign: "left",
-                                            padding: "0.9rem 1.2rem",
-                                            color: "#2d3748",
-                                            fontSize: "0.95rem",
+                                            padding: "0.75rem 1rem",
+                                            color: "#4a5568",
+                                            fontSize: "0.9rem",
                                             textDecoration: "none",
                                             borderBottom: "1px solid #f1f5f9",
+                                            background: "transparent",
+                                            transition: "all 0.2s",
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = "#667eea";
+                                            e.currentTarget.style.color = "#fff";
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = "transparent";
+                                            e.currentTarget.style.color = "#4a5568";
                                         }}
                                     >
                                         <span>📋</span>
@@ -563,17 +678,27 @@ export default function ProductsPage() {
                                             alignItems: "center",
                                             gap: "0.8rem",
                                             textAlign: "left",
-                                            padding: "0.9rem 1.2rem",
+                                            padding: "0.75rem 1rem",
                                             color: "#e53e3e",
-                                            fontSize: "0.95rem",
+                                            fontSize: "0.9rem",
                                             border: "none",
                                             background: "transparent",
                                             cursor: "pointer",
+                                            transition: "all 0.2s",
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = "#fed7d7";
+                                            e.currentTarget.style.color = "#c53030";
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = "transparent";
+                                            e.currentTarget.style.color = "#e53e3e";
                                         }}
                                     >
                                         <span>🚪</span>
                                         <span>Logout</span>
                                     </button>
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -979,7 +1104,7 @@ export default function ProductsPage() {
                                         >
                                             {product.inStock ? `✓ In Stock (${product.quantity})` : "✗ Out of Stock"}
                                         </div>
-                                        {userRole !== "PRODUCT_MANAGER" && (
+                                        {(userRole !== "PRODUCT_MANAGER" && userRole !== "SALES_MANAGER" && userRole !== "SUPPORT_AGENT") && (
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -994,11 +1119,12 @@ export default function ProductsPage() {
                                                         : "#cbd5e0",
                                                     color: "#fff",
                                                     border: "none",
-                                                    borderRadius: "10px",
+                                                    borderRadius: "4px",
                                                     fontWeight: 600,
                                                     cursor: (product.quantity || 0) > 0 && product.inStock && !addingToCart[product.productId] ? "pointer" : "not-allowed",
                                                     transition: "all 0.2s",
                                                     opacity: (product.quantity || 0) > 0 && product.inStock && !addingToCart[product.productId] ? 1 : 0.6,
+                                                    fontSize: "0.85rem",
                                                 }}
                                                 onMouseEnter={(e) => {
                                                     if ((product.quantity || 0) > 0 && product.inStock && !addingToCart[product.productId]) {
@@ -1014,7 +1140,7 @@ export default function ProductsPage() {
                                                 {addingToCart[product.productId] ? "Adding..." : (product.quantity || 0) <= 0 ? "Out of Stock" : product.inStock ? "Add to Cart" : "Out of Stock"}
                                             </button>
                                         )}
-                                        {userRole === "PRODUCT_MANAGER" && (
+                                        {(userRole === "PRODUCT_MANAGER" || userRole === "SALES_MANAGER" || userRole === "SUPPORT_AGENT") && (
                                             <div
                                                 style={{
                                                     width: "100%",
@@ -1022,13 +1148,15 @@ export default function ProductsPage() {
                                                     background: "#e2e8f0",
                                                     color: "#4a5568",
                                                     border: "none",
-                                                    borderRadius: "10px",
+                                                    borderRadius: "4px",
                                                     fontWeight: 600,
                                                     textAlign: "center",
-                                                    fontSize: "0.9rem",
+                                                    fontSize: "0.85rem",
                                                 }}
                                             >
-                                                Product Manager View
+                                                {userRole === "PRODUCT_MANAGER" && "Product Manager View"}
+                                                {userRole === "SALES_MANAGER" && "Sales Manager View"}
+                                                {userRole === "SUPPORT_AGENT" && "Support Agent View"}
                                             </div>
                                         )}
                                     </div>
