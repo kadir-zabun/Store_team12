@@ -972,11 +972,13 @@ export default function SalesManagerDashboard() {
                             
                             <button
                                 onClick={async () => {
+                                    if (loadingRefunds) return;
                                     setLoadingRefunds(true);
                                     try {
                                         const response = await salesApi.getPendingRefunds();
                                         const refundsData = response.data?.data || response.data || [];
                                         setPendingRefunds(Array.isArray(refundsData) ? refundsData : []);
+                                        showSuccess("Refund requests refreshed!");
                                     } catch (error) {
                                         console.error("Error loading refunds:", error);
                                         showError(error.response?.data?.message || "Failed to load refund requests.");
@@ -986,25 +988,29 @@ export default function SalesManagerDashboard() {
                                 }}
                                 disabled={loadingRefunds}
                                 style={{
-                                    padding: "0.75rem 1.5rem",
-                                    background: "#667eea",
+                                    padding: "1rem 1.5rem",
+                                    background: loadingRefunds ? "#cbd5e0" : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
                                     color: "#fff",
                                     border: "none",
-                                    borderRadius: "4px",
-                                    fontSize: "0.85rem",
+                                    borderRadius: "10px",
+                                    fontSize: "1rem",
                                     fontWeight: 600,
                                     cursor: loadingRefunds ? "not-allowed" : "pointer",
                                     marginBottom: "1.5rem",
-                                    transition: "all 0.2s",
+                                    transition: "all 0.3s",
+                                    opacity: loadingRefunds ? 0.6 : 1,
+                                    boxShadow: loadingRefunds ? "none" : "0 2px 4px rgba(102, 126, 234, 0.3)",
                                 }}
                                 onMouseEnter={(e) => {
                                     if (!loadingRefunds) {
-                                        e.currentTarget.style.background = "#764ba2";
+                                        e.currentTarget.style.transform = "translateY(-2px)";
+                                        e.currentTarget.style.boxShadow = "0 4px 8px rgba(102, 126, 234, 0.4)";
                                     }
                                 }}
                                 onMouseLeave={(e) => {
                                     if (!loadingRefunds) {
-                                        e.currentTarget.style.background = "#667eea";
+                                        e.currentTarget.style.transform = "translateY(0)";
+                                        e.currentTarget.style.boxShadow = "0 2px 4px rgba(102, 126, 234, 0.3)";
                                     }
                                 }}
                             >
@@ -1090,6 +1096,7 @@ export default function SalesManagerDashboard() {
                                                 <div style={{ display: "flex", gap: "1rem" }}>
                                                     <button
                                                         onClick={async () => {
+                                                            if (decidingRefund[refund.refundId]) return;
                                                             setDecidingRefund({ ...decidingRefund, [refund.refundId]: true });
                                                             try {
                                                                 await salesApi.decideRefund(
@@ -1105,32 +1112,42 @@ export default function SalesManagerDashboard() {
                                                                 setPendingRefunds(Array.isArray(refundsData) ? refundsData : []);
                                                             } catch (error) {
                                                                 console.error("Error approving refund:", error);
-                                                                showError(error.response?.data?.message || "Failed to approve refund.");
+                                                                console.error("Error response:", error.response);
+                                                                console.error("Error data:", error.response?.data);
+                                                                const errorMessage = error.response?.data?.message 
+                                                                    || error.response?.data?.error 
+                                                                    || error.message 
+                                                                    || "Failed to approve refund.";
+                                                                showError(errorMessage);
                                                             } finally {
-                                                                setDecidingRefund({ ...decidingRefund, [refund.refundId]: false });
+                                                                setDecidingRefund((prev) => ({ ...prev, [refund.refundId]: false }));
                                                             }
                                                         }}
                                                         disabled={decidingRefund[refund.refundId]}
                                                         style={{
                                                             flex: 1,
-                                                            padding: "0.75rem 1.5rem",
-                                                            background: "#2f855a",
+                                                            padding: "1rem 1.5rem",
+                                                            background: decidingRefund[refund.refundId] ? "#cbd5e0" : "linear-gradient(135deg, #2f855a 0%, #22543d 100%)",
                                                             color: "#fff",
                                                             border: "none",
-                                                            borderRadius: "4px",
-                                                            fontSize: "0.85rem",
+                                                            borderRadius: "10px",
+                                                            fontSize: "1rem",
                                                             fontWeight: 600,
                                                             cursor: decidingRefund[refund.refundId] ? "not-allowed" : "pointer",
-                                                            transition: "all 0.2s",
+                                                            transition: "all 0.3s",
+                                                            opacity: decidingRefund[refund.refundId] ? 0.6 : 1,
+                                                            boxShadow: decidingRefund[refund.refundId] ? "none" : "0 2px 4px rgba(47, 133, 90, 0.3)",
                                                         }}
                                                         onMouseEnter={(e) => {
                                                             if (!decidingRefund[refund.refundId]) {
-                                                                e.currentTarget.style.background = "#22543d";
+                                                                e.currentTarget.style.transform = "translateY(-2px)";
+                                                                e.currentTarget.style.boxShadow = "0 4px 8px rgba(47, 133, 90, 0.4)";
                                                             }
                                                         }}
                                                         onMouseLeave={(e) => {
                                                             if (!decidingRefund[refund.refundId]) {
-                                                                e.currentTarget.style.background = "#2f855a";
+                                                                e.currentTarget.style.transform = "translateY(0)";
+                                                                e.currentTarget.style.boxShadow = "0 2px 4px rgba(47, 133, 90, 0.3)";
                                                             }
                                                         }}
                                                     >
@@ -1138,6 +1155,7 @@ export default function SalesManagerDashboard() {
                                                     </button>
                                                     <button
                                                         onClick={async () => {
+                                                            if (decidingRefund[refund.refundId]) return;
                                                             setDecidingRefund({ ...decidingRefund, [refund.refundId]: true });
                                                             try {
                                                                 await salesApi.decideRefund(
@@ -1153,32 +1171,42 @@ export default function SalesManagerDashboard() {
                                                                 setPendingRefunds(Array.isArray(refundsData) ? refundsData : []);
                                                             } catch (error) {
                                                                 console.error("Error rejecting refund:", error);
-                                                                showError(error.response?.data?.message || "Failed to reject refund.");
+                                                                console.error("Error response:", error.response);
+                                                                console.error("Error data:", error.response?.data);
+                                                                const errorMessage = error.response?.data?.message 
+                                                                    || error.response?.data?.error 
+                                                                    || error.message 
+                                                                    || "Failed to reject refund.";
+                                                                showError(errorMessage);
                                                             } finally {
-                                                                setDecidingRefund({ ...decidingRefund, [refund.refundId]: false });
+                                                                setDecidingRefund((prev) => ({ ...prev, [refund.refundId]: false }));
                                                             }
                                                         }}
                                                         disabled={decidingRefund[refund.refundId]}
                                                         style={{
                                                             flex: 1,
-                                                            padding: "0.75rem 1.5rem",
-                                                            background: "#e53e3e",
+                                                            padding: "1rem 1.5rem",
+                                                            background: decidingRefund[refund.refundId] ? "#cbd5e0" : "linear-gradient(135deg, #e53e3e 0%, #c53030 100%)",
                                                             color: "#fff",
                                                             border: "none",
-                                                            borderRadius: "4px",
-                                                            fontSize: "0.85rem",
+                                                            borderRadius: "10px",
+                                                            fontSize: "1rem",
                                                             fontWeight: 600,
                                                             cursor: decidingRefund[refund.refundId] ? "not-allowed" : "pointer",
-                                                            transition: "all 0.2s",
+                                                            transition: "all 0.3s",
+                                                            opacity: decidingRefund[refund.refundId] ? 0.6 : 1,
+                                                            boxShadow: decidingRefund[refund.refundId] ? "none" : "0 2px 4px rgba(229, 62, 62, 0.3)",
                                                         }}
                                                         onMouseEnter={(e) => {
                                                             if (!decidingRefund[refund.refundId]) {
-                                                                e.currentTarget.style.background = "#c53030";
+                                                                e.currentTarget.style.transform = "translateY(-2px)";
+                                                                e.currentTarget.style.boxShadow = "0 4px 8px rgba(229, 62, 62, 0.4)";
                                                             }
                                                         }}
                                                         onMouseLeave={(e) => {
                                                             if (!decidingRefund[refund.refundId]) {
-                                                                e.currentTarget.style.background = "#e53e3e";
+                                                                e.currentTarget.style.transform = "translateY(0)";
+                                                                e.currentTarget.style.boxShadow = "0 2px 4px rgba(229, 62, 62, 0.3)";
                                                             }
                                                         }}
                                                     >
