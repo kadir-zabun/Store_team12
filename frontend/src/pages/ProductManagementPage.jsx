@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import productApi from "../api/productApi";
 import categoryApi from "../api/categoryApi";
 import { useToast } from "../contexts/ToastContext";
@@ -7,7 +7,6 @@ import { useUserRole } from "../hooks/useUserRole";
 import CustomSelect from "../components/CustomSelect";
 
 export default function ProductManagementPage() {
-    const [userName, setUserName] = useState(null);
     const [products, setProducts] = useState([]);
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -35,8 +34,6 @@ export default function ProductManagementPage() {
     const navigate = useNavigate();
     const { success: showSuccess, error: showError } = useToast();
     const userRole = useUserRole();
-    const dropdownRef = useRef(null);
-    const [showDropdown, setShowDropdown] = useState(false);
 
     useEffect(() => {
         const token = localStorage.getItem("access_token");
@@ -61,14 +58,6 @@ export default function ProductManagementPage() {
 
         const loadData = async () => {
             try {
-                // Get username
-                const payloadBase64 = token.split(".")[1];
-                const normalized = payloadBase64.replace(/-/g, "+").replace(/_/g, "/");
-                const payloadJson = atob(normalized);
-                const payload = JSON.parse(payloadJson);
-                const username = payload.sub || payload.name || payload.username;
-                setUserName(username);
-
                 // Load products and categories
                 const [productsRes, categoriesRes] = await Promise.all([
                     productApi.getMyProducts(),
@@ -180,18 +169,6 @@ export default function ProductManagementPage() {
         }
     };
 
-    const handleLogout = () => {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("user_role");
-        setUserName(null);
-        setShowDropdown(false);
-        navigate("/login");
-    };
-
-    const toggleDropdown = () => {
-        setShowDropdown(!showDropdown);
-    };
-
     // Check role from localStorage directly if hook hasn't loaded yet
     const storedRole = localStorage.getItem("user_role");
     const currentRole = userRole || storedRole;
@@ -218,167 +195,7 @@ export default function ProductManagementPage() {
     }
 
     return (
-        <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}>
-            <nav
-                style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "1.2rem 4rem",
-                    background: "rgba(255, 255, 255, 0.95)",
-                    backdropFilter: "blur(10px)",
-                    boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-                    position: "sticky",
-                    top: 0,
-                    zIndex: 100,
-                }}
-            >
-                <div style={{ display: "flex", alignItems: "center", gap: "3rem" }}>
-                    <Link
-                        to="/"
-                        style={{
-                            fontSize: "1.5rem",
-                            fontWeight: 700,
-                            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                            WebkitBackgroundClip: "text",
-                            WebkitTextFillColor: "transparent",
-                            textDecoration: "none",
-                        }}
-                    >
-                        🛍️ TeknoSU
-                    </Link>
-                    <div style={{ display: "flex", alignItems: "center", gap: "2rem" }}>
-                        <Link 
-                            to="/owner-dashboard" 
-                            style={{ color: "#4a5568", textDecoration: "none", padding: "0.5rem 1rem", borderRadius: "4px", fontWeight: 500, transition: "all 0.2s" }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.background = "#667eea";
-                                e.currentTarget.style.color = "#fff";
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.background = "transparent";
-                                e.currentTarget.style.color = "#4a5568";
-                            }}
-                        >
-                            Dashboard
-                        </Link>
-                        <Link 
-                            to="/owner/products" 
-                            style={{ color: "#667eea", textDecoration: "none", padding: "0.5rem 1rem", borderRadius: "4px", fontWeight: 600, background: "#fff", border: "2px solid #667eea", transition: "all 0.2s" }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.background = "#667eea";
-                                e.currentTarget.style.color = "#fff";
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.background = "#fff";
-                                e.currentTarget.style.color = "#667eea";
-                            }}
-                        >
-                            Products
-                        </Link>
-                        <Link 
-                            to="/owner/orders" 
-                            style={{ color: "#4a5568", textDecoration: "none", padding: "0.5rem 1rem", borderRadius: "4px", fontWeight: 500, transition: "all 0.2s" }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.background = "#667eea";
-                                e.currentTarget.style.color = "#fff";
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.background = "transparent";
-                                e.currentTarget.style.color = "#4a5568";
-                            }}
-                        >
-                            Orders
-                        </Link>
-                        <Link 
-                            to="/owner/reviews" 
-                            style={{ color: "#4a5568", textDecoration: "none", padding: "0.5rem 1rem", borderRadius: "4px", fontWeight: 500, transition: "all 0.2s" }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.background = "#667eea";
-                                e.currentTarget.style.color = "#fff";
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.background = "transparent";
-                                e.currentTarget.style.color = "#4a5568";
-                            }}
-                        >
-                            Reviews
-                        </Link>
-                    </div>
-                </div>
-
-                <div style={{ display: "flex", alignItems: "center", gap: "1rem", position: "relative" }}>
-                    {userName && (
-                        <div ref={dropdownRef} style={{ position: "relative" }}>
-                            <button
-                                onClick={toggleDropdown}
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "0.6rem",
-                                    padding: "0.6rem 1.2rem",
-                                    borderRadius: "4px",
-                                    border: "2px solid #667eea",
-                                    background: "#fff",
-                                    color: "#667eea",
-                                    fontSize: "0.95rem",
-                                    fontWeight: 600,
-                                    cursor: "pointer",
-                                    transition: "all 0.2s",
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = "#667eea";
-                                    e.currentTarget.style.color = "#fff";
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = "#fff";
-                                    e.currentTarget.style.color = "#667eea";
-                                }}
-                            >
-                                <span>{userName}</span>
-                                <span style={{ fontSize: "0.7rem" }}>{showDropdown ? "▲" : "▼"}</span>
-                            </button>
-                            {showDropdown && (
-                                <div
-                                    style={{
-                                        position: "absolute",
-                                        top: "100%",
-                                        right: 0,
-                                        marginTop: "0.8rem",
-                                        background: "#fff",
-                                        border: "1px solid #e2e8f0",
-                                        borderRadius: "4px",
-                                        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
-                                        minWidth: "200px",
-                                        zIndex: 1000,
-                                    }}
-                                >
-                                    <button
-                                        onClick={handleLogout}
-                                        style={{
-                                            width: "100%",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "0.8rem",
-                                            textAlign: "left",
-                                            padding: "0.9rem 1.2rem",
-                                            color: "#e53e3e",
-                                            fontSize: "0.95rem",
-                                            border: "none",
-                                            background: "transparent",
-                                            cursor: "pointer",
-                                        }}
-                                    >
-                                        <span>🚪</span>
-                                        <span>Logout</span>
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-            </nav>
-
+        <div style={{ minHeight: "calc(100vh - 80px)", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}>
             <div style={{ padding: "2rem", maxWidth: "1400px", margin: "0 auto" }}>
                 <div style={{ background: "rgba(255, 255, 255, 0.95)", padding: "2rem", borderRadius: "8px", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>

@@ -413,11 +413,24 @@ export default function ProductDetailPage() {
                                                     : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
                                                 color: "#fff",
                                                 border: "none",
-                                                borderRadius: "4px",
-                                                fontSize: "0.9rem",
+                                                borderRadius: "10px",
+                                                fontSize: "1rem",
                                                 fontWeight: 600,
                                                 cursor: (product.quantity || 0) === 0 ? "not-allowed" : "pointer",
                                                 transition: "all 0.3s",
+                                                boxShadow: (product.quantity || 0) > 0 ? "0 2px 4px rgba(102, 126, 234, 0.3)" : "none",
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                if ((product.quantity || 0) > 0 && !addingToCart) {
+                                                    e.currentTarget.style.transform = "translateY(-2px)";
+                                                    e.currentTarget.style.boxShadow = "0 4px 8px rgba(102, 126, 234, 0.4)";
+                                                }
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                if ((product.quantity || 0) > 0) {
+                                                    e.currentTarget.style.transform = "translateY(0)";
+                                                    e.currentTarget.style.boxShadow = "0 2px 4px rgba(102, 126, 234, 0.3)";
+                                                }
                                             }}
                                         >
                                             {addingToCart ? "Adding..." : (product.quantity || 0) === 0 ? "Out of Stock" : "Add to Cart"}
@@ -449,13 +462,13 @@ export default function ProductDetailPage() {
                                         disabled={addingToWishlist}
                                         style={{
                                             width: "100%",
-                                            padding: "0.75rem 2rem",
+                                            padding: "1rem 2rem",
                                             background: isInWishlist
-                                                ? "#e53e3e"
+                                                ? "linear-gradient(135deg, #e53e3e 0%, #c53030 100%)"
                                                 : "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
                                             color: "#fff",
                                             border: "none",
-                                            borderRadius: "12px",
+                                            borderRadius: "10px",
                                             fontSize: "1rem",
                                             fontWeight: 600,
                                             cursor: addingToWishlist ? "not-allowed" : "pointer",
@@ -464,6 +477,23 @@ export default function ProductDetailPage() {
                                             alignItems: "center",
                                             justifyContent: "center",
                                             gap: "0.5rem",
+                                            boxShadow: !addingToWishlist ? "0 2px 4px rgba(245, 87, 108, 0.3)" : "none",
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            if (!addingToWishlist) {
+                                                e.currentTarget.style.transform = "translateY(-2px)";
+                                                e.currentTarget.style.boxShadow = isInWishlist 
+                                                    ? "0 4px 8px rgba(229, 62, 62, 0.4)"
+                                                    : "0 4px 8px rgba(245, 87, 108, 0.4)";
+                                            }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            if (!addingToWishlist) {
+                                                e.currentTarget.style.transform = "translateY(0)";
+                                                e.currentTarget.style.boxShadow = isInWishlist
+                                                    ? "0 2px 4px rgba(229, 62, 62, 0.3)"
+                                                    : "0 2px 4px rgba(245, 87, 108, 0.3)";
+                                            }
                                         }}
                                     >
                                         {addingToWishlist ? (
