@@ -27,6 +27,9 @@ const userApi = {
 
     getMyCard: () =>
         axiosClient.get("/api/users/my-card"),
+
+    getMyProfile: () =>
+        axiosClient.get("/api/users/me/profile"),
 };
 
 export default userApi;

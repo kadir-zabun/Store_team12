@@ -14,6 +14,9 @@ const categoryApi = {
 
     createCategory: (category) =>
         axiosClient.post("/api/categories", category),
+
+    deleteCategory: (categoryId) =>
+        axiosClient.delete(`/api/categories/${categoryId}`),
 };
 
 export default categoryApi;

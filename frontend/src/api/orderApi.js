@@ -25,6 +25,15 @@ const orderApi = {
 
     getDeliveredOrdersByCustomer: (customerId) =>
         axiosClient.get(`/api/orders/customer/${customerId}/delivered`),
+
+    cancelOrder: (orderId) =>
+        axiosClient.post(`/api/orders/${orderId}/cancel`),
+
+    requestRefund: (orderId, refundData) =>
+        axiosClient.post(`/api/orders/${orderId}/refund`, refundData),
+
+    getMyRefunds: () =>
+        axiosClient.get("/api/orders/refunds/me"),
 };
 
 export default orderApi;
