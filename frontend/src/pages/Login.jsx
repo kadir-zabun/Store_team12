@@ -417,29 +417,29 @@ export default function LoginPage() {
                 style={{
                     display: "flex",
                     flexDirection: "column",
-                        gap: "1.2rem",
-                        background: "rgba(255, 255, 255, 0.95)",
-                        backdropFilter: "blur(10px)",
-                        padding: "3rem",
-                        borderRadius: "20px",
-                        boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)",
-                        minWidth: "400px",
-                        maxWidth: "450px",
+                        gap: "1rem",
+                        background: "#fff",
+                        padding: "2rem",
+                        borderRadius: "4px",
+                        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
+                        minWidth: "320px",
+                        maxWidth: "380px",
+                        width: "100%",
                 }}
             >
                 <h2
                     style={{
                         textAlign: "center",
                             color: "#2d3748",
-                            fontSize: "2rem",
-                            fontWeight: 700,
+                            fontSize: "1.5rem",
+                            fontWeight: 600,
                         margin: 0,
-                            marginBottom: "0.5rem",
+                            marginBottom: "0.25rem",
                     }}
                 >
                         Welcome Back
                 </h2>
-                    <p style={{ textAlign: "center", color: "#718096", marginBottom: "1rem" }}>
+                    <p style={{ textAlign: "center", color: "#718096", fontSize: "0.9rem", marginBottom: "1.5rem" }}>
                         Sign in to your account
                     </p>
 
@@ -449,17 +449,17 @@ export default function LoginPage() {
                     value={usernameOrEmail}
                     onChange={(e) => setUsernameOrEmail(e.target.value)}
                     style={{
-                            padding: "1rem",
-                            fontSize: "1rem",
-                            borderRadius: "12px",
-                            border: "2px solid #e2e8f0",
+                            padding: "0.75rem",
+                            fontSize: "0.9rem",
+                            borderRadius: "4px",
+                            border: "1px solid #e2e8f0",
                             background: "#fff",
                             color: "#2d3748",
                             transition: "all 0.2s",
                         }}
                         onFocus={(e) => {
                             e.currentTarget.style.borderColor = "#667eea";
-                            e.currentTarget.style.boxShadow = "0 0 0 3px rgba(102, 126, 234, 0.1)";
+                            e.currentTarget.style.boxShadow = "0 0 0 2px rgba(102, 126, 234, 0.1)";
                         }}
                         onBlur={(e) => {
                             e.currentTarget.style.borderColor = "#e2e8f0";
@@ -473,17 +473,17 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     style={{
-                            padding: "1rem",
-                            fontSize: "1rem",
-                            borderRadius: "12px",
-                            border: "2px solid #e2e8f0",
+                            padding: "0.75rem",
+                            fontSize: "0.9rem",
+                            borderRadius: "4px",
+                            border: "1px solid #e2e8f0",
                             background: "#fff",
                             color: "#2d3748",
                             transition: "all 0.2s",
                         }}
                         onFocus={(e) => {
                             e.currentTarget.style.borderColor = "#667eea";
-                            e.currentTarget.style.boxShadow = "0 0 0 3px rgba(102, 126, 234, 0.1)";
+                            e.currentTarget.style.boxShadow = "0 0 0 2px rgba(102, 126, 234, 0.1)";
                         }}
                         onBlur={(e) => {
                             e.currentTarget.style.borderColor = "#e2e8f0";
@@ -494,11 +494,11 @@ export default function LoginPage() {
                 {error && (
                         <div
                             style={{
-                                padding: "0.75rem 1rem",
+                                padding: "0.6rem 0.75rem",
                                 background: "#fed7d7",
                                 color: "#c53030",
-                                borderRadius: "8px",
-                                fontSize: "0.9rem",
+                                borderRadius: "4px",
+                                fontSize: "0.85rem",
                             }}
                         >
                             {error}
@@ -508,25 +508,22 @@ export default function LoginPage() {
                     <button
                         type="submit"
                         style={{
-                            padding: "1rem",
-                            fontSize: "1.1rem",
+                            padding: "0.75rem",
+                            fontSize: "0.95rem",
                             fontWeight: 600,
-                            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                            background: "#667eea",
                             color: "#fff",
                             border: "none",
-                            borderRadius: "12px",
+                            borderRadius: "4px",
                             cursor: "pointer",
-                            transition: "all 0.3s",
-                            boxShadow: "0 4px 15px rgba(102, 126, 234, 0.4)",
-                            marginTop: "0.5rem",
+                            transition: "all 0.2s",
+                            marginTop: "0.25rem",
                         }}
                         onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = "translateY(-2px)";
-                            e.currentTarget.style.boxShadow = "0 6px 20px rgba(102, 126, 234, 0.5)";
+                            e.currentTarget.style.background = "#5568d3";
                         }}
                         onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = "translateY(0)";
-                            e.currentTarget.style.boxShadow = "0 4px 15px rgba(102, 126, 234, 0.4)";
+                            e.currentTarget.style.background = "#667eea";
                         }}
                     >
                         Sign In
@@ -535,8 +532,8 @@ export default function LoginPage() {
                 <div
                     style={{
                             textAlign: "center",
-                            marginTop: "0.5rem",
-                            fontSize: "0.95rem",
+                            marginTop: "0.75rem",
+                            fontSize: "0.85rem",
                             color: "#718096",
                         }}
                     >
@@ -545,10 +542,17 @@ export default function LoginPage() {
                             style={{
                                 color: "#667eea",
                                 textDecoration: "none",
-                                fontWeight: 600,
+                                fontWeight: 500,
                                 display: "block",
                                 marginBottom: "0.5rem",
+                                transition: "color 0.2s",
                     }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.color = "#5568d3";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.color = "#667eea";
+                            }}
                 >
                             Forgot Password?
                         </Link>
@@ -558,7 +562,14 @@ export default function LoginPage() {
                         style={{
                                 color: "#667eea",
                             textDecoration: "none",
-                                fontWeight: 600,
+                                fontWeight: 500,
+                                transition: "color 0.2s",
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.color = "#5568d3";
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.color = "#667eea";
                         }}
                     >
                         Sign up
