@@ -10,6 +10,7 @@ import { useCartCount } from "../hooks/useCartCount";
 import { useToast } from "../contexts/ToastContext";
 import { useUserRole } from "../hooks/useUserRole";
 import { getErrorMessage } from "../utils/errorHandler";
+import CustomSelect from "../components/CustomSelect";
 
 export default function ProductsPage() {
     const [userName, setUserName] = useState(null);
@@ -703,8 +704,8 @@ export default function ProductsPage() {
                             {/* Sort and Filters */}
                             <div style={{ display: "flex", gap: "1rem", alignItems: "center", flexWrap: "wrap" }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                    <label style={{ fontSize: "0.9rem", fontWeight: 600, color: "#4a5568" }}>Category:</label>
-                                    <select
+                                    <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "#4a5568" }}>Category:</label>
+                                    <CustomSelect
                                         value={selectedCategory}
                                         onChange={(e) => {
                                             setSelectedCategory(e.target.value);
@@ -714,67 +715,39 @@ export default function ProductsPage() {
                                                 navigate("/products");
                                             }
                                         }}
-                                        style={{
-                                            padding: "0.5rem 1rem",
-                                            borderRadius: "8px",
-                                            border: "2px solid #e2e8f0",
-                                            fontSize: "0.9rem",
-                                            outline: "none",
-                                            cursor: "pointer",
-                                            background: "#fff",
-                                            color: "#2d3748",
-                                            minWidth: "150px",
-                                        }}
-                                    >
-                                        <option value="">All Categories</option>
-                                        {categories.map(cat => (
-                                            <option key={cat.categoryId} value={cat.categoryId}>
-                                                {cat.categoryName}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        options={[
+                                            { value: "", label: "All Categories" },
+                                            ...categories.map(cat => ({ value: cat.categoryId, label: cat.categoryName }))
+                                        ]}
+                                        placeholder="All Categories"
+                                        minWidth="200px"
+                                    />
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                    <label style={{ fontSize: "0.9rem", fontWeight: 600, color: "#4a5568" }}>Sort by:</label>
-                                    <select
+                                    <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "#4a5568" }}>Sort by:</label>
+                                    <CustomSelect
                                         value={sortBy}
                                         onChange={(e) => setSortBy(e.target.value)}
-                                        style={{
-                                            padding: "0.5rem 1rem",
-                                            borderRadius: "8px",
-                                            border: "2px solid #e2e8f0",
-                                            fontSize: "0.9rem",
-                                            outline: "none",
-                                            cursor: "pointer",
-                                            background: "#fff",
-                                            color: "#2d3748",
-                                        }}
-                                    >
-                                        <option value="productName">Name</option>
-                                        <option value="price">Price</option>
-                                        <option value="popularity">Popularity</option>
-                                    </select>
-                                    <select
+                                        options={[
+                                            { value: "productName", label: "Name" },
+                                            { value: "price", label: "Price" },
+                                            { value: "popularity", label: "Popularity" }
+                                        ]}
+                                        minWidth="120px"
+                                    />
+                                    <CustomSelect
                                         value={sortDir}
                                         onChange={(e) => setSortDir(e.target.value)}
-                                        style={{
-                                            padding: "0.5rem 1rem",
-                                            borderRadius: "8px",
-                                            border: "2px solid #e2e8f0",
-                                            fontSize: "0.9rem",
-                                            outline: "none",
-                                            cursor: "pointer",
-                                            background: "#fff",
-                                            color: "#2d3748",
-                                        }}
-                                    >
-                                        <option value="asc">Ascending</option>
-                                        <option value="desc">Descending</option>
-                                    </select>
+                                        options={[
+                                            { value: "asc", label: "Ascending" },
+                                            { value: "desc", label: "Descending" }
+                                        ]}
+                                        minWidth="130px"
+                                    />
                                 </div>
 
                                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                    <label style={{ fontSize: "0.9rem", fontWeight: 600, color: "#4a5568" }}>Price:</label>
+                                    <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "#4a5568" }}>Price:</label>
                                     <input
                                         type="number"
                                         placeholder="Min"
@@ -783,12 +756,29 @@ export default function ProductsPage() {
                                         style={{
                                             width: "100px",
                                             padding: "0.5rem",
-                                            borderRadius: "8px",
+                                            borderRadius: "4px",
                                             border: "2px solid #e2e8f0",
-                                            fontSize: "0.9rem",
+                                            fontSize: "0.85rem",
                                             outline: "none",
                                             background: "#fff",
                                             color: "#2d3748",
+                                            transition: "all 0.2s",
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.borderColor = "#667eea";
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            if (document.activeElement !== e.currentTarget) {
+                                                e.currentTarget.style.borderColor = "#e2e8f0";
+                                            }
+                                        }}
+                                        onFocus={(e) => {
+                                            e.currentTarget.style.borderColor = "#667eea";
+                                            e.currentTarget.style.boxShadow = "0 0 0 3px rgba(102, 126, 234, 0.1)";
+                                        }}
+                                        onBlur={(e) => {
+                                            e.currentTarget.style.borderColor = "#e2e8f0";
+                                            e.currentTarget.style.boxShadow = "none";
                                         }}
                                     />
                                     <span style={{ color: "#4a5568" }}>-</span>
@@ -800,12 +790,29 @@ export default function ProductsPage() {
                                         style={{
                                             width: "100px",
                                             padding: "0.5rem",
-                                            borderRadius: "8px",
+                                            borderRadius: "4px",
                                             border: "2px solid #e2e8f0",
-                                            fontSize: "0.9rem",
+                                            fontSize: "0.85rem",
                                             outline: "none",
                                             background: "#fff",
                                             color: "#2d3748",
+                                            transition: "all 0.2s",
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.borderColor = "#667eea";
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            if (document.activeElement !== e.currentTarget) {
+                                                e.currentTarget.style.borderColor = "#e2e8f0";
+                                            }
+                                        }}
+                                        onFocus={(e) => {
+                                            e.currentTarget.style.borderColor = "#667eea";
+                                            e.currentTarget.style.boxShadow = "0 0 0 3px rgba(102, 126, 234, 0.1)";
+                                        }}
+                                        onBlur={(e) => {
+                                            e.currentTarget.style.borderColor = "#e2e8f0";
+                                            e.currentTarget.style.boxShadow = "none";
                                         }}
                                     />
                                 </div>

@@ -4,6 +4,7 @@ import { useUserRole } from "../hooks/useUserRole";
 import { useToast } from "../contexts/ToastContext";
 import salesApi from "../api/salesApi";
 import productApi from "../api/productApi";
+import CustomSelect from "../components/CustomSelect";
 
 export default function SalesManagerDashboard() {
     const [userName, setUserName] = useState(null);
@@ -212,13 +213,13 @@ export default function SalesManagerDashboard() {
                                 color: "#4a5568",
                                 textDecoration: "none",
                                 padding: "0.5rem 1rem",
-                                borderRadius: "8px",
+                                borderRadius: "4px",
                                 fontWeight: 500,
                                 transition: "all 0.2s",
                             }}
                             onMouseEnter={(e) => {
-                                e.currentTarget.style.background = "#f7fafc";
-                                e.currentTarget.style.color = "#667eea";
+                                e.currentTarget.style.background = "#667eea";
+                                e.currentTarget.style.color = "#fff";
                             }}
                             onMouseLeave={(e) => {
                                 e.currentTarget.style.background = "transparent";
@@ -233,10 +234,19 @@ export default function SalesManagerDashboard() {
                                 color: "#667eea",
                                 textDecoration: "none",
                                 padding: "0.5rem 1rem",
-                                borderRadius: "8px",
+                                borderRadius: "4px",
                                 fontWeight: 600,
-                                background: "#f7fafc",
+                                background: "#fff",
+                                border: "2px solid #667eea",
                                 transition: "all 0.2s",
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = "#667eea";
+                                e.currentTarget.style.color = "#fff";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = "#fff";
+                                e.currentTarget.style.color = "#667eea";
                             }}
                         >
                             Sales Manager
@@ -254,15 +264,22 @@ export default function SalesManagerDashboard() {
                                     alignItems: "center",
                                     gap: "0.6rem",
                                     padding: "0.6rem 1.2rem",
-                                    borderRadius: "10px",
-                                    border: "none",
-                                    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                                    color: "#fff",
+                                    borderRadius: "4px",
+                                    border: "2px solid #667eea",
+                                    background: "#fff",
+                                    color: "#667eea",
                                     fontSize: "0.95rem",
                                     fontWeight: 600,
                                     cursor: "pointer",
-                                    transition: "all 0.3s",
-                                    boxShadow: "0 2px 4px rgba(102, 126, 234, 0.3)",
+                                    transition: "all 0.2s",
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = "#667eea";
+                                    e.currentTarget.style.color = "#fff";
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = "#fff";
+                                    e.currentTarget.style.color = "#667eea";
                                 }}
                             >
                                 <span style={{ fontSize: "1.2rem" }}>👤</span>
@@ -278,8 +295,8 @@ export default function SalesManagerDashboard() {
                                         marginTop: "0.8rem",
                                         background: "#fff",
                                         border: "1px solid #e2e8f0",
-                                        borderRadius: "12px",
-                                        boxShadow: "0 10px 25px rgba(0, 0, 0, 0.15)",
+                                        borderRadius: "4px",
+                                        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
                                         minWidth: "200px",
                                         zIndex: 1000,
                                     }}
@@ -320,10 +337,17 @@ export default function SalesManagerDashboard() {
                                 background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
                                 textDecoration: "none",
                                 padding: "0.6rem 1.5rem",
-                                borderRadius: "10px",
+                                borderRadius: "4px",
                                 fontWeight: 600,
-                                transition: "all 0.3s",
-                                boxShadow: "0 2px 4px rgba(102, 126, 234, 0.3)",
+                                transition: "all 0.2s",
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = "#667eea";
+                                e.currentTarget.style.color = "#fff";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = "#fff";
+                                e.currentTarget.style.color = "#667eea";
                             }}
                         >
                             Login
@@ -342,9 +366,9 @@ export default function SalesManagerDashboard() {
                     style={{
                         background: "rgba(255, 255, 255, 0.95)",
                         backdropFilter: "blur(10px)",
-                        borderRadius: "20px",
+                        borderRadius: "8px",
                         padding: "2rem",
-                        boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)",
+                        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
                         maxWidth: "1400px",
                         margin: "0 auto",
                         width: "100%",
@@ -360,7 +384,7 @@ export default function SalesManagerDashboard() {
                     >
                         Sales Manager Dashboard
                     </h1>
-                    <p style={{ color: "#718096", fontSize: "1.1rem", marginBottom: "2rem" }}>
+                    <p style={{ color: "#718096", fontSize: "0.95rem", marginBottom: "2rem" }}>
                         Welcome, {userName}! Set product prices and apply discounts.
                     </p>
 
@@ -382,14 +406,25 @@ export default function SalesManagerDashboard() {
                                 onClick={() => setActiveTab(tab.id)}
                                 style={{
                                     padding: "0.8rem 1.5rem",
-                                    border: "none",
-                                    background: activeTab === tab.id ? "#667eea" : "#f7fafc",
-                                    color: activeTab === tab.id ? "#fff" : "#4a5568",
-                                    fontWeight: activeTab === tab.id ? 600 : 500,
+                                    border: activeTab === tab.id ? "2px solid #667eea" : "2px solid transparent",
+                                    background: activeTab === tab.id ? "#fff" : "transparent",
+                                    color: activeTab === tab.id ? "#667eea" : "#4a5568",
+                                    fontWeight: 600,
                                     cursor: "pointer",
-                                    borderRadius: "8px 8px 0 0",
+                                    borderRadius: "4px",
                                     transition: "all 0.2s",
-                                    borderBottom: activeTab === tab.id ? "3px solid #667eea" : "3px solid transparent",
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (activeTab !== tab.id) {
+                                        e.currentTarget.style.background = "#667eea";
+                                        e.currentTarget.style.color = "#fff";
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (activeTab !== tab.id) {
+                                        e.currentTarget.style.background = "transparent";
+                                        e.currentTarget.style.color = "#4a5568";
+                                    }
                                 }}
                             >
                                 {tab.label}
@@ -400,7 +435,7 @@ export default function SalesManagerDashboard() {
                     {/* Pricing Tab */}
                     {activeTab === "pricing" && (
                         <div>
-                            <h2 style={{ fontSize: "1.5rem", fontWeight: 600, marginBottom: "1.5rem", color: "#2d3748" }}>
+                            <h2 style={{ fontSize: "1.25rem", fontWeight: 600, marginBottom: "1.5rem", color: "#2d3748" }}>
                                 Set Product Price
                             </h2>
                             <form
@@ -408,36 +443,27 @@ export default function SalesManagerDashboard() {
                                 style={{
                                     background: "#f7fafc",
                                     padding: "1.5rem",
-                                    borderRadius: "12px",
+                                    borderRadius: "4px",
                                     marginBottom: "2rem",
                                 }}
                             >
                                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: "1rem", alignItems: "end" }}>
                                     <div>
-                                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, color: "#2d3748" }}>
+                                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, color: "#2d3748", fontSize: "0.85rem" }}>
                                             Select Product
                                         </label>
-                                        <select
+                                        <CustomSelect
                                             value={priceForm.productId}
                                             onChange={(e) => setPriceForm({ ...priceForm, productId: e.target.value })}
-                                            required
-                                            style={{
-                                                width: "100%",
-                                                padding: "0.75rem",
-                                                borderRadius: "8px",
-                                                border: "1px solid #e2e8f0",
-                                                fontSize: "1rem",
-                                                backgroundColor: "#fff",
-                                                color: "#2d3748",
-                                            }}
-                                        >
-                                            <option value="">Select a product...</option>
-                                            {products.map((product) => (
-                                                <option key={product.productId} value={product.productId}>
-                                                    {product.productName} - {formatCurrency(product.price)}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            options={[
+                                                { value: "", label: "Select a product..." },
+                                                ...products.map((product) => ({
+                                                    value: product.productId,
+                                                    label: `${product.productName} - ${formatCurrency(product.price)}`
+                                                }))
+                                            ]}
+                                            placeholder="Select a product..."
+                                        />
                                     </div>
                                     <div>
                                         <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, color: "#2d3748" }}>
@@ -453,9 +479,9 @@ export default function SalesManagerDashboard() {
                                             style={{
                                                 width: "100%",
                                                 padding: "0.75rem",
-                                                borderRadius: "8px",
-                                                border: "1px solid #e2e8f0",
-                                                fontSize: "1rem",
+                                                borderRadius: "4px",
+                                                border: "2px solid #e2e8f0",
+                                                fontSize: "0.85rem",
                                                 backgroundColor: "#fff",
                                                 color: "#2d3748",
                                             }}
@@ -465,13 +491,22 @@ export default function SalesManagerDashboard() {
                                         type="submit"
                                         style={{
                                             padding: "0.75rem 2rem",
-                                            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                                            color: "#fff",
-                                            border: "none",
-                                            borderRadius: "8px",
+                                            background: "#fff",
+                                            color: "#667eea",
+                                            border: "2px solid #667eea",
+                                            borderRadius: "4px",
                                             fontWeight: 600,
                                             cursor: "pointer",
                                             fontSize: "1rem",
+                                            transition: "all 0.2s",
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = "#667eea";
+                                            e.currentTarget.style.color = "#fff";
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = "#fff";
+                                            e.currentTarget.style.color = "#667eea";
                                         }}
                                     >
                                         Update Price
@@ -484,7 +519,7 @@ export default function SalesManagerDashboard() {
                     {/* Discount Tab */}
                     {activeTab === "discount" && (
                         <div>
-                            <h2 style={{ fontSize: "1.5rem", fontWeight: 600, marginBottom: "1.5rem", color: "#2d3748" }}>
+                            <h2 style={{ fontSize: "1.25rem", fontWeight: 600, marginBottom: "1.5rem", color: "#2d3748" }}>
                                 Apply Discount to Products
                             </h2>
                             <form
@@ -492,12 +527,12 @@ export default function SalesManagerDashboard() {
                                 style={{
                                     background: "#f7fafc",
                                     padding: "1.5rem",
-                                    borderRadius: "12px",
+                                    borderRadius: "4px",
                                     marginBottom: "2rem",
                                 }}
                             >
                                 <div style={{ marginBottom: "1.5rem" }}>
-                                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, color: "#2d3748" }}>
+                                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, color: "#2d3748", fontSize: "0.85rem" }}>
                                         Discount Rate (%)
                                     </label>
                                     <input
@@ -514,16 +549,16 @@ export default function SalesManagerDashboard() {
                                             width: "100%",
                                             maxWidth: "300px",
                                             padding: "0.75rem",
-                                            borderRadius: "8px",
-                                            border: "1px solid #e2e8f0",
-                                            fontSize: "1rem",
+                                            borderRadius: "4px",
+                                            border: "2px solid #e2e8f0",
+                                            fontSize: "0.85rem",
                                             backgroundColor: "#fff",
                                             color: "#2d3748",
                                         }}
                                     />
                                 </div>
                                 <div style={{ marginBottom: "1.5rem" }}>
-                                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, color: "#2d3748" }}>
+                                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, color: "#2d3748", fontSize: "0.85rem" }}>
                                         Products to Apply Discount ({discountForm.productIds.length} selected)
                                     </label>
                                     <div
@@ -531,7 +566,7 @@ export default function SalesManagerDashboard() {
                                             maxHeight: "300px",
                                             overflowY: "auto",
                                             border: "1px solid #e2e8f0",
-                                            borderRadius: "8px",
+                                            borderRadius: "4px",
                                             padding: "1rem",
                                             background: "#fff",
                                         }}
@@ -553,11 +588,35 @@ export default function SalesManagerDashboard() {
                                                             gap: "1rem",
                                                             padding: "0.75rem",
                                                             marginBottom: "0.5rem",
-                                                            borderRadius: "8px",
+                                                            borderRadius: "4px",
                                                             cursor: "pointer",
-                                                            background: isSelected ? "#e6f3ff" : "#f7fafc",
-                                                            border: `2px solid ${isSelected ? "#667eea" : "transparent"}`,
+                                                            background: isSelected ? "#667eea" : "#fff",
+                                                            border: `2px solid ${isSelected ? "#667eea" : "#e2e8f0"}`,
                                                             transition: "all 0.2s",
+                                                        }}
+                                                        onMouseEnter={(e) => {
+                                                            if (!isSelected) {
+                                                                e.currentTarget.style.background = "#667eea";
+                                                                e.currentTarget.style.borderColor = "#667eea";
+                                                                const textElements = e.currentTarget.querySelectorAll("div");
+                                                                textElements.forEach(el => {
+                                                                    if (el.style.color !== "#e53e3e") {
+                                                                        el.style.color = "#fff";
+                                                                    }
+                                                                });
+                                                            }
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            if (!isSelected) {
+                                                                e.currentTarget.style.background = "#fff";
+                                                                e.currentTarget.style.borderColor = "#e2e8f0";
+                                                                const textElements = e.currentTarget.querySelectorAll("div");
+                                                                textElements.forEach(el => {
+                                                                    if (el.style.color !== "#e53e3e") {
+                                                                        el.style.color = "#2d3748";
+                                                                    }
+                                                                });
+                                                            }
                                                         }}
                                                     >
                                                         <input
@@ -568,7 +627,7 @@ export default function SalesManagerDashboard() {
                                                         />
                                                         <div style={{ flex: 1 }}>
                                                             <div style={{ fontWeight: 600, color: "#2d3748" }}>{product.productName}</div>
-                                                            <div style={{ color: "#718096", fontSize: "0.9rem" }}>
+                                                            <div style={{ color: "#718096", fontSize: "0.85rem" }}>
                                                                 {formatCurrency(product.price)}
                                                                 {product.discount > 0 && (
                                                                     <span style={{ marginLeft: "0.5rem", color: "#e53e3e" }}>
@@ -587,13 +646,22 @@ export default function SalesManagerDashboard() {
                                     type="submit"
                                     style={{
                                         padding: "0.75rem 2rem",
-                                        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                                        color: "#fff",
-                                        border: "none",
-                                        borderRadius: "8px",
+                                        background: "#fff",
+                                        color: "#667eea",
+                                        border: "2px solid #667eea",
+                                        borderRadius: "4px",
                                         fontWeight: 600,
                                         cursor: "pointer",
                                         fontSize: "1rem",
+                                        transition: "all 0.2s",
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = "#667eea";
+                                        e.currentTarget.style.color = "#fff";
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = "#fff";
+                                        e.currentTarget.style.color = "#667eea";
                                     }}
                                 >
                                     Apply Discount

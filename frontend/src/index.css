@@ -68,3 +68,14 @@ select option {
   background-color: #fff;
   color: #2d3748;
 }
+
+/* Select hover effects */
+select:hover {
+  border-color: #667eea;
+}
+
+select:focus {
+  border-color: #667eea;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
