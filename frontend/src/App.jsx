@@ -18,6 +18,11 @@ import OwnerDashboard from "./pages/OwnerDashboard";
 import ProductDetailPage from "./pages/ProductDetailPage";
 import SalesManagerDashboard from "./pages/SalesManagerDashboard";
 import WishlistPage from "./pages/WishlistPage";
+import DeliveryManagementPage from "./pages/DeliveryManagementPage";
+import ProductManagerInvoicePage from "./pages/ProductManagerInvoicePage";
+import SupportAgentChatPage from "./pages/SupportAgentChatPage";
+import CustomerChatWidget from "./components/CustomerChatWidget";
+import ProfilePage from "./pages/ProfilePage";
 
 function App() {
     return (
@@ -31,8 +36,11 @@ function App() {
                     <Route path="/checkout" element={<CheckoutPage />} />
                     <Route path="/invoice/:orderId" element={<InvoicePage />} />
                     <Route path="/orders" element={<OrderHistoryPage />} />
+                    <Route path="/profile" element={<ProfilePage />} />
                     <Route path="/owner/products" element={<ProductManagementPage />} />
                     <Route path="/owner/orders" element={<OrderManagementPage />} />
+                    <Route path="/owner/deliveries" element={<DeliveryManagementPage />} />
+                    <Route path="/owner/invoices" element={<ProductManagerInvoicePage />} />
                     <Route path="/owner/reviews" element={<ReviewManagementPage />} />
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/register" element={<RegisterPage />} />
@@ -41,8 +49,10 @@ function App() {
                     <Route path="/owner-dashboard" element={<OwnerDashboard />} />
                     <Route path="/sales-manager" element={<SalesManagerDashboard />} />
                     <Route path="/wishlist" element={<WishlistPage />} />
+                    <Route path="/support/chat" element={<SupportAgentChatPage />} />
                 </Routes>
                 <Toast />
+                <CustomerChatWidget />
             </BrowserRouter>
         </ToastProvider>
     );

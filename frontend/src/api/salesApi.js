@@ -38,6 +38,17 @@ const salesApi = {
                 to: to.toISOString(),
             },
         }),
+
+    // Pending refund request'leri getir
+    getPendingRefunds: () =>
+        axiosClient.get("/api/sales/refunds/pending"),
+
+    // Refund request'i approve/reject et
+    decideRefund: (refundId, approved, decisionNote) =>
+        axiosClient.put(`/api/sales/refunds/${refundId}/decision`, {
+            approved,
+            decisionNote,
+        }),
 };
 
 export default salesApi;

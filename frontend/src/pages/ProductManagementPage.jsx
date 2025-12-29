@@ -14,6 +14,7 @@ export default function ProductManagementPage() {
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [showCreateCategoryForm, setShowCreateCategoryForm] = useState(false);
     const [deleting, setDeleting] = useState({});
+    const [deletingCategory, setDeletingCategory] = useState({});
     const [categoryForm, setCategoryForm] = useState({
         categoryName: "",
         description: "",
@@ -520,6 +521,68 @@ export default function ProductManagementPage() {
                             </form>
                         </div>
                     )}
+
+                    {/* Categories List */}
+                    <div style={{ marginBottom: "2rem", padding: "2rem", background: "#f7fafc", borderRadius: "4px", border: "2px solid #e2e8f0" }}>
+                        <h2 style={{ marginBottom: "1.5rem", color: "#2d3748", fontSize: "1.25rem" }}>Categories</h2>
+                        {categories.length === 0 ? (
+                            <div style={{ textAlign: "center", padding: "2rem", color: "#718096" }}>No categories found.</div>
+                        ) : (
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: "1rem" }}>
+                                {categories.map((category) => (
+                                    <div
+                                        key={category.categoryId}
+                                        style={{
+                                            padding: "1rem",
+                                            background: "#fff",
+                                            borderRadius: "4px",
+                                            border: "1px solid #e2e8f0",
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            alignItems: "center",
+                                        }}
+                                    >
+                                        <div>
+                                            <div style={{ fontWeight: 600, color: "#2d3748", fontSize: "0.9rem", marginBottom: "0.25rem" }}>
+                                                {category.categoryName}
+                                            </div>
+                                            {category.description && (
+                                                <div style={{ fontSize: "0.85rem", color: "#718096" }}>
+                                                    {category.description}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <button
+                                            onClick={() => handleDeleteCategory(category.categoryId)}
+                                            disabled={deletingCategory[category.categoryId]}
+                                            style={{
+                                                padding: "0.5rem 1rem",
+                                                background: "#e53e3e",
+                                                color: "#fff",
+                                                border: "none",
+                                                borderRadius: "4px",
+                                                fontSize: "0.85rem",
+                                                cursor: deletingCategory[category.categoryId] ? "not-allowed" : "pointer",
+                                                transition: "all 0.2s",
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                if (!deletingCategory[category.categoryId]) {
+                                                    e.currentTarget.style.background = "#c53030";
+                                                }
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                if (!deletingCategory[category.categoryId]) {
+                                                    e.currentTarget.style.background = "#e53e3e";
+                                                }
+                                            }}
+                                        >
+                                            {deletingCategory[category.categoryId] ? "Deleting..." : "Delete"}
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
 
                     {/* Create Product Form */}
                     {showCreateForm && (

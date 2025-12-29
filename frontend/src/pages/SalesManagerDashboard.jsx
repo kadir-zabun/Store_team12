@@ -33,6 +33,12 @@ export default function SalesManagerDashboard() {
         from: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
         to: new Date().toISOString().split('T')[0],
     });
+    
+    // Refund Management states
+    const [pendingRefunds, setPendingRefunds] = useState([]);
+    const [loadingRefunds, setLoadingRefunds] = useState(false);
+    const [decidingRefund, setDecidingRefund] = useState({});
+    const [decisionNote, setDecisionNote] = useState({});
 
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
@@ -623,6 +629,7 @@ export default function SalesManagerDashboard() {
                             { id: "discount", label: "🎯 Discount Management", icon: "🎯" },
                             { id: "invoices", label: "📄 Invoice Management", icon: "📄" },
                             { id: "revenue", label: "📊 Revenue & Profit", icon: "📊" },
+                            { id: "refunds", label: "💳 Refund Management", icon: "💳" },
                         ].map((tab) => (
                             <button
                                 key={tab.id}
@@ -1312,6 +1319,236 @@ export default function SalesManagerDashboard() {
                                 </div>
                             ) : (
                                 <div style={{ textAlign: "center", padding: "2rem", color: "#718096" }}>Select a date range and click "Load Metrics" to view revenue and profit analysis.</div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Refund Management Tab */}
+                    {activeTab === "refunds" && (
+                        <div>
+                            <h2 style={{ fontSize: "1.25rem", fontWeight: 600, marginBottom: "1.5rem", color: "#2d3748" }}>
+                                Pending Refund Requests
+                            </h2>
+                            
+                            <button
+                                onClick={async () => {
+                                    setLoadingRefunds(true);
+                                    try {
+                                        const response = await salesApi.getPendingRefunds();
+                                        const refundsData = response.data?.data || response.data || [];
+                                        setPendingRefunds(Array.isArray(refundsData) ? refundsData : []);
+                                    } catch (error) {
+                                        console.error("Error loading refunds:", error);
+                                        showError(error.response?.data?.message || "Failed to load refund requests.");
+                                    } finally {
+                                        setLoadingRefunds(false);
+                                    }
+                                }}
+                                disabled={loadingRefunds}
+                                style={{
+                                    padding: "0.75rem 1.5rem",
+                                    background: "#667eea",
+                                    color: "#fff",
+                                    border: "none",
+                                    borderRadius: "4px",
+                                    fontSize: "0.85rem",
+                                    fontWeight: 600,
+                                    cursor: loadingRefunds ? "not-allowed" : "pointer",
+                                    marginBottom: "1.5rem",
+                                    transition: "all 0.2s",
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (!loadingRefunds) {
+                                        e.currentTarget.style.background = "#764ba2";
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!loadingRefunds) {
+                                        e.currentTarget.style.background = "#667eea";
+                                    }
+                                }}
+                            >
+                                {loadingRefunds ? "Loading..." : "Refresh Refund Requests"}
+                            </button>
+
+                            {pendingRefunds.length === 0 ? (
+                                <div style={{ textAlign: "center", padding: "3rem", color: "#718096", background: "#f7fafc", borderRadius: "4px" }}>
+                                    No pending refund requests.
+                                </div>
+                            ) : (
+                                <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                                    {pendingRefunds.map((refund) => (
+                                        <div
+                                            key={refund.refundId}
+                                            style={{
+                                                background: "#f7fafc",
+                                                padding: "1.5rem",
+                                                borderRadius: "4px",
+                                                border: "1px solid #e2e8f0",
+                                            }}
+                                        >
+                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: "1rem" }}>
+                                                <div>
+                                                    <div style={{ fontSize: "1rem", fontWeight: 600, color: "#2d3748", marginBottom: "0.5rem" }}>
+                                                        Refund Request #{refund.refundId}
+                                                    </div>
+                                                    <div style={{ fontSize: "0.85rem", color: "#718096", marginBottom: "0.25rem" }}>
+                                                        Order ID: {refund.orderId}
+                                                    </div>
+                                                    <div style={{ fontSize: "0.85rem", color: "#718096", marginBottom: "0.25rem" }}>
+                                                        Product ID: {refund.productId}
+                                                    </div>
+                                                    <div style={{ fontSize: "0.85rem", color: "#718096", marginBottom: "0.25rem" }}>
+                                                        Quantity: {refund.quantity}
+                                                    </div>
+                                                    {refund.reason && (
+                                                        <div style={{ fontSize: "0.85rem", color: "#718096", marginTop: "0.5rem", padding: "0.75rem", background: "#fff", borderRadius: "4px" }}>
+                                                            <strong>Reason:</strong> {refund.reason}
+                                                        </div>
+                                                    )}
+                                                    <div style={{ fontSize: "0.9rem", color: "#2d3748", marginTop: "0.75rem", fontWeight: 600 }}>
+                                                        Refund Amount: <span style={{ color: "#667eea" }}>${refund.refundAmount?.toFixed(2) || "0.00"}</span>
+                                                    </div>
+                                                    <div style={{ fontSize: "0.85rem", color: "#718096", marginTop: "0.25rem" }}>
+                                                        Request Date: {refund.requestDate ? new Date(refund.requestDate).toLocaleString() : "N/A"}
+                                                    </div>
+                                                </div>
+                                                <div
+                                                    style={{
+                                                        padding: "0.5rem 1rem",
+                                                        background: "#fed7d7",
+                                                        color: "#742a2a",
+                                                        borderRadius: "4px",
+                                                        fontSize: "0.85rem",
+                                                        fontWeight: 600,
+                                                    }}
+                                                >
+                                                    {refund.status}
+                                                </div>
+                                            </div>
+                                            
+                                            <div style={{ marginTop: "1rem", paddingTop: "1rem", borderTop: "1px solid #e2e8f0" }}>
+                                                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600, color: "#4a5568", fontSize: "0.85rem" }}>
+                                                    Decision Note (Optional)
+                                                </label>
+                                                <textarea
+                                                    value={decisionNote[refund.refundId] || ""}
+                                                    onChange={(e) => setDecisionNote({ ...decisionNote, [refund.refundId]: e.target.value })}
+                                                    placeholder="Add a note about your decision..."
+                                                    rows={3}
+                                                    style={{
+                                                        width: "100%",
+                                                        padding: "0.75rem",
+                                                        border: "1px solid #cbd5e0",
+                                                        borderRadius: "4px",
+                                                        fontSize: "0.85rem",
+                                                        marginBottom: "1rem",
+                                                        boxSizing: "border-box",
+                                                        resize: "vertical",
+                                                    }}
+                                                />
+                                                <div style={{ display: "flex", gap: "1rem" }}>
+                                                    <button
+                                                        onClick={async () => {
+                                                            setDecidingRefund({ ...decidingRefund, [refund.refundId]: true });
+                                                            try {
+                                                                await salesApi.decideRefund(
+                                                                    refund.refundId,
+                                                                    true,
+                                                                    decisionNote[refund.refundId] || null
+                                                                );
+                                                                showSuccess("Refund approved successfully!");
+                                                                setDecisionNote({ ...decisionNote, [refund.refundId]: "" });
+                                                                // Reload refunds
+                                                                const response = await salesApi.getPendingRefunds();
+                                                                const refundsData = response.data?.data || response.data || [];
+                                                                setPendingRefunds(Array.isArray(refundsData) ? refundsData : []);
+                                                            } catch (error) {
+                                                                console.error("Error approving refund:", error);
+                                                                showError(error.response?.data?.message || "Failed to approve refund.");
+                                                            } finally {
+                                                                setDecidingRefund({ ...decidingRefund, [refund.refundId]: false });
+                                                            }
+                                                        }}
+                                                        disabled={decidingRefund[refund.refundId]}
+                                                        style={{
+                                                            flex: 1,
+                                                            padding: "0.75rem 1.5rem",
+                                                            background: "#2f855a",
+                                                            color: "#fff",
+                                                            border: "none",
+                                                            borderRadius: "4px",
+                                                            fontSize: "0.85rem",
+                                                            fontWeight: 600,
+                                                            cursor: decidingRefund[refund.refundId] ? "not-allowed" : "pointer",
+                                                            transition: "all 0.2s",
+                                                        }}
+                                                        onMouseEnter={(e) => {
+                                                            if (!decidingRefund[refund.refundId]) {
+                                                                e.currentTarget.style.background = "#22543d";
+                                                            }
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            if (!decidingRefund[refund.refundId]) {
+                                                                e.currentTarget.style.background = "#2f855a";
+                                                            }
+                                                        }}
+                                                    >
+                                                        {decidingRefund[refund.refundId] ? "Approving..." : "Approve Refund"}
+                                                    </button>
+                                                    <button
+                                                        onClick={async () => {
+                                                            setDecidingRefund({ ...decidingRefund, [refund.refundId]: true });
+                                                            try {
+                                                                await salesApi.decideRefund(
+                                                                    refund.refundId,
+                                                                    false,
+                                                                    decisionNote[refund.refundId] || null
+                                                                );
+                                                                showSuccess("Refund rejected.");
+                                                                setDecisionNote({ ...decisionNote, [refund.refundId]: "" });
+                                                                // Reload refunds
+                                                                const response = await salesApi.getPendingRefunds();
+                                                                const refundsData = response.data?.data || response.data || [];
+                                                                setPendingRefunds(Array.isArray(refundsData) ? refundsData : []);
+                                                            } catch (error) {
+                                                                console.error("Error rejecting refund:", error);
+                                                                showError(error.response?.data?.message || "Failed to reject refund.");
+                                                            } finally {
+                                                                setDecidingRefund({ ...decidingRefund, [refund.refundId]: false });
+                                                            }
+                                                        }}
+                                                        disabled={decidingRefund[refund.refundId]}
+                                                        style={{
+                                                            flex: 1,
+                                                            padding: "0.75rem 1.5rem",
+                                                            background: "#e53e3e",
+                                                            color: "#fff",
+                                                            border: "none",
+                                                            borderRadius: "4px",
+                                                            fontSize: "0.85rem",
+                                                            fontWeight: 600,
+                                                            cursor: decidingRefund[refund.refundId] ? "not-allowed" : "pointer",
+                                                            transition: "all 0.2s",
+                                                        }}
+                                                        onMouseEnter={(e) => {
+                                                            if (!decidingRefund[refund.refundId]) {
+                                                                e.currentTarget.style.background = "#c53030";
+                                                            }
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            if (!decidingRefund[refund.refundId]) {
+                                                                e.currentTarget.style.background = "#e53e3e";
+                                                            }
+                                                        }}
+                                                    >
+                                                        {decidingRefund[refund.refundId] ? "Rejecting..." : "Reject Refund"}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
                             )}
                         </div>
                     )}
