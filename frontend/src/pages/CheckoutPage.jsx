@@ -41,7 +41,7 @@ export default function CheckoutPage() {
             return;
         }
 
-        if (userRole === "PRODUCT_OWNER") {
+        if (userRole === "PRODUCT_MANAGER") {
             navigate("/owner-dashboard");
             return;
         }

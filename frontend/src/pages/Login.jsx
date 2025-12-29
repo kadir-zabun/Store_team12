@@ -120,7 +120,7 @@ export default function LoginPage() {
                 window.dispatchEvent(new CustomEvent("tokenSet"));
                 setTimeout(() => {
                     // Role göre yönlendirme
-                    if (authResponse.role === "PRODUCT_OWNER") {
+                    if (authResponse.role === "PRODUCT_MANAGER") {
                         navigate("/owner-dashboard");
                     } else {
                         navigate("/");
@@ -235,7 +235,7 @@ export default function LoginPage() {
                             Cart
                         </Link>
                         )}
-                        {userRole === "PRODUCT_OWNER" && (
+                        {userRole === "PRODUCT_MANAGER" && (
                             <Link
                                 to="/owner-dashboard"
                                 style={{
@@ -320,7 +320,7 @@ export default function LoginPage() {
                                         <span>My Cart</span>
                                     </Link>
                                     )}
-                                    {userRole === "PRODUCT_OWNER" && (
+                                    {userRole === "PRODUCT_MANAGER" && (
                                         <Link
                                             to="/owner-dashboard"
                                             onClick={() => setShowDropdown(false)}

@@ -52,7 +52,7 @@ export default function ProductManagementPage() {
             return; // Still loading
         }
 
-        if (currentRole !== "PRODUCT_OWNER") {
+        if (currentRole !== "PRODUCT_MANAGER") {
             navigate("/");
             return;
         }
@@ -203,13 +203,13 @@ export default function ProductManagementPage() {
         );
     }
 
-    // If not PRODUCT_OWNER, show message (will redirect in useEffect)
-    if (currentRole !== "PRODUCT_OWNER") {
+    // If not PRODUCT_MANAGER, show message (will redirect in useEffect)
+    if (currentRole !== "PRODUCT_MANAGER") {
         return (
             <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <div style={{ background: "rgba(255, 255, 255, 0.95)", padding: "2rem", borderRadius: "20px", textAlign: "center" }}>
                     <h2 style={{ color: "#2d3748" }}>Access Denied</h2>
-                    <p style={{ color: "#718096" }}>This page is only accessible to Product Owners.</p>
+                    <p style={{ color: "#718096" }}>This page is only accessible to Product Managers.</p>
                 </div>
             </div>
         );

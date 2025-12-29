@@ -307,7 +307,7 @@ export default function HomePage() {
                                 Wishlist
                             </Link>
                         )}
-                        {userRole === "PRODUCT_OWNER" && (
+                        {(userRole === "PRODUCT_MANAGER" || localStorage.getItem("user_role") === "PRODUCT_MANAGER") && (
                             <Link
                                 to="/owner-dashboard"
                                 style={{
@@ -468,7 +468,7 @@ export default function HomePage() {
                                     </Link>
                                     </>
                                     )}
-                                    {userRole === "PRODUCT_OWNER" && (
+                                    {(userRole === "PRODUCT_MANAGER" || localStorage.getItem("user_role") === "PRODUCT_MANAGER") && (
                                         <Link
                                             to="/owner-dashboard"
                                             onClick={() => setShowDropdown(false)}

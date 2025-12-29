@@ -11,7 +11,7 @@ export default function RegisterPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
-    const [role, setRole] = useState("CUSTOMER"); // CUSTOMER veya PRODUCT_OWNER
+    const [role] = useState("CUSTOMER"); // Only CUSTOMER role available
     const [error, setError] = useState("");
     const [userName, setUserName] = useState(null);
     const [showDropdown, setShowDropdown] = useState(false);
@@ -210,7 +210,7 @@ export default function RegisterPage() {
                             Cart
                         </Link>
                         )}
-                        {userRole === "PRODUCT_OWNER" && (
+                        {userRole === "PRODUCT_MANAGER" && (
                             <Link
                                 to="/owner-dashboard"
                                 style={{
@@ -295,7 +295,7 @@ export default function RegisterPage() {
                                         <span>My Cart</span>
                                     </Link>
                                     )}
-                                    {userRole === "PRODUCT_OWNER" && (
+                                    {userRole === "PRODUCT_MANAGER" && (
                                         <Link
                                             to="/owner-dashboard"
                                             onClick={() => setShowDropdown(false)}
@@ -418,47 +418,6 @@ export default function RegisterPage() {
                         Join us and start shopping
                     </p>
 
-                    <div style={{ marginBottom: "1rem" }}>
-                        <label style={{ display: "block", marginBottom: "0.5rem", color: "#2d3748", fontWeight: 600 }}>
-                            Account Type
-                        </label>
-                        <div style={{ display: "flex", gap: "1rem" }}>
-                            <button
-                                type="button"
-                                onClick={() => setRole("CUSTOMER")}
-                                style={{
-                                    flex: 1,
-                                    padding: "0.75rem",
-                                    borderRadius: "8px",
-                                    border: `2px solid ${role === "CUSTOMER" ? "#667eea" : "#e2e8f0"}`,
-                                    background: role === "CUSTOMER" ? "#f0f4ff" : "#fff",
-                                    color: role === "CUSTOMER" ? "#667eea" : "#4a5568",
-                                    fontWeight: 600,
-                                    cursor: "pointer",
-                                    transition: "all 0.2s",
-                                }}
-                            >
-                                Customer
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setRole("PRODUCT_OWNER")}
-                                style={{
-                                    flex: 1,
-                                    padding: "0.75rem",
-                                    borderRadius: "8px",
-                                    border: `2px solid ${role === "PRODUCT_OWNER" ? "#667eea" : "#e2e8f0"}`,
-                                    background: role === "PRODUCT_OWNER" ? "#f0f4ff" : "#fff",
-                                    color: role === "PRODUCT_OWNER" ? "#667eea" : "#4a5568",
-                                    fontWeight: 600,
-                                    cursor: "pointer",
-                                    transition: "all 0.2s",
-                                }}
-                            >
-                                Product Owner
-                            </button>
-                        </div>
-                    </div>
 
                     <input
                         type="text"

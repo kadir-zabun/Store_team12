@@ -253,9 +253,9 @@ export default function ProductsPage() {
     };
 
     const handleAddToCart = async (productId) => {
-        // PRODUCT_OWNER cannot add to cart
-        if (userRole === "PRODUCT_OWNER") {
-            showError("Product owners cannot add products to cart.");
+        // PRODUCT_MANAGER cannot add to cart
+        if (userRole === "PRODUCT_MANAGER") {
+            showError("Product managers cannot add products to cart.");
             return;
         }
 
@@ -385,7 +385,7 @@ export default function ProductsPage() {
                         >
                             Products
                         </Link>
-                        {userRole !== "PRODUCT_OWNER" && (
+                        {userRole !== "PRODUCT_MANAGER" && (
                             <Link
                                 to="/cart"
                                 style={{
@@ -431,7 +431,7 @@ export default function ProductsPage() {
                                 )}
                             </Link>
                         )}
-                        {userRole === "PRODUCT_OWNER" && (
+                        {userRole === "PRODUCT_MANAGER" && (
                             <Link
                                 to="/owner-dashboard"
                                 style={{
@@ -497,7 +497,7 @@ export default function ProductsPage() {
                                         zIndex: 1000,
                                     }}
                                 >
-                                    {userRole !== "PRODUCT_OWNER" && (
+                                    {userRole !== "PRODUCT_MANAGER" && (
                                         <Link
                                             to="/cart"
                                             onClick={() => setShowDropdown(false)}
@@ -516,7 +516,7 @@ export default function ProductsPage() {
                                             <span>My Cart</span>
                                         </Link>
                                     )}
-                                    {userRole === "PRODUCT_OWNER" && (
+                                    {userRole === "PRODUCT_MANAGER" && (
                                         <Link
                                             to="/owner-dashboard"
                                             onClick={() => setShowDropdown(false)}
@@ -972,7 +972,7 @@ export default function ProductsPage() {
                                         >
                                             {product.inStock ? `✓ In Stock (${product.quantity})` : "✗ Out of Stock"}
                                         </div>
-                                        {userRole !== "PRODUCT_OWNER" && (
+                                        {userRole !== "PRODUCT_MANAGER" && (
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -1007,7 +1007,7 @@ export default function ProductsPage() {
                                                 {addingToCart[product.productId] ? "Adding..." : (product.quantity || 0) <= 0 ? "Out of Stock" : product.inStock ? "Add to Cart" : "Out of Stock"}
                                             </button>
                                         )}
-                                        {userRole === "PRODUCT_OWNER" && (
+                                        {userRole === "PRODUCT_MANAGER" && (
                                             <div
                                                 style={{
                                                     width: "100%",
@@ -1021,7 +1021,7 @@ export default function ProductsPage() {
                                                     fontSize: "0.9rem",
                                                 }}
                                             >
-                                                Product Owner View
+                                                Product Manager View
                                             </div>
                                         )}
                                     </div>

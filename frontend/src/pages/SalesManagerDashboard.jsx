@@ -299,6 +299,12 @@ export default function SalesManagerDashboard() {
                                             background: "transparent",
                                             cursor: "pointer",
                                         }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = "#fee";
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = "transparent";
+                                        }}
                                     >
                                         <span>🚪</span>
                                         <span>Logout</span>
@@ -377,7 +383,7 @@ export default function SalesManagerDashboard() {
                                 style={{
                                     padding: "0.8rem 1.5rem",
                                     border: "none",
-                                    background: activeTab === tab.id ? "#667eea" : "transparent",
+                                    background: activeTab === tab.id ? "#667eea" : "#f7fafc",
                                     color: activeTab === tab.id ? "#fff" : "#4a5568",
                                     fontWeight: activeTab === tab.id ? 600 : 500,
                                     cursor: "pointer",
@@ -394,7 +400,7 @@ export default function SalesManagerDashboard() {
                     {/* Pricing Tab */}
                     {activeTab === "pricing" && (
                         <div>
-                            <h2 style={{ fontSize: "1.5rem", fontWeight: 600, marginBottom: "1.5rem" }}>
+                            <h2 style={{ fontSize: "1.5rem", fontWeight: 600, marginBottom: "1.5rem", color: "#2d3748" }}>
                                 Set Product Price
                             </h2>
                             <form
@@ -408,7 +414,7 @@ export default function SalesManagerDashboard() {
                             >
                                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: "1rem", alignItems: "end" }}>
                                     <div>
-                                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, color: "#2d3748" }}>
                                             Select Product
                                         </label>
                                         <select
@@ -421,6 +427,8 @@ export default function SalesManagerDashboard() {
                                                 borderRadius: "8px",
                                                 border: "1px solid #e2e8f0",
                                                 fontSize: "1rem",
+                                                backgroundColor: "#fff",
+                                                color: "#2d3748",
                                             }}
                                         >
                                             <option value="">Select a product...</option>
@@ -432,7 +440,7 @@ export default function SalesManagerDashboard() {
                                         </select>
                                     </div>
                                     <div>
-                                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, color: "#2d3748" }}>
                                             New Price (₺)
                                         </label>
                                         <input
@@ -448,6 +456,8 @@ export default function SalesManagerDashboard() {
                                                 borderRadius: "8px",
                                                 border: "1px solid #e2e8f0",
                                                 fontSize: "1rem",
+                                                backgroundColor: "#fff",
+                                                color: "#2d3748",
                                             }}
                                         />
                                     </div>
@@ -474,7 +484,7 @@ export default function SalesManagerDashboard() {
                     {/* Discount Tab */}
                     {activeTab === "discount" && (
                         <div>
-                            <h2 style={{ fontSize: "1.5rem", fontWeight: 600, marginBottom: "1.5rem" }}>
+                            <h2 style={{ fontSize: "1.5rem", fontWeight: 600, marginBottom: "1.5rem", color: "#2d3748" }}>
                                 Apply Discount to Products
                             </h2>
                             <form
@@ -487,7 +497,7 @@ export default function SalesManagerDashboard() {
                                 }}
                             >
                                 <div style={{ marginBottom: "1.5rem" }}>
-                                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, color: "#2d3748" }}>
                                         Discount Rate (%)
                                     </label>
                                     <input
@@ -507,11 +517,13 @@ export default function SalesManagerDashboard() {
                                             borderRadius: "8px",
                                             border: "1px solid #e2e8f0",
                                             fontSize: "1rem",
+                                            backgroundColor: "#fff",
+                                            color: "#2d3748",
                                         }}
                                     />
                                 </div>
                                 <div style={{ marginBottom: "1.5rem" }}>
-                                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500 }}>
+                                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, color: "#2d3748" }}>
                                         Products to Apply Discount ({discountForm.productIds.length} selected)
                                     </label>
                                     <div
@@ -525,9 +537,9 @@ export default function SalesManagerDashboard() {
                                         }}
                                     >
                                         {loadingProducts ? (
-                                            <div>Loading...</div>
+                                            <div style={{ color: "#2d3748" }}>Loading...</div>
                                         ) : products.length === 0 ? (
-                                            <div>No products found.</div>
+                                            <div style={{ color: "#2d3748" }}>No products found.</div>
                                         ) : (
                                             products.map((product) => {
                                                 const isSelected = discountForm.productIds.includes(product.productId);
@@ -555,7 +567,7 @@ export default function SalesManagerDashboard() {
                                                             style={{ cursor: "pointer" }}
                                                         />
                                                         <div style={{ flex: 1 }}>
-                                                            <div style={{ fontWeight: 600 }}>{product.productName}</div>
+                                                            <div style={{ fontWeight: 600, color: "#2d3748" }}>{product.productName}</div>
                                                             <div style={{ color: "#718096", fontSize: "0.9rem" }}>
                                                                 {formatCurrency(product.price)}
                                                                 {product.discount > 0 && (

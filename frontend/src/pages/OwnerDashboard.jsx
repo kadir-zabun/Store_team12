@@ -12,9 +12,9 @@ export default function OwnerDashboard() {
     const userRole = useUserRole();
     const { info: showInfo } = useToast();
 
-    // Redirect if not PRODUCT_OWNER
+    // Redirect if not PRODUCT_MANAGER
     useEffect(() => {
-        if (userRole !== "PRODUCT_OWNER") {
+        if (userRole !== "PRODUCT_MANAGER") {
             navigate("/");
         }
     }, [userRole, navigate]);
@@ -341,7 +341,7 @@ export default function OwnerDashboard() {
                             marginBottom: "1rem",
                         }}
                     >
-                        Product Owner Dashboard
+                        Product Manager Dashboard
                     </h1>
                     <p style={{ color: "#718096", fontSize: "1.1rem", marginBottom: "2rem" }}>
                         Welcome, {userName}! Manage your products and orders from here.

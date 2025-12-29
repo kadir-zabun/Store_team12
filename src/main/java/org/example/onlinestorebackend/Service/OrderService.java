@@ -26,9 +26,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -219,34 +217,14 @@ public class OrderService {
                 .collect(java.util.stream.Collectors.toList());
     }
 
-    // Get orders for a product owner (only orders containing their products)
+    // Get all orders (PRODUCT_MANAGER için - tek satıcı olduğu için tüm orderlar)
     public List<Order> getOrdersByOwner(String ownerUsername, String status) {
-        User owner = userRepository.findByUsername(ownerUsername)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + ownerUsername));
-        String ownerId = owner.getUserId();
-
-        List<Product> ownerProducts = productRepository.findByOwnerId(ownerId);
-        Set<String> ownerProductIds = ownerProducts.stream()
-                .map(Product::getProductId)
-                .collect(Collectors.toSet());
-
-        if (ownerProductIds.isEmpty()) {
-            return new ArrayList<>();
-        }
-
+        // Artık owner kontrolü yok, tüm orderları döndür
         List<Order> allOrders = status != null
                 ? orderRepository.findByStatus(status)
                 : orderRepository.findAll();
 
-        return allOrders.stream()
-                .filter(order -> {
-                    if (order.getItems() == null || order.getItems().isEmpty()) {
-                        return false;
-                    }
-                    return order.getItems().stream()
-                            .anyMatch(item -> ownerProductIds.contains(item.getProductId()));
-                })
-                .collect(Collectors.toList());
+        return allOrders;
     }
 
     public String getUserIdByUsername(String username) {

@@ -23,9 +23,9 @@ export default function CartPage() {
     const { success: showSuccess, error: showError, info: showInfo } = useToast();
     const userRole = useUserRole();
 
-    // Redirect PRODUCT_OWNER to dashboard
+    // Redirect PRODUCT_MANAGER to dashboard
     useEffect(() => {
-        if (userRole === "PRODUCT_OWNER") {
+        if (userRole === "PRODUCT_MANAGER") {
             navigate("/owner-dashboard");
         }
     }, [userRole, navigate]);
