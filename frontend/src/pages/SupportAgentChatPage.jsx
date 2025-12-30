@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import supportApi from "../api/supportApi";
 import { useToast } from "../contexts/ToastContext";
 import { useUserRole } from "../hooks/useUserRole";
+import socketService from "../utils/socketService";
 
 export default function SupportAgentChatPage() {
     const [userName, setUserName] = useState(null);
@@ -24,7 +25,7 @@ export default function SupportAgentChatPage() {
     const userRole = useUserRole();
     const dropdownRef = useRef(null);
     const [showDropdown, setShowDropdown] = useState(false);
-    const [pollingInterval, setPollingInterval] = useState(null);
+    const [queuePollingInterval, setQueuePollingInterval] = useState(null);
 
     useEffect(() => {
         const token = localStorage.getItem("access_token");
@@ -54,6 +55,16 @@ export default function SupportAgentChatPage() {
                 const username = payload.sub || payload.name || payload.username;
                 setUserName(username);
 
+                // Connect to Socket
+                socketService.connect(token, () => {
+                    // console.log("Agent Connected to WebSocket");
+
+                    // Listen for global queue updates
+                    socketService.subscribe("/topic/support/queue", () => {
+                        loadQueue(true);
+                    });
+                });
+
                 await loadQueue();
             } catch (error) {
                 console.error("Error loading data:", error);
@@ -65,18 +76,44 @@ export default function SupportAgentChatPage() {
 
         loadData();
 
-        // Poll for new messages every 3 seconds if a conversation is selected
+        // Poll for QUEUE updates every 5 seconds (Queue updates are less critical than messages)
         const interval = setInterval(() => {
-            if (selectedConversation) {
-                loadMessages(selectedConversation.conversationId);
-            }
-        }, 3000);
-        setPollingInterval(interval);
+            loadQueue(true); // silent update
+        }, 5000);
+        setQueuePollingInterval(interval);
 
         return () => {
             if (interval) clearInterval(interval);
+            socketService.disconnect();
         };
-    }, [navigate, userRole, showError, selectedConversation]);
+    }, [navigate, userRole, showError]);
+
+    // WebSocket subscription for selected conversation
+    useEffect(() => {
+        if (selectedConversation) {
+            const topic = `/topic/support/${selectedConversation.conversationId}`;
+            // Subscribe
+            const sub = socketService.subscribe(topic, (message) => {
+                setMessages((prev) => {
+                    // Avoid duplicates
+                    if (prev.some(m => m.messageId === message.messageId)) return prev;
+                    return [...prev, message];
+                });
+            });
+
+            // Cleanup subscription when switching conversation? 
+            // In current simple implementation, we can just rely on the fact that existing subscriptions 
+            // will still fire but we only care about if it matches 'selectedConversation'. 
+            // Actually, if we switch conv, we probably want to stop listening to the old one to avoid noise?
+            // But StompJS client doesn't expose easy unsubscribe from here without storing ID. 
+            // Simpler approach: Just let it be or improve socketService to return unsubscribe handle.
+            // Our socketService implementation returns the subscription object which has unsubscribe().
+
+            return () => {
+                if (sub) sub.unsubscribe();
+            };
+        }
+    }, [selectedConversation]);
 
     useEffect(() => {
         if (messagesEndRef.current) {
@@ -84,21 +121,29 @@ export default function SupportAgentChatPage() {
         }
     }, [messages]);
 
-    const loadQueue = async () => {
-        setLoadingQueue(true);
+    const loadQueue = async (silent = false) => {
+        if (!silent) setLoadingQueue(true);
         try {
             const response = await supportApi.getQueue(statusFilter || null);
             const conversationsData = response.data?.data || response.data || [];
+
+            // Check if our selected conversation status changed in the list
+            if (selectedConversation) {
+                const updated = conversationsData.find(c => c.conversationId === selectedConversation.conversationId);
+                // Update selected conversation status if needed (e.g. if another agent closed it, though unlikely)
+            }
+
             setConversations(Array.isArray(conversationsData) ? conversationsData : []);
         } catch (error) {
             console.error("Error loading queue:", error);
-            showError(error.response?.data?.message || "Failed to load conversation queue.");
+            if (!silent) showError(error.response?.data?.message || "Failed to load conversation queue.");
         } finally {
-            setLoadingQueue(false);
+            if (!silent) setLoadingQueue(false);
         }
     };
 
     const loadMessages = async (conversationId) => {
+        setLoadingMessages(true);
         try {
             const response = await supportApi.agentGetMessages(conversationId);
             const messagesData = response.data?.data || response.data || [];
@@ -106,6 +151,8 @@ export default function SupportAgentChatPage() {
         } catch (error) {
             console.error("Error loading messages:", error);
             showError(error.response?.data?.message || "Failed to load messages.");
+        } finally {
+            setLoadingMessages(false);
         }
     };
 
@@ -117,6 +164,7 @@ export default function SupportAgentChatPage() {
         } catch (error) {
             console.error("Error loading customer context:", error);
             // Don't show error, context might not be available for guest users
+            setCustomerContext(null);
         }
     };
 
@@ -153,7 +201,7 @@ export default function SupportAgentChatPage() {
         try {
             await supportApi.agentSendText(selectedConversation.conversationId, messageText.trim());
             setMessageText("");
-            await loadMessages(selectedConversation.conversationId);
+            // WebSocket will add the message to the list
         } catch (error) {
             console.error("Error sending message:", error);
             showError(error.response?.data?.message || "Failed to send message.");
@@ -169,11 +217,11 @@ export default function SupportAgentChatPage() {
         setUploadingFile(true);
         try {
             await supportApi.agentUploadAttachment(selectedConversation.conversationId, file);
-            await loadMessages(selectedConversation.conversationId);
             showSuccess("File uploaded successfully!");
             if (fileInputRef.current) {
                 fileInputRef.current.value = "";
             }
+            // WebSocket will add the message
         } catch (error) {
             console.error("Error uploading file:", error);
             showError(error.response?.data?.message || "Failed to upload file.");
@@ -247,167 +295,60 @@ export default function SupportAgentChatPage() {
     }
 
     return (
-        <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}>
-            <nav
-                style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "1.2rem 4rem",
-                    background: "rgba(255, 255, 255, 0.95)",
-                    backdropFilter: "blur(10px)",
-                    boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-                    position: "sticky",
-                    top: 0,
-                    zIndex: 100,
-                }}
-            >
-                <div style={{ display: "flex", alignItems: "center", gap: "3rem" }}>
-                    <Link
-                        to="/"
-                        style={{
-                            fontSize: "1.5rem",
-                            fontWeight: 700,
-                            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                            WebkitBackgroundClip: "text",
-                            WebkitTextFillColor: "transparent",
-                            textDecoration: "none",
-                        }}
-                    >
-                        🛍️ TeknoSU
-                    </Link>
-                    <div style={{ display: "flex", alignItems: "center", gap: "2rem" }}>
-                        <Link 
-                            to="/support/chat" 
-                            style={{ color: "#667eea", textDecoration: "underline", padding: "0.5rem 1rem", borderRadius: "4px", fontWeight: 600, transition: "all 0.2s" }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.color = "#764ba2";
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.color = "#667eea";
-                            }}
-                        >
-                            Support Chat
-                        </Link>
-                    </div>
-                </div>
+        <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%)", display: "flex", flexDirection: "column", color: "#2d3748" }}>
 
-                <div style={{ display: "flex", alignItems: "center", gap: "1rem", position: "relative" }}>
-                    {userName && (
-                        <div ref={dropdownRef} style={{ position: "relative" }}
-                            onMouseEnter={() => setShowDropdown(true)}
-                            onMouseLeave={() => setShowDropdown(false)}
-                        >
-                            <button
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "0.6rem",
-                                    padding: "0.6rem 1.2rem",
-                                    borderRadius: "4px",
-                                    border: "none",
-                                    background: showDropdown ? "#f7fafc" : "transparent",
-                                    color: showDropdown ? "#667eea" : "#4a5568",
-                                    transition: "all 0.2s",
-                                    fontSize: "0.95rem",
-                                    fontWeight: 500,
-                                    cursor: "pointer",
-                                }}
-                            >
-                                <span>{userName}</span>
-                                <span style={{ fontSize: "0.7rem" }}>{showDropdown ? "▲" : "▼"}</span>
-                            </button>
-                            {showDropdown && (
-                                <div
-                                    style={{
-                                        position: "absolute",
-                                        top: "100%",
-                                        right: 0,
-                                        marginTop: "0.25rem",
-                                        background: "#fff",
-                                        border: "1px solid #e2e8f0",
-                                        borderRadius: "4px",
-                                        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
-                                        minWidth: "200px",
-                                        zIndex: 1000,
-                                    }}
-                                >
-                                    <button
-                                        onClick={handleLogout}
-                                        style={{
-                                            width: "100%",
-                                            textAlign: "left",
-                                            padding: "0.75rem 1rem",
-                                            background: "transparent",
-                                            border: "none",
-                                            color: "#e53e3e",
-                                            fontSize: "0.9rem",
-                                            cursor: "pointer",
-                                            transition: "all 0.2s",
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            e.currentTarget.style.background = "#fee";
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            e.currentTarget.style.background = "transparent";
-                                        }}
-                                    >
-                                        Logout
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-            </nav>
 
-            <div style={{ display: "flex", height: "calc(100vh - 80px)", padding: "2rem", gap: "1rem" }}>
+            <div style={{ flex: 1, display: "flex", padding: "2rem", gap: "1.5rem", overflow: "hidden" }}>
                 {/* Conversation Queue */}
                 <div
                     style={{
-                        flex: "0 0 350px",
-                        background: "rgba(255, 255, 255, 0.95)",
-                        backdropFilter: "blur(10px)",
-                        borderRadius: "8px",
+                        flex: "0 0 320px",
+                        background: "#fff",
+                        borderRadius: "12px",
                         padding: "1.5rem",
-                        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
+                        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
                         display: "flex",
                         flexDirection: "column",
                     }}
                 >
-                    <h2 style={{ fontSize: "1.25rem", fontWeight: 700, color: "#2d3748", marginBottom: "1rem" }}>
-                        Conversation Queue
+                    <h2 style={{ fontSize: "1.1rem", fontWeight: 700, color: "#2d3748", marginBottom: "1rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span>Conversations</span>
+                        <span style={{ fontSize: "0.8rem", color: "#718096", fontWeight: "normal" }}>Queue</span>
                     </h2>
-                    
+
                     {/* Filter */}
                     <div style={{ marginBottom: "1rem" }}>
                         <select
                             value={statusFilter}
                             onChange={(e) => {
                                 setStatusFilter(e.target.value);
-                                loadQueue();
+                                loadQueue(); // Trigger load immediately on change
                             }}
                             style={{
                                 width: "100%",
-                                padding: "0.5rem",
-                                border: "1px solid #cbd5e0",
-                                borderRadius: "4px",
-                                fontSize: "0.85rem",
+                                padding: "0.6rem",
+                                border: "1px solid #e2e8f0",
+                                borderRadius: "8px",
+                                fontSize: "0.9rem",
+                                outline: "none",
+                                color: "#4a5568",
+                                background: "#f8f9fa",
+                                boxSizing: "border-box"
                             }}
                         >
-                            <option value="">All Status</option>
-                            <option value="OPEN">Open</option>
-                            <option value="CLAIMED">Claimed</option>
+                            <option value="">All Statuses</option>
+                            <option value="OPEN">Open (Waiting)</option>
+                            <option value="CLAIMED">My Active</option>
                             <option value="CLOSED">Closed</option>
                         </select>
                     </div>
 
                     {/* Conversations List */}
-                    <div style={{ flex: 1, overflowY: "auto" }}>
+                    <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                         {loadingQueue ? (
-                            <div style={{ textAlign: "center", padding: "2rem", color: "#718096" }}>Loading...</div>
+                            <div style={{ textAlign: "center", padding: "2rem", color: "#a0aec0" }}>Loading...</div>
                         ) : conversations.length === 0 ? (
-                            <div style={{ textAlign: "center", padding: "2rem", color: "#718096" }}>No conversations found.</div>
+                            <div style={{ textAlign: "center", padding: "2rem", color: "#a0aec0" }}>No conversations.</div>
                         ) : (
                             conversations.map((conv) => (
                                 <div
@@ -415,36 +356,36 @@ export default function SupportAgentChatPage() {
                                     onClick={() => handleSelectConversation(conv)}
                                     style={{
                                         padding: "1rem",
-                                        marginBottom: "0.5rem",
-                                        background: selectedConversation?.conversationId === conv.conversationId ? "#667eea" : "#f7fafc",
-                                        color: selectedConversation?.conversationId === conv.conversationId ? "#fff" : "#2d3748",
-                                        borderRadius: "4px",
+                                        background: selectedConversation?.conversationId === conv.conversationId ? "#ebf4ff" : "#fff",
+                                        borderRadius: "8px",
                                         cursor: "pointer",
+                                        border: selectedConversation?.conversationId === conv.conversationId ? "1px solid #667eea" : "1px solid #e2e8f0",
                                         transition: "all 0.2s",
-                                        border: selectedConversation?.conversationId === conv.conversationId ? "2px solid #667eea" : "1px solid #e2e8f0",
                                     }}
-                                    onMouseEnter={(e) => {
-                                        if (selectedConversation?.conversationId !== conv.conversationId) {
-                                            e.currentTarget.style.background = "#e2e8f0";
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        if (selectedConversation?.conversationId !== conv.conversationId) {
-                                            e.currentTarget.style.background = "#f7fafc";
-                                        }
-                                    }}
+                                    onMouseEnter={(e) => { if (selectedConversation?.conversationId !== conv.conversationId) e.currentTarget.style.borderColor = "#cbd5e0"; }}
+                                    onMouseLeave={(e) => { if (selectedConversation?.conversationId !== conv.conversationId) e.currentTarget.style.borderColor = "#e2e8f0"; }}
                                 >
-                                    <div style={{ fontWeight: 600, fontSize: "0.9rem", marginBottom: "0.25rem" }}>
-                                        {conv.customerUserId ? `User: ${conv.customerUserId}` : `Guest: ${conv.guestToken?.substring(0, 8)}...`}
+                                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
+                                        <span style={{ fontWeight: 600, fontSize: "0.9rem", color: "#2d3748" }}>
+                                            {conv.customerUserId ? conv.customerUserId : "Guest"}
+                                        </span>
+                                        <span style={{
+                                            fontSize: "0.75rem",
+                                            padding: "0.1rem 0.4rem",
+                                            borderRadius: "4px",
+                                            background: conv.status === "OPEN" ? "#fed7d7" : conv.status === "CLAIMED" ? "#c6f6d5" : "#e2e8f0",
+                                            color: conv.status === "OPEN" ? "#c53030" : conv.status === "CLAIMED" ? "#2f855a" : "#718096",
+                                            fontWeight: 600
+                                        }}>
+                                            {conv.status}
+                                        </span>
                                     </div>
-                                    <div style={{ fontSize: "0.85rem", opacity: 0.8 }}>
-                                        Status: {conv.status}
+                                    <div style={{ fontSize: "0.8rem", color: "#718096" }}>
+                                        {conv.guestToken ? `Token: ...${conv.guestToken.substr(-4)}` : "Verified User"}
                                     </div>
-                                    {conv.lastMessageAt && (
-                                        <div style={{ fontSize: "0.75rem", opacity: 0.7, marginTop: "0.25rem" }}>
-                                            {new Date(conv.lastMessageAt).toLocaleString()}
-                                        </div>
-                                    )}
+                                    <div style={{ fontSize: "0.75rem", color: "#a0aec0", marginTop: "0.4rem" }}>
+                                        {new Date(conv.lastMessageAt).toLocaleString()}
+                                    </div>
                                 </div>
                             ))
                         )}
@@ -457,23 +398,24 @@ export default function SupportAgentChatPage() {
                         flex: 1,
                         display: "flex",
                         flexDirection: "column",
-                        background: "rgba(255, 255, 255, 0.95)",
-                        backdropFilter: "blur(10px)",
-                        borderRadius: "8px",
-                        padding: "1.5rem",
-                        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
+                        background: "#fff",
+                        borderRadius: "12px",
+                        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
+                        overflow: "hidden"
                     }}
                 >
                     {selectedConversation ? (
                         <>
                             {/* Chat Header */}
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", paddingBottom: "1rem", borderBottom: "1px solid #e2e8f0" }}>
+                            <div style={{ padding: "1.25rem", borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                 <div>
-                                    <h3 style={{ fontSize: "1.1rem", fontWeight: 600, color: "#2d3748", marginBottom: "0.25rem" }}>
-                                        {selectedConversation.customerUserId ? `User: ${selectedConversation.customerUserId}` : `Guest: ${selectedConversation.guestToken?.substring(0, 8)}...`}
-                                    </h3>
-                                    <div style={{ fontSize: "0.85rem", color: "#718096" }}>
-                                        Status: {selectedConversation.status}
+                                    <div style={{ fontSize: "1.1rem", fontWeight: 600, color: "#2d3748" }}>
+                                        {selectedConversation.customerUserId ? `User: ${selectedConversation.customerUserId}` : `Guest Customer`}
+                                    </div>
+                                    <div style={{ fontSize: "0.85rem", color: "#718096", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                        Status:
+                                        <span style={{ fontWeight: 600 }}>{selectedConversation.status}</span>
+                                        {selectedConversation.guestToken && <span style={{ opacity: 0.5 }}>| Guest Token: {selectedConversation.guestToken.substr(0, 8)}...</span>}
                                     </div>
                                 </div>
                                 <button
@@ -481,165 +423,301 @@ export default function SupportAgentChatPage() {
                                     disabled={selectedConversation.status === "CLOSED"}
                                     style={{
                                         padding: "0.5rem 1rem",
-                                        background: selectedConversation.status === "CLOSED" ? "#e2e8f0" : "#e53e3e",
-                                        color: selectedConversation.status === "CLOSED" ? "#718096" : "#fff",
-                                        border: "none",
-                                        borderRadius: "4px",
+                                        background: selectedConversation.status === "CLOSED" ? "#edf2f7" : "#fff",
+                                        color: selectedConversation.status === "CLOSED" ? "#a0aec0" : "#e53e3e",
+                                        border: selectedConversation.status === "CLOSED" ? "none" : "1px solid #e53e3e",
+                                        borderRadius: "6px",
                                         fontSize: "0.85rem",
                                         cursor: selectedConversation.status === "CLOSED" ? "not-allowed" : "pointer",
+                                        fontWeight: 600,
+                                        transition: "all 0.2s"
                                     }}
                                 >
-                                    Close Conversation
+                                    {selectedConversation.status === "CLOSED" ? "Archived" : "Mark Resolved"}
                                 </button>
                             </div>
 
-                            {/* Customer Context */}
-                            {customerContext && (
-                                <div style={{ marginBottom: "1rem", padding: "1rem", background: "#f7fafc", borderRadius: "4px", fontSize: "0.85rem" }}>
-                                    <div style={{ fontWeight: 600, marginBottom: "0.5rem", color: "#2d3748" }}>Customer Information:</div>
-                                    {customerContext.user && (
-                                        <div style={{ marginBottom: "0.5rem" }}>
-                                            <strong>Name:</strong> {customerContext.user.name || "N/A"} | 
-                                            <strong> Email:</strong> {customerContext.user.email || "N/A"}
+                            <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+                                {/* Messages */}
+                                <div style={{ flex: 1, display: "flex", flexDirection: "column", borderRight: "1px solid #e2e8f0" }}>
+                                    <div style={{ flex: 1, overflowY: "auto", padding: "1.5rem", background: "#f8f9fa", display: "flex", flexDirection: "column", gap: "1rem" }}>
+                                        {loadingMessages ? (
+                                            <div style={{ textAlign: "center", color: "#a0aec0", marginTop: "2rem" }}>Loading conversation history...</div>
+                                        ) : messages.length === 0 ? (
+                                            <div style={{ textAlign: "center", color: "#a0aec0", marginTop: "2rem" }}>No messages yet.</div>
+                                        ) : (
+                                            messages.map((msg) => {
+                                                const isMe = msg.senderType === "SUPPORT_AGENT";
+                                                return (
+                                                    <div
+                                                        key={msg.messageId}
+                                                        style={{
+                                                            display: "flex",
+                                                            justifyContent: isMe ? "flex-end" : "flex-start",
+                                                        }}
+                                                    >
+                                                        <div
+                                                            style={{
+                                                                maxWidth: "70%",
+                                                                padding: "1rem",
+                                                                background: isMe ? "#667eea" : "#fff",
+                                                                color: isMe ? "#fff" : "#2d3748",
+                                                                borderRadius: isMe ? "12px 12px 0 12px" : "12px 12px 12px 0",
+                                                                boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)",
+                                                            }}
+                                                        >
+                                                            <div style={{ fontSize: "0.75rem", marginBottom: "0.25rem", opacity: 0.8 }}>
+                                                                {isMe ? "You" : msg.senderType === "CUSTOMER" ? "Customer" : "Guest"}
+                                                            </div>
+                                                            {msg.type === "TEXT" ? (
+                                                                <div style={{ fontSize: "0.95rem", lineHeight: "1.5" }}>{msg.text}</div>
+                                                            ) : (
+                                                                <div>
+                                                                    <div style={{ fontSize: "0.85rem", opacity: 0.9, marginBottom: "0.5rem" }}>Attachment</div>
+                                                                    <button
+                                                                        onClick={() => handleDownloadAttachment(msg.attachmentId)}
+                                                                        style={{
+                                                                            padding: "0.4rem 0.8rem",
+                                                                            background: isMe ? "rgba(255,255,255,0.2)" : "#edf2f7",
+                                                                            color: isMe ? "#fff" : "#2d3748",
+                                                                            border: "none",
+                                                                            borderRadius: "4px",
+                                                                            fontSize: "0.85rem",
+                                                                            cursor: "pointer",
+                                                                            display: "flex",
+                                                                            alignItems: "center",
+                                                                            gap: "0.5rem"
+                                                                        }}
+                                                                    >
+                                                                        ⬇️ Download
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                            <div style={{ fontSize: "0.7rem", opacity: 0.7, marginTop: "0.5rem", textAlign: "right" }}>
+                                                                {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })
+                                        )}
+                                        <div ref={messagesEndRef} />
+                                    </div>
+
+                                    {/* Input Area */}
+                                    <form onSubmit={handleSendMessage} style={{ padding: "1.25rem", background: "#fff", borderTop: "1px solid #e2e8f0", display: "flex", gap: "1rem", alignItems: "flex-end" }}>
+                                        <input
+                                            ref={fileInputRef}
+                                            type="file"
+                                            onChange={handleFileUpload}
+                                            disabled={selectedConversation.status === "CLOSED" || uploadingFile}
+                                            style={{ display: "none" }}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => fileInputRef.current?.click()}
+                                            disabled={selectedConversation.status === "CLOSED" || uploadingFile}
+                                            style={{
+                                                padding: "0.6rem",
+                                                background: "#edf2f7",
+                                                color: "#4a5568",
+                                                border: "none",
+                                                borderRadius: "8px",
+                                                cursor: selectedConversation.status === "CLOSED" ? "not-allowed" : "pointer",
+                                                transition: "all 0.2s"
+                                            }}
+                                            title="Attach File"
+                                        >
+                                            📎
+                                        </button>
+                                        <div style={{ flex: 1 }}>
+                                            <input
+                                                type="text"
+                                                value={messageText}
+                                                onChange={(e) => setMessageText(e.target.value)}
+                                                placeholder={selectedConversation.status === "CLOSED" ? "This conversation is closed." : "Type your reply..."}
+                                                disabled={selectedConversation.status === "CLOSED" || sendingMessage}
+                                                style={{
+                                                    width: "100%",
+                                                    padding: "0.75rem",
+                                                    border: "1px solid #cbd5e0",
+                                                    borderRadius: "8px",
+                                                    fontSize: "0.95rem",
+                                                    outline: "none",
+                                                    background: selectedConversation.status === "CLOSED" ? "#f7fafc" : "#fff",
+                                                    color: "#2d3748",
+                                                    boxSizing: "border-box"
+                                                }}
+                                            />
                                         </div>
-                                    )}
-                                    {customerContext.orders && customerContext.orders.length > 0 && (
-                                        <div style={{ marginBottom: "0.5rem" }}>
-                                            <strong>Orders:</strong> {customerContext.orders.length}
+                                        <button
+                                            type="submit"
+                                            disabled={selectedConversation.status === "CLOSED" || sendingMessage || !messageText.trim()}
+                                            style={{
+                                                padding: "0.75rem 1.5rem",
+                                                background: selectedConversation.status === "CLOSED" || sendingMessage || !messageText.trim() ? "#cbd5e0" : "#667eea",
+                                                color: "#fff",
+                                                border: "none",
+                                                borderRadius: "8px",
+                                                fontSize: "0.95rem",
+                                                fontWeight: 600,
+                                                cursor: selectedConversation.status === "CLOSED" || sendingMessage || !messageText.trim() ? "not-allowed" : "pointer",
+                                                flexShrink: 0
+                                            }}
+                                        >
+                                            Send
+                                        </button>
+                                    </form>
+                                </div>
+
+                                {/* Context Panel (Right Side) */}
+                                <div style={{ width: "300px", background: "#fff", padding: "1.5rem", overflowY: "auto" }}>
+                                    <h3 style={{ fontSize: "1rem", fontWeight: 700, color: "#2d3748", marginBottom: "1rem", borderBottom: "1px solid #e2e8f0", paddingBottom: "0.5rem" }}>
+                                        Customer Context
+                                    </h3>
+
+                                    {customerContext ? (
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+                                            {/* Profile */}
+                                            {customerContext.user && (
+                                                <div>
+                                                    <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#a0aec0", textTransform: "uppercase", marginBottom: "0.5rem" }}>Profile</div>
+                                                    <div style={{ fontSize: "0.9rem", color: "#2d3748" }}>
+                                                        <div style={{ fontWeight: 600 }}>{customerContext.user.name}</div>
+                                                        <div style={{ color: "#718096" }}>{customerContext.user.email}</div>
+                                                        <div style={{ fontSize: "0.8rem", marginTop: "0.25rem", padding: "0.1rem 0.4rem", background: "#edf2f7", borderRadius: "4px", display: "inline-block" }}>
+                                                            {customerContext.user.role}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Active Cart */}
+                                            <div>
+                                                <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#a0aec0", textTransform: "uppercase", marginBottom: "0.5rem" }}>Active Cart</div>
+                                                {customerContext.cart && customerContext.cart.items && customerContext.cart.items.length > 0 ? (
+                                                    <div style={{ background: "#f7fafc", borderRadius: "8px", padding: "0.75rem", border: "1px solid #edf2f7" }}>
+                                                        <div style={{ marginBottom: "0.5rem", fontWeight: 600, fontSize: "0.9rem" }}>
+                                                            Total: ${customerContext.cart.totalPrice}
+                                                        </div>
+                                                        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                                                            {customerContext.cart.items.slice(0, 3).map((item, idx) => (
+                                                                <div key={idx} style={{ fontSize: "0.85rem", display: "flex", justifyContent: "space-between" }}>
+                                                                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginRight: "0.5rem" }}>
+                                                                        {item.quantity}x {item.productName || "Product"}
+                                                                    </span>
+                                                                    <span style={{ fontWeight: 600 }}>${item.price}</span>
+                                                                </div>
+                                                            ))}
+                                                            {customerContext.cart.items.length > 3 && (
+                                                                <div style={{ fontSize: "0.8rem", color: "#718096", fontStyle: "italic" }}>
+                                                                    + {customerContext.cart.items.length - 3} more items
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ fontSize: "0.9rem", color: "#a0aec0", fontStyle: "italic" }}>Cart is empty</div>
+                                                )}
+                                            </div>
+
+                                            {/* Orders */}
+                                            <div>
+                                                <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#a0aec0", textTransform: "uppercase", marginBottom: "0.5rem" }}>Recent Orders</div>
+                                                {customerContext.orders && customerContext.orders.length > 0 ? (
+                                                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                                                        {customerContext.orders.slice(0, 3).map((order) => (
+                                                            <div key={order.orderId} style={{ padding: "0.5rem", border: "1px solid #e2e8f0", borderRadius: "6px", fontSize: "0.85rem" }}>
+                                                                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.2rem" }}>
+                                                                    <span style={{ fontWeight: 600 }}>#{order.orderId.substring(0, 6)}</span>
+                                                                    <span style={{ color: "#718096" }}>{new Date(order.orderDate).toLocaleDateString()}</span>
+                                                                </div>
+                                                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                                                    <span style={{
+                                                                        padding: "0.1rem 0.3rem",
+                                                                        borderRadius: "3px",
+                                                                        fontSize: "0.7rem",
+                                                                        background: "#ebf8ff",
+                                                                        color: "#2b6cb0"
+                                                                    }}>
+                                                                        {order.status}
+                                                                    </span>
+                                                                    <span style={{ fontWeight: 600 }}>${order.totalAmount}</span>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ fontSize: "0.9rem", color: "#a0aec0", fontStyle: "italic" }}>No previous orders</div>
+                                                )}
+                                            </div>
+
+                                            {/* Deliveries */}
+                                            <div>
+                                                <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#a0aec0", textTransform: "uppercase", marginBottom: "0.5rem" }}>Deliveries</div>
+                                                {customerContext.deliveries && customerContext.deliveries.length > 0 ? (
+                                                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                                                        {customerContext.deliveries.map((delivery) => (
+                                                            <div key={delivery.deliveryId} style={{ padding: "0.5rem", border: "1px solid #e2e8f0", borderRadius: "6px", fontSize: "0.85rem", background: "#f8f9fa" }}>
+                                                                <div style={{ marginBottom: "0.2rem" }}>
+                                                                    <span style={{ fontWeight: 600 }}>Order: #{delivery.orderId.substring(0, 6)}</span>
+                                                                </div>
+                                                                <div style={{ color: "#4a5568", fontSize: "0.8rem", marginBottom: "0.2rem" }}>
+                                                                    {delivery.deliveryAddress}
+                                                                </div>
+                                                                <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                                                                    <span style={{
+                                                                        padding: "0.1rem 0.3rem",
+                                                                        borderRadius: "3px",
+                                                                        fontSize: "0.7rem",
+                                                                        background: delivery.completed ? "#c6f6d5" : "#fffaf0",
+                                                                        color: delivery.completed ? "#2f855a" : "#c05621",
+                                                                        fontWeight: 600
+                                                                    }}>
+                                                                        {delivery.completed ? "DELIVERED" : "IN PROGRESS"}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ fontSize: "0.9rem", color: "#a0aec0", fontStyle: "italic" }}>No active deliveries</div>
+                                                )}
+                                            </div>
+
+                                            {/* Wishlist */}
+                                            <div>
+                                                <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#a0aec0", textTransform: "uppercase", marginBottom: "0.5rem" }}>Wishlist</div>
+                                                {customerContext.wishListProductIds && customerContext.wishListProductIds.length > 0 ? (
+                                                    <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                                                        {customerContext.wishListProductIds.map((pid, idx) => (
+                                                            <div key={idx} style={{ padding: "0.4rem", background: "#ebf4ff", borderRadius: "4px", fontSize: "0.8rem", color: "#4299e1" }}>
+                                                                Product ID: {pid}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ fontSize: "0.9rem", color: "#a0aec0", fontStyle: "italic" }}>Wishlist is empty</div>
+                                                )}
+                                            </div>
                                         </div>
-                                    )}
-                                    {customerContext.wishListProductIds && customerContext.wishListProductIds.length > 0 && (
-                                        <div>
-                                            <strong>Wishlist Items:</strong> {customerContext.wishListProductIds.length}
+                                    ) : (
+                                        <div style={{ color: "#718096", fontSize: "0.9rem" }}>
+                                            {selectedConversation.customerUserId ? "Loading context..." : "No context available for Guest users."}
                                         </div>
                                     )}
                                 </div>
-                            )}
-
-                            {/* Messages */}
-                            <div style={{ flex: 1, overflowY: "auto", marginBottom: "1rem", padding: "1rem", background: "#f7fafc", borderRadius: "4px" }}>
-                                {loadingMessages ? (
-                                    <div style={{ textAlign: "center", padding: "2rem", color: "#718096" }}>Loading messages...</div>
-                                ) : messages.length === 0 ? (
-                                    <div style={{ textAlign: "center", padding: "2rem", color: "#718096" }}>No messages yet.</div>
-                                ) : (
-                                    messages.map((msg) => (
-                                        <div
-                                            key={msg.messageId}
-                                            style={{
-                                                marginBottom: "1rem",
-                                                display: "flex",
-                                                justifyContent: msg.senderType === "SUPPORT_AGENT" ? "flex-end" : "flex-start",
-                                            }}
-                                        >
-                                            <div
-                                                style={{
-                                                    maxWidth: "70%",
-                                                    padding: "0.75rem 1rem",
-                                                    background: msg.senderType === "SUPPORT_AGENT" ? "#667eea" : "#fff",
-                                                    color: msg.senderType === "SUPPORT_AGENT" ? "#fff" : "#2d3748",
-                                                    borderRadius: "8px",
-                                                    boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
-                                                }}
-                                            >
-                                                <div style={{ fontSize: "0.85rem", marginBottom: "0.25rem" }}>
-                                                    {msg.senderType === "SUPPORT_AGENT" ? "You" : msg.senderType === "CUSTOMER" ? "Customer" : "Guest"}
-                                                </div>
-                                                {msg.type === "TEXT" ? (
-                                                    <div style={{ fontSize: "0.9rem" }}>{msg.text}</div>
-                                                ) : (
-                                                    <div>
-                                                        <div style={{ fontSize: "0.9rem", marginBottom: "0.5rem" }}>Attachment</div>
-                                                        <button
-                                                            onClick={() => handleDownloadAttachment(msg.attachmentId)}
-                                                            style={{
-                                                                padding: "0.5rem 1rem",
-                                                                background: msg.senderType === "SUPPORT_AGENT" ? "#764ba2" : "#667eea",
-                                                                color: "#fff",
-                                                                border: "none",
-                                                                borderRadius: "4px",
-                                                                fontSize: "0.85rem",
-                                                                cursor: "pointer",
-                                                            }}
-                                                        >
-                                                            Download File
-                                                        </button>
-                                                    </div>
-                                                )}
-                                                <div style={{ fontSize: "0.75rem", opacity: 0.7, marginTop: "0.25rem" }}>
-                                                    {new Date(msg.createdAt).toLocaleString()}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                                <div ref={messagesEndRef} />
                             </div>
-
-                            {/* Message Input */}
-                            <form onSubmit={handleSendMessage} style={{ display: "flex", gap: "0.5rem" }}>
-                                <input
-                                    type="text"
-                                    value={messageText}
-                                    onChange={(e) => setMessageText(e.target.value)}
-                                    placeholder="Type a message..."
-                                    disabled={selectedConversation.status === "CLOSED" || sendingMessage}
-                                    style={{
-                                        flex: 1,
-                                        padding: "0.75rem",
-                                        border: "1px solid #cbd5e0",
-                                        borderRadius: "4px",
-                                        fontSize: "0.85rem",
-                                    }}
-                                />
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    onChange={handleFileUpload}
-                                    disabled={selectedConversation.status === "CLOSED" || uploadingFile}
-                                    style={{ display: "none" }}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => fileInputRef.current?.click()}
-                                    disabled={selectedConversation.status === "CLOSED" || uploadingFile}
-                                    style={{
-                                        padding: "0.75rem 1rem",
-                                        background: "#e2e8f0",
-                                        color: "#4a5568",
-                                        border: "none",
-                                        borderRadius: "4px",
-                                        fontSize: "0.85rem",
-                                        cursor: selectedConversation.status === "CLOSED" ? "not-allowed" : "pointer",
-                                    }}
-                                >
-                                    📎
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={selectedConversation.status === "CLOSED" || sendingMessage || !messageText.trim()}
-                                    style={{
-                                        padding: "0.75rem 1.5rem",
-                                        background: selectedConversation.status === "CLOSED" || sendingMessage || !messageText.trim() ? "#e2e8f0" : "#667eea",
-                                        color: selectedConversation.status === "CLOSED" || sendingMessage || !messageText.trim() ? "#718096" : "#fff",
-                                        border: "none",
-                                        borderRadius: "4px",
-                                        fontSize: "0.85rem",
-                                        cursor: selectedConversation.status === "CLOSED" || sendingMessage || !messageText.trim() ? "not-allowed" : "pointer",
-                                    }}
-                                >
-                                    {sendingMessage ? "Sending..." : "Send"}
-                                </button>
-                            </form>
                         </>
                     ) : (
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "#718096" }}>
-                            Select a conversation to start chatting
+                        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", color: "#a0aec0" }}>
+                            <div style={{ fontSize: "3rem", marginBottom: "1rem", opacity: 0.5 }}>💬</div>
+                            <div>Select a conversation from the queue to start chatting.</div>
                         </div>
                     )}
                 </div>
             </div>
-        </div>
+        </div >
     );
 }
 
