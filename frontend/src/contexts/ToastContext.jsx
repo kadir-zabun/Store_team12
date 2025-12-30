@@ -14,8 +14,22 @@ export const ToastProvider = ({ children }) => {
     const [toasts, setToasts] = useState([]);
 
     const showToast = useCallback((message, type = "info", duration = 4000) => {
+        // Ensure message is always a string
+        let messageStr;
+        if (typeof message === 'string') {
+            messageStr = message;
+        } else if (message === null || message === undefined) {
+            messageStr = 'Notification';
+        } else if (typeof message === 'object') {
+            // Log warning if object is passed
+            console.warn("Toast received object instead of string:", message);
+            messageStr = JSON.stringify(message);
+        } else {
+            messageStr = String(message);
+        }
+        
         const id = Date.now() + Math.random();
-        const toast = { id, message, type, duration };
+        const toast = { id, message: messageStr, type, duration };
         
         setToasts((prev) => [...prev, toast]);
 
@@ -46,11 +60,15 @@ export const ToastProvider = ({ children }) => {
     }, [showToast]);
 
     const info = useCallback((message, duration) => {
-        return showToast(message, "info", duration);
+        // Ensure message is always a string
+        const messageStr = typeof message === 'string' ? message : String(message || 'Info');
+        return showToast(messageStr, "info", duration);
     }, [showToast]);
 
     const warning = useCallback((message, duration) => {
-        return showToast(message, "warning", duration);
+        // Ensure message is always a string
+        const messageStr = typeof message === 'string' ? message : String(message || 'Warning');
+        return showToast(messageStr, "warning", duration);
     }, [showToast]);
 
     return (

@@ -71,7 +71,13 @@ public class SupportChatController {
                 text
         );
         SupportMessageDto dto = toDto(saved);
-        messagingTemplate.convertAndSend("/topic/support/" + conversationId, dto);
+        
+        // Broadcast message to all subscribers of this conversation topic
+        String topic = "/topic/support/" + conversationId;
+        System.out.println("Broadcasting message to topic: " + topic);
+        System.out.println("Message DTO: " + dto);
+        messagingTemplate.convertAndSend(topic, dto);
+        
         return ResponseEntity.ok(dto);
     }
 
@@ -87,7 +93,12 @@ public class SupportChatController {
                 file
         );
         SupportMessageDto dto = toDto(saved);
-        messagingTemplate.convertAndSend("/topic/support/" + conversationId, dto);
+        
+        // Broadcast attachment message to all subscribers
+        String topic = "/topic/support/" + conversationId;
+        System.out.println("Broadcasting attachment message to topic: " + topic);
+        messagingTemplate.convertAndSend(topic, dto);
+        
         return ResponseEntity.ok(dto);
     }
 
@@ -176,7 +187,13 @@ public class SupportChatController {
                                                            @AuthenticationPrincipal UserDetails userDetails) {
         SupportMessage saved = supportChatService.sendTextAsAgent(conversationId, userDetails.getUsername(), text);
         SupportMessageDto dto = toDto(saved);
-        messagingTemplate.convertAndSend("/topic/support/" + conversationId, dto);
+        
+        // Broadcast message to all subscribers of this conversation topic
+        String topic = "/topic/support/" + conversationId;
+        System.out.println("Broadcasting agent message to topic: " + topic);
+        System.out.println("Message DTO: " + dto);
+        messagingTemplate.convertAndSend(topic, dto);
+        
         return ResponseEntity.ok(dto);
     }
 
@@ -187,7 +204,12 @@ public class SupportChatController {
                                                                    @AuthenticationPrincipal UserDetails userDetails) {
         SupportMessage saved = supportChatService.uploadAttachmentAsAgent(conversationId, userDetails.getUsername(), file);
         SupportMessageDto dto = toDto(saved);
-        messagingTemplate.convertAndSend("/topic/support/" + conversationId, dto);
+        
+        // Broadcast attachment message to all subscribers
+        String topic = "/topic/support/" + conversationId;
+        System.out.println("Broadcasting agent attachment message to topic: " + topic);
+        messagingTemplate.convertAndSend(topic, dto);
+        
         return ResponseEntity.ok(dto);
     }
 

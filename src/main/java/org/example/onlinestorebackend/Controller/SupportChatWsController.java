@@ -43,6 +43,11 @@ public class SupportChatWsController {
                 saved.getAttachmentId(),
                 saved.getCreatedAt()
         );
-        messagingTemplate.convertAndSend("/topic/support/" + saved.getConversationId(), dto);
+        
+        // Broadcast message to all subscribers
+        String topic = "/topic/support/" + saved.getConversationId();
+        System.out.println("Broadcasting WebSocket message to topic: " + topic);
+        System.out.println("Message DTO: " + dto);
+        messagingTemplate.convertAndSend(topic, dto);
     }
 }

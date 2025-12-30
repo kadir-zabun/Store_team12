@@ -2,6 +2,7 @@ package org.example.onlinestorebackend.Service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.onlinestorebackend.Dto.SupportContextDto;
+import org.example.onlinestorebackend.Dto.SupportMessageDto;
 import org.example.onlinestorebackend.Entity.Cart;
 import org.example.onlinestorebackend.Entity.Delivery;
 import org.example.onlinestorebackend.Entity.Order;
@@ -21,6 +22,7 @@ import org.example.onlinestorebackend.Repository.WishListRepository;
 import org.example.onlinestorebackend.exception.InvalidRequestException;
 import org.example.onlinestorebackend.exception.ResourceNotFoundException;
 import org.springframework.http.MediaType;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -56,6 +58,7 @@ public class SupportChatService {
     private final OrderRepository orderRepository;
     private final DeliveryRepository deliveryRepository;
     private final WishListRepository wishListRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Transactional
     public SupportConversation startForGuest(String existingGuestToken) {
@@ -157,9 +160,47 @@ public class SupportChatService {
             throw new InvalidRequestException("Conversation already claimed");
         }
 
+        // Only send welcome message if not already claimed
+        boolean isNewClaim = c.getClaimedByAgentId() == null;
+        
         c.setClaimedByAgentId(agent.getUserId());
         c.setStatus(STATUS_CLAIMED);
-        return conversationRepository.save(c);
+        SupportConversation saved = conversationRepository.save(c);
+        
+        // Send automatic welcome message when agent claims for the first time
+        if (isNewClaim) {
+            String agentName = agent.getName() != null ? agent.getName() : agent.getUsername();
+            String welcomeMessage = "Merhaba ben " + agentName + ", sorununuzu inceliyorum. Nasıl yardımcı olabilirim?";
+            
+            SupportMessage welcomeMsg = new SupportMessage();
+            welcomeMsg.setMessageId(UUID.randomUUID().toString());
+            welcomeMsg.setConversationId(conversationId);
+            welcomeMsg.setSenderType(SENDER_SUPPORT_AGENT);
+            welcomeMsg.setSenderId(agent.getUserId());
+            welcomeMsg.setType(MESSAGE_TEXT);
+            welcomeMsg.setText(welcomeMessage);
+            welcomeMsg.setCreatedAt(LocalDateTime.now());
+            
+            SupportMessage savedWelcomeMsg = messageRepository.save(welcomeMsg);
+            c.setLastMessageAt(savedWelcomeMsg.getCreatedAt());
+            conversationRepository.save(c);
+            
+            // Broadcast welcome message via WebSocket
+            SupportMessageDto welcomeMsgDto = new SupportMessageDto(
+                    savedWelcomeMsg.getMessageId(),
+                    savedWelcomeMsg.getConversationId(),
+                    savedWelcomeMsg.getSenderType(),
+                    savedWelcomeMsg.getSenderId(),
+                    savedWelcomeMsg.getType(),
+                    savedWelcomeMsg.getText(),
+                    savedWelcomeMsg.getAttachmentId(),
+                    savedWelcomeMsg.getCreatedAt()
+            );
+            String topic = "/topic/support/" + conversationId;
+            messagingTemplate.convertAndSend(topic, welcomeMsgDto);
+        }
+        
+        return saved;
     }
 
     @Transactional
@@ -195,6 +236,15 @@ public class SupportChatService {
         if (STATUS_CLOSED.equals(c.getStatus())) {
             throw new InvalidRequestException("Conversation is closed");
         }
+        // Don't allow customers to send messages when conversation is OPEN (waiting for agent to claim)
+        // Customers can only send the first message, then must wait for agent to claim
+        if (STATUS_OPEN.equals(c.getStatus())) {
+            // Check if this is the first message (no messages exist yet)
+            List<SupportMessage> existingMessages = messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId);
+            if (!existingMessages.isEmpty()) {
+                throw new InvalidRequestException("Lütfen bir destek temsilcisinin konuşmayı devralmasını bekleyin.");
+            }
+        }
 
         SupportMessage m = new SupportMessage();
         m.setMessageId(UUID.randomUUID().toString());
@@ -216,6 +266,42 @@ public class SupportChatService {
         SupportMessage saved = messageRepository.save(m);
         c.setLastMessageAt(saved.getCreatedAt());
         conversationRepository.save(c);
+        
+        // If conversation is OPEN and this is the first customer message, send automatic system message
+        if (STATUS_OPEN.equals(c.getStatus())) {
+            List<SupportMessage> allMessages = messageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId);
+            // Check if this is the first customer/guest message (only this message exists)
+            if (allMessages.size() == 1) {
+                // Send automatic system message
+                SupportMessage systemMsg = new SupportMessage();
+                systemMsg.setMessageId(UUID.randomUUID().toString());
+                systemMsg.setConversationId(conversationId);
+                systemMsg.setSenderType(SENDER_SUPPORT_AGENT);
+                systemMsg.setSenderId(null); // System message, no specific agent
+                systemMsg.setType(MESSAGE_TEXT);
+                systemMsg.setText("Mesajınız alındı. Bir destek temsilcisi konuşmayı devraldığında size otomatik olarak bilgilendirme mesajı gönderilecektir.");
+                systemMsg.setCreatedAt(LocalDateTime.now());
+                
+                SupportMessage savedSystemMsg = messageRepository.save(systemMsg);
+                c.setLastMessageAt(savedSystemMsg.getCreatedAt());
+                conversationRepository.save(c);
+                
+                // Broadcast system message via WebSocket
+                SupportMessageDto systemMsgDto = new SupportMessageDto(
+                        savedSystemMsg.getMessageId(),
+                        savedSystemMsg.getConversationId(),
+                        savedSystemMsg.getSenderType(),
+                        savedSystemMsg.getSenderId(),
+                        savedSystemMsg.getType(),
+                        savedSystemMsg.getText(),
+                        savedSystemMsg.getAttachmentId(),
+                        savedSystemMsg.getCreatedAt()
+                );
+                String topic = "/topic/support/" + conversationId;
+                messagingTemplate.convertAndSend(topic, systemMsgDto);
+            }
+        }
+        
         return saved;
     }
 

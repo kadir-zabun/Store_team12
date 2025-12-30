@@ -71,16 +71,17 @@ export default function SupportAgentChatPage() {
         };
     }, [navigate, userRole, showError]);
 
-    // Load messages when conversation is selected and connect WebSocket
+    // Load messages when conversation is selected and connect WebSocket (REAL-TIME ONLY, NO POLLING)
     useEffect(() => {
         if (!selectedConversation) {
             setMessages([]);
             disconnectWebSocket();
             return;
         }
-        // Initial load only - no polling
+        
+        // Initial load
         loadMessages(selectedConversation.conversationId, true);
-        // Connect WebSocket for real-time updates
+        // Connect WebSocket for real-time updates (push-based, no polling)
         connectWebSocket(selectedConversation.conversationId);
         
         return () => {
@@ -89,7 +90,22 @@ export default function SupportAgentChatPage() {
     }, [selectedConversation?.conversationId]);
 
     const connectWebSocket = (conversationId) => {
-        if (!conversationId || stompClientRef.current) return;
+        if (!conversationId) {
+            console.warn("Cannot connect WebSocket: no conversationId");
+            return;
+        }
+        
+        // Disconnect existing connection if conversationId changed
+        if (stompClientRef.current && stompClientRef.current.conversationId !== conversationId) {
+            console.log("Disconnecting existing WebSocket for different conversation");
+            disconnectWebSocket();
+        }
+        
+        // If already connected to this conversation, don't reconnect
+        if (stompClientRef.current && stompClientRef.current.conversationId === conversationId) {
+            console.log("WebSocket already connected to conversation:", conversationId);
+            return;
+        }
         
         try {
             if (!window.SockJS || !window.Stomp) {
@@ -99,6 +115,7 @@ export default function SupportAgentChatPage() {
 
             const baseUrl = window.location.origin;
             const wsUrl = `${baseUrl}/ws`;
+            console.log("Connecting WebSocket to:", wsUrl, "for conversation:", conversationId);
             
             let client;
             if (window.Stomp && window.Stomp.Client) {
@@ -116,18 +133,53 @@ export default function SupportAgentChatPage() {
                 }
                 
                 client.onConnect = () => {
+                    console.log("WebSocket connected for conversation:", conversationId);
                     // Subscribe to messages
                     client.subscribe(`/topic/support/${conversationId}`, (message) => {
                         try {
-                            const messageData = JSON.parse(message.body);
+                            console.log("WebSocket message received:", message.body);
+                            const messageData = typeof message.body === 'string' ? JSON.parse(message.body) : message.body;
+                            console.log("Parsed message data:", messageData);
+                            
+                            if (!messageData || !messageData.messageId) {
+                                console.warn("Invalid message format received:", messageData);
+                                return;
+                            }
+                            
                             setMessages((prevMessages) => {
-                                const exists = prevMessages.some(msg => msg.messageId === messageData.messageId);
-                                if (exists) return prevMessages;
-                                const updated = [...prevMessages, messageData];
-                                return updated.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+                                // Check if message already exists (real message, not temporary)
+                                const existingRealMessage = prevMessages.find(
+                                    msg => !msg.isTemporary && msg.messageId === messageData.messageId
+                                );
+                                if (existingRealMessage) {
+                                    console.log("Message already exists, skipping:", messageData.messageId);
+                                    return prevMessages; // Keep all messages as-is
+                                }
+                                
+                                // Check if there's a temporary message with matching text (optimistic update)
+                                const matchingTempIndex = prevMessages.findIndex(
+                                    msg => msg.isTemporary && 
+                                           msg.text === messageData.text &&
+                                           (msg.senderType === messageData.senderType)
+                                );
+                                
+                                let updatedMessages;
+                                if (matchingTempIndex !== -1) {
+                                    // Replace temporary message with real one
+                                    console.log("Replacing temporary message with real message:", messageData.messageId);
+                                    updatedMessages = [...prevMessages];
+                                    updatedMessages[matchingTempIndex] = messageData;
+                                } else {
+                                    // Add new message
+                                    console.log("Adding new message via WebSocket:", messageData.messageId);
+                                    updatedMessages = [...prevMessages, messageData];
+                                }
+                                
+                                return updatedMessages.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
                             });
                         } catch (error) {
                             console.error("Error parsing WebSocket message:", error);
+                            console.error("Message body:", message.body);
                         }
                     });
                     
@@ -142,7 +194,32 @@ export default function SupportAgentChatPage() {
                                 }
                                 return prev;
                             });
-                            // Refresh queue to update conversation list
+                            // Update conversation status in queue immediately
+                            setConversations((prevConversations) => {
+                                const updated = prevConversations.map((conv) => {
+                                    if (conv.conversationId === statusData.conversationId) {
+                                        return { 
+                                            ...conv, 
+                                            status: statusData.status,
+                                            claimedBy: statusData.claimedBy || statusData.agentId || statusData.claimedByAgent,
+                                            agentId: statusData.agentId || statusData.claimedBy || statusData.claimedByAgent,
+                                            claimedByAgent: statusData.claimedByAgent || statusData.claimedBy || statusData.agentId
+                                        };
+                                    }
+                                    return conv;
+                                });
+                                
+                                // Filter out conversations claimed by other agents
+                                return updated.filter((conv) => {
+                                    if (conv.status === "OPEN") return true;
+                                    if (conv.status === "CLAIMED") {
+                                        const claimedBy = conv.claimedBy || conv.agentId || conv.claimedByAgent;
+                                        return claimedBy === userName || claimedBy === conv.agentUsername;
+                                    }
+                                    return true;
+                                });
+                            });
+                            // Refresh queue to get latest data
                             loadQueue();
                         } catch (error) {
                             console.error("Error parsing WebSocket status update:", error);
@@ -152,9 +229,25 @@ export default function SupportAgentChatPage() {
                 
                 client.onStompError = (frame) => {
                     console.error("STOMP error:", frame);
+                    console.error("STOMP error headers:", frame.headers);
+                    console.error("STOMP error body:", frame.body);
+                    // Clear client ref on error to allow reconnection
+                    stompClientRef.current = null;
                 };
                 
+                client.onWebSocketClose = () => {
+                    console.log("WebSocket closed, will attempt to reconnect");
+                    stompClientRef.current = null;
+                };
+                
+                client.onDisconnect = () => {
+                    console.log("WebSocket disconnected");
+                    stompClientRef.current = null;
+                };
+                
+                // Activate connection
                 client.activate();
+                console.log("WebSocket activation initiated for conversation:", conversationId);
             } else if (window.Stomp && window.Stomp.client) {
                 client = window.Stomp.client(wsUrl);
                 const token = localStorage.getItem("access_token");
@@ -163,42 +256,115 @@ export default function SupportAgentChatPage() {
                     headers.Authorization = `Bearer ${token}`;
                 }
                 
-                client.connect(headers, () => {
-                    client.subscribe(`/topic/support/${conversationId}`, (message) => {
+                client.connect(headers, 
+                    () => {
+                        // Success callback
+                        console.log("WebSocket connected (old API) for conversation:", conversationId);
+                        client.subscribe(`/topic/support/${conversationId}`, (message) => {
                         try {
+                            console.log("WebSocket message received (old API):", message.body);
                             const messageData = typeof message.body === 'string' ? JSON.parse(message.body) : message.body;
+                            console.log("Parsed message data:", messageData);
+                            
+                            if (!messageData || !messageData.messageId) {
+                                console.warn("Invalid message format received:", messageData);
+                                return;
+                            }
+                            
                             setMessages((prevMessages) => {
-                                const exists = prevMessages.some(msg => msg.messageId === messageData.messageId);
-                                if (exists) return prevMessages;
-                                const updated = [...prevMessages, messageData];
-                                return updated.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+                                // Check if message already exists (real message, not temporary)
+                                const existingRealMessage = prevMessages.find(
+                                    msg => !msg.isTemporary && msg.messageId === messageData.messageId
+                                );
+                                if (existingRealMessage) {
+                                    console.log("Message already exists, skipping:", messageData.messageId);
+                                    return prevMessages; // Keep all messages as-is
+                                }
+                                
+                                // Check if there's a temporary message with matching text (optimistic update)
+                                const matchingTempIndex = prevMessages.findIndex(
+                                    msg => msg.isTemporary && 
+                                           msg.text === messageData.text &&
+                                           (msg.senderType === messageData.senderType)
+                                );
+                                
+                                let updatedMessages;
+                                if (matchingTempIndex !== -1) {
+                                    // Replace temporary message with real one
+                                    console.log("Replacing temporary message with real message:", messageData.messageId);
+                                    updatedMessages = [...prevMessages];
+                                    updatedMessages[matchingTempIndex] = messageData;
+                                } else {
+                                    // Add new message
+                                    console.log("Adding new message via WebSocket:", messageData.messageId);
+                                    updatedMessages = [...prevMessages, messageData];
+                                }
+                                
+                                return updatedMessages.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
                             });
                         } catch (error) {
                             console.error("Error parsing WebSocket message:", error);
+                            console.error("Message body:", message.body);
                         }
                     });
                     
                     client.subscribe(`/topic/support/${conversationId}/status`, (message) => {
                         try {
                             const statusData = typeof message.body === 'string' ? JSON.parse(message.body) : message.body;
+                            // Update selected conversation status
                             setSelectedConversation((prev) => {
                                 if (prev && prev.conversationId === statusData.conversationId) {
                                     return { ...prev, status: statusData.status };
                                 }
                                 return prev;
                             });
+                            // Update conversation status in queue immediately
+                            setConversations((prevConversations) => {
+                                const updated = prevConversations.map((conv) => {
+                                    if (conv.conversationId === statusData.conversationId) {
+                                        return { 
+                                            ...conv, 
+                                            status: statusData.status,
+                                            claimedBy: statusData.claimedBy || statusData.agentId || statusData.claimedByAgent,
+                                            agentId: statusData.agentId || statusData.claimedBy || statusData.claimedByAgent,
+                                            claimedByAgent: statusData.claimedByAgent || statusData.claimedBy || statusData.agentId
+                                        };
+                                    }
+                                    return conv;
+                                });
+                                
+                                // Filter out conversations claimed by other agents
+                                return updated.filter((conv) => {
+                                    if (conv.status === "OPEN") return true;
+                                    if (conv.status === "CLAIMED") {
+                                        const claimedBy = conv.claimedBy || conv.agentId || conv.claimedByAgent;
+                                        return claimedBy === userName || claimedBy === conv.agentUsername;
+                                    }
+                                    return true;
+                                });
+                            });
+                            // Refresh queue to get latest data
                             loadQueue();
                         } catch (error) {
                             console.error("Error parsing WebSocket status update:", error);
                         }
                     });
-                });
+                    },
+                    (error) => {
+                        // Error callback
+                        console.error("WebSocket connection error (old API):", error);
+                        stompClientRef.current = null;
+                    }
+                );
             } else {
                 console.warn("STOMP client not available");
                 return;
             }
             
+            // Store conversationId with client for tracking
+            client.conversationId = conversationId;
             stompClientRef.current = client;
+            console.log("WebSocket client stored for conversation:", conversationId);
         } catch (error) {
             console.error("Error connecting to WebSocket:", error);
         }
@@ -206,12 +372,15 @@ export default function SupportAgentChatPage() {
 
     const disconnectWebSocket = () => {
         if (stompClientRef.current) {
+            const conversationId = stompClientRef.current.conversationId;
+            console.log("Disconnecting WebSocket for conversation:", conversationId);
             try {
                 if (stompClientRef.current.deactivate) {
                     stompClientRef.current.deactivate();
                 } else if (stompClientRef.current.disconnect) {
                     stompClientRef.current.disconnect();
                 }
+                console.log("WebSocket disconnected successfully");
             } catch (error) {
                 console.error("Error disconnecting WebSocket:", error);
             }
@@ -245,25 +414,92 @@ export default function SupportAgentChatPage() {
             console.log("Queue response:", response);
             const conversationsData = response.data?.data || response.data || [];
             console.log("Conversations data:", conversationsData);
-            setConversations(Array.isArray(conversationsData) ? conversationsData : []);
+            
+            // Filter conversations: show only OPEN and CLAIMED by current agent
+            const filteredConversations = (Array.isArray(conversationsData) ? conversationsData : []).filter((conv) => {
+                // Show OPEN conversations
+                if (conv.status === "OPEN") {
+                    return true;
+                }
+                // Show CLAIMED conversations only if claimed by current agent
+                if (conv.status === "CLAIMED") {
+                    // Check if conversation is claimed by current agent
+                    // Backend should return claimedBy or agentId field
+                    const claimedBy = conv.claimedBy || conv.agentId || conv.claimedByAgent;
+                    return claimedBy === userName || claimedBy === conv.agentUsername;
+                }
+                // Show CLOSED conversations (optional, can be filtered out)
+                return true;
+            });
+            
+            setConversations(filteredConversations);
         } catch (error) {
-            console.error("Error loading queue:", error);
+            // Detailed error logging
+            console.error("=== SUPPORT AGENT - LOAD QUEUE ERROR ===");
+            console.error("Error object:", error);
+            console.error("Error type:", typeof error);
+            console.error("Error message:", error.message);
             console.error("Error response:", error.response);
+            console.error("Error response status:", error.response?.status);
+            console.error("Error response data:", error.response?.data);
+            console.error("Error response data type:", typeof error.response?.data);
+            console.error("Full error response:", JSON.stringify(error.response, null, 2));
+            
             let errorMessage = "Failed to load conversation queue.";
             if (error.response?.data) {
-                if (typeof error.response.data === "string") {
-                    errorMessage = error.response.data;
-                } else if (error.response.data.message) {
-                    errorMessage = String(error.response.data.message);
-                } else if (error.response.data.error) {
-                    errorMessage = String(error.response.data.error);
+                const errorData = error.response.data;
+                console.log("Error data:", errorData);
+                console.log("Error data type:", typeof errorData);
+                
+                // Handle nested data structure (ApiResponse format)
+                const actualErrorData = errorData?.data || errorData;
+                console.log("Actual error data:", actualErrorData);
+                console.log("Actual error data type:", typeof actualErrorData);
+                
+                if (typeof actualErrorData === "string") {
+                    console.log("Error is string:", actualErrorData);
+                    errorMessage = actualErrorData;
+                } else if (actualErrorData?.message) {
+                    console.log("Error has message property:", actualErrorData.message);
+                    errorMessage = String(actualErrorData.message);
+                } else if (actualErrorData?.error) {
+                    console.log("Error has error property:", actualErrorData.error);
+                    // If error is an object, extract message from it
+                    if (typeof actualErrorData.error === "object" && actualErrorData.error.message) {
+                        errorMessage = String(actualErrorData.error.message);
+                    } else {
+                        errorMessage = String(actualErrorData.error);
+                    }
+                } else if (errorData?.message) {
+                    console.log("ErrorData has message property:", errorData.message);
+                    errorMessage = String(errorData.message);
+                } else if (errorData?.error) {
+                    console.log("ErrorData has error property:", errorData.error);
+                    // If error is an object, extract message from it
+                    if (typeof errorData.error === "object" && errorData.error.message) {
+                        errorMessage = String(errorData.error.message);
+                    } else {
+                        errorMessage = String(errorData.error);
+                    }
+                } else {
+                    console.log("Using fallback - converting to JSON string");
+                    errorMessage = typeof actualErrorData === "object" 
+                        ? JSON.stringify(actualErrorData) 
+                        : String(actualErrorData || "Failed to load conversation queue.");
                 }
+            } else if (error.message) {
+                console.log("Using error.message:", error.message);
+                errorMessage = String(error.message);
             }
+            
+            console.log("Final error message:", errorMessage);
+            console.log("Final error message type:", typeof errorMessage);
+            console.log("=== END ERROR LOG ===");
             // Don't show error on initial load failures, just log
             if (conversations.length === 0) {
                 console.warn("Queue load failed:", errorMessage);
             } else {
-                showError(errorMessage);
+                showError(String(errorMessage));
             }
         } finally {
             setLoadingQueue(false);
@@ -285,14 +521,17 @@ export default function SupportAgentChatPage() {
                 // Initial load: replace all messages
                 setMessages(newMessages);
             } else {
-                // Subsequent loads: merge only new messages
+                // Polling: merge only new messages (silent update)
                 setMessages((prevMessages) => {
                     if (prevMessages.length === 0) {
                         return newMessages;
                     }
                     
+                    // Remove temporary messages
+                    const withoutTemp = prevMessages.filter(msg => !msg.isTemporary);
+                    
                     // Create a map of existing message IDs for quick lookup
-                    const existingIds = new Set(prevMessages.map(msg => msg.messageId));
+                    const existingIds = new Set(withoutTemp.map(msg => msg.messageId));
                     
                     // Add only new messages that don't exist in current list
                     const messagesToAdd = newMessages.filter(msg => !existingIds.has(msg.messageId));
@@ -302,19 +541,86 @@ export default function SupportAgentChatPage() {
                         return prevMessages;
                     }
                     
+                    console.log(`Polling: Found ${messagesToAdd.length} new message(s)`);
+                    
                     // Merge: existing messages + new messages, sorted by createdAt
-                    const merged = [...prevMessages, ...messagesToAdd];
+                    const merged = [...withoutTemp, ...messagesToAdd];
                     return merged.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
                 });
             }
         } catch (error) {
-            console.error("Error loading messages:", error);
-            const errorMessage = error.response?.data?.message 
-                || error.response?.data?.error 
-                || "Failed to load messages.";
-            // Only show error if it's not an access denied error (403) and it's initial load
-            if (error.response?.status !== 403 && isInitialLoad) {
-                showError(errorMessage);
+            // Detailed error logging
+            console.error("=== SUPPORT AGENT - LOAD MESSAGES ERROR ===");
+            console.error("Error object:", error);
+            console.error("Error type:", typeof error);
+            console.error("Error message:", error.message);
+            console.error("Error response:", error.response);
+            console.error("Error response status:", error.response?.status);
+            console.error("Error response data:", error.response?.data);
+            console.error("Error response data type:", typeof error.response?.data);
+            console.error("Full error response:", JSON.stringify(error.response, null, 2));
+            
+            let errorMessage = "Failed to load messages.";
+            if (error.response?.data) {
+                const errorData = error.response.data;
+                console.log("Error data:", errorData);
+                console.log("Error data type:", typeof errorData);
+                
+                // Handle nested data structure (ApiResponse format)
+                const actualErrorData = errorData?.data || errorData;
+                console.log("Actual error data:", actualErrorData);
+                console.log("Actual error data type:", typeof actualErrorData);
+                
+                if (typeof actualErrorData === "string") {
+                    console.log("Error is string:", actualErrorData);
+                    errorMessage = actualErrorData;
+                } else if (actualErrorData?.message) {
+                    console.log("Error has message property:", actualErrorData.message);
+                    errorMessage = String(actualErrorData.message);
+                } else if (actualErrorData?.error) {
+                    console.log("Error has error property:", actualErrorData.error);
+                    // If error is an object, extract message from it
+                    if (typeof actualErrorData.error === "object" && actualErrorData.error.message) {
+                        errorMessage = String(actualErrorData.error.message);
+                    } else {
+                        errorMessage = String(actualErrorData.error);
+                    }
+                } else if (errorData?.message) {
+                    console.log("ErrorData has message property:", errorData.message);
+                    errorMessage = String(errorData.message);
+                } else if (errorData?.error) {
+                    console.log("ErrorData has error property:", errorData.error);
+                    // If error is an object, extract message from it
+                    if (typeof errorData.error === "object" && errorData.error.message) {
+                        errorMessage = String(errorData.error.message);
+                    } else {
+                        errorMessage = String(errorData.error);
+                    }
+                } else {
+                    console.log("Using fallback - converting to JSON string");
+                    errorMessage = typeof actualErrorData === "object" 
+                        ? JSON.stringify(actualErrorData) 
+                        : String(actualErrorData || "Failed to load messages.");
+                }
+            } else if (error.message) {
+                console.log("Using error.message:", error.message);
+                errorMessage = String(error.message);
+            }
+            
+            console.log("Final error message:", errorMessage);
+            console.log("Final error message type:", typeof errorMessage);
+            console.log("=== END ERROR LOG ===");
+            
+            // Check if error is about conversation not being claimed
+            const isNotClaimedError = String(errorMessage).toLowerCase().includes("not claimed") ||
+                                     error.response?.status === 400 ||
+                                     error.response?.status === 403;
+            
+            // Only show error if it's not a "not claimed" error and it's initial load
+            if (!isNotClaimedError && isInitialLoad) {
+                showError(String(errorMessage));
+            } else if (isNotClaimedError) {
+                console.log("Not showing error for unclaimed conversation - this is expected");
             }
             // Don't clear messages on error, keep existing ones
         } finally {
@@ -326,12 +632,39 @@ export default function SupportAgentChatPage() {
 
     const loadCustomerContext = async (conversationId) => {
         try {
+            console.log("=== SUPPORT AGENT - LOAD CUSTOMER CONTEXT ===");
+            console.log("Conversation ID:", conversationId);
             const response = await supportApi.getCustomerDetails(conversationId);
+            console.log("Customer context response:", response);
+            console.log("Response data:", response.data);
             const contextData = response.data?.data || response.data;
+            console.log("Context data:", contextData);
             setCustomerContext(contextData);
+            console.log("=== END LOAD CUSTOMER CONTEXT ===");
         } catch (error) {
-            console.error("Error loading customer context:", error);
-            // Don't show error, context might not be available for guest users
+            // Detailed error logging
+            console.error("=== SUPPORT AGENT - LOAD CUSTOMER CONTEXT ERROR ===");
+            console.error("Conversation ID:", conversationId);
+            console.error("Error object:", error);
+            console.error("Error type:", typeof error);
+            console.error("Error message:", error.message);
+            console.error("Error response:", error.response);
+            console.error("Error response status:", error.response?.status);
+            console.error("Error response data:", error.response?.data);
+            console.error("Error response data type:", typeof error.response?.data);
+            console.error("Full error response:", JSON.stringify(error.response, null, 2));
+            
+            // 400 Bad Request is normal for guest users (no customer context available)
+            if (error.response?.status === 400) {
+                console.log("400 Bad Request - This is normal for guest users. Customer context not available.");
+            } else if (error.response?.status === 404) {
+                console.log("404 Not Found - Customer context endpoint not found.");
+            } else {
+                console.log("Unexpected error loading customer context.");
+            }
+            
+            console.log("=== END ERROR LOG ===");
+            // Don't show error to user, context might not be available for guest users
         }
     };
 
@@ -340,17 +673,90 @@ export default function SupportAgentChatPage() {
             const response = await supportApi.claimConversation(conversationId);
             const conversation = response.data?.data || response.data;
             setSelectedConversation(conversation);
+            
+            // Update conversation status in queue immediately
+            setConversations((prevConversations) => {
+                return prevConversations.map((conv) => {
+                    if (conv.conversationId === conversationId) {
+                        return { 
+                            ...conv, 
+                            status: conversation.status || "CLAIMED",
+                            claimedBy: conversation.claimedBy || userName,
+                            agentId: conversation.agentId || userName,
+                            claimedByAgent: conversation.claimedByAgent || userName
+                        };
+                    }
+                    return conv;
+                });
+            });
+            
             await loadMessages(conversationId, true);
             await loadCustomerContext(conversationId);
-            await loadQueue();
+            await loadQueue(); // Refresh queue to get latest data
             showSuccess("Conversation claimed successfully!");
         } catch (error) {
-            console.error("Error claiming conversation:", error);
+            // Detailed error logging
+            console.error("=== SUPPORT AGENT - CLAIM CONVERSATION ERROR ===");
+            console.error("Error object:", error);
+            console.error("Error type:", typeof error);
+            console.error("Error message:", error.message);
             console.error("Error response:", error.response);
-            const errorMessage = error.response?.data?.message 
-                || error.response?.data?.error 
-                || "Failed to claim conversation.";
-            showError(errorMessage);
+            console.error("Error response status:", error.response?.status);
+            console.error("Error response data:", error.response?.data);
+            console.error("Error response data type:", typeof error.response?.data);
+            console.error("Full error response:", JSON.stringify(error.response, null, 2));
+            
+            let errorMessage = "Failed to claim conversation.";
+            if (error.response?.data) {
+                const errorData = error.response.data;
+                console.log("Error data:", errorData);
+                console.log("Error data type:", typeof errorData);
+                
+                // Handle nested data structure (ApiResponse format)
+                const actualErrorData = errorData?.data || errorData;
+                console.log("Actual error data:", actualErrorData);
+                console.log("Actual error data type:", typeof actualErrorData);
+                
+                if (typeof actualErrorData === "string") {
+                    console.log("Error is string:", actualErrorData);
+                    errorMessage = actualErrorData;
+                } else if (actualErrorData?.message) {
+                    console.log("Error has message property:", actualErrorData.message);
+                    errorMessage = String(actualErrorData.message);
+                } else if (actualErrorData?.error) {
+                    console.log("Error has error property:", actualErrorData.error);
+                    // If error is an object, extract message from it
+                    if (typeof actualErrorData.error === "object" && actualErrorData.error.message) {
+                        errorMessage = String(actualErrorData.error.message);
+                    } else {
+                        errorMessage = String(actualErrorData.error);
+                    }
+                } else if (errorData?.message) {
+                    console.log("ErrorData has message property:", errorData.message);
+                    errorMessage = String(errorData.message);
+                } else if (errorData?.error) {
+                    console.log("ErrorData has error property:", errorData.error);
+                    // If error is an object, extract message from it
+                    if (typeof errorData.error === "object" && errorData.error.message) {
+                        errorMessage = String(errorData.error.message);
+                    } else {
+                        errorMessage = String(errorData.error);
+                    }
+                } else {
+                    console.log("Using fallback - converting to JSON string");
+                    errorMessage = typeof actualErrorData === "object" 
+                        ? JSON.stringify(actualErrorData) 
+                        : String(actualErrorData || "Failed to claim conversation.");
+                }
+            } else if (error.message) {
+                console.log("Using error.message:", error.message);
+                errorMessage = String(error.message);
+            }
+            
+            console.log("Final error message:", errorMessage);
+            console.log("Final error message type:", typeof errorMessage);
+            console.log("=== END ERROR LOG ===");
+            showError(String(errorMessage));
             // If claim fails, still try to load messages (might already be claimed by this agent)
             if (error.response?.status !== 403) {
                 try {
@@ -365,22 +771,35 @@ export default function SupportAgentChatPage() {
 
     const handleSelectConversation = async (conversation) => {
         console.log("Selecting conversation:", conversation);
-        // Don't auto-claim OPEN conversations - let agent manually claim them
-        // Just select the conversation and try to load messages
         setSelectedConversation(conversation);
+        
+        // Don't try to load messages for OPEN conversations - agent needs to claim first
+        if (conversation.status === "OPEN") {
+            console.log("OPEN conversation selected, agent needs to claim first");
+            setMessages([]);
+            setCustomerContext(null);
+            return;
+        }
+        
+        // For CLAIMED conversations, try to load messages
         try {
             await loadMessages(conversation.conversationId, true);
             await loadCustomerContext(conversation.conversationId);
         } catch (error) {
             console.error("Error loading messages:", error);
             // If access denied for CLAIMED conversation, show error
-            if (error.response?.status === 403 || error.response?.data?.message?.includes("not claimed")) {
-                if (conversation.status === "CLAIMED") {
-                    showError("You don't have access to this conversation. Please claim it first.");
-                } else if (conversation.status === "OPEN") {
-                    // For OPEN conversations, silently fail - agent needs to claim first
-                    console.log("OPEN conversation selected, agent needs to claim first");
+            if (error.response?.status === 403) {
+                let errorMessage = "You don't have access to this conversation. Please claim it first.";
+                // Check if error message contains "not claimed"
+                const errorData = error.response?.data;
+                const actualErrorData = errorData?.data || errorData;
+                if (actualErrorData?.error?.message?.includes("not claimed") || 
+                    actualErrorData?.message?.includes("not claimed") ||
+                    errorData?.error?.message?.includes("not claimed") ||
+                    errorData?.message?.includes("not claimed")) {
+                    errorMessage = "You don't have access to this conversation. Please claim it first.";
                 }
+                showError(errorMessage);
             } else {
                 // Still show the conversation even if messages fail to load
                 console.warn("Failed to load messages but keeping conversation selected");
@@ -397,7 +816,7 @@ export default function SupportAgentChatPage() {
         setSendingMessage(true);
         
         // Optimistic update: add temporary message immediately
-        const tempMessageId = `temp_${Date.now()}`;
+        const tempMessageId = `temp_${Date.now()}_${Math.random()}`;
         const optimisticMessage = {
             messageId: tempMessageId,
             conversationId: selectedConversation.conversationId,
@@ -405,6 +824,7 @@ export default function SupportAgentChatPage() {
             type: "TEXT",
             text: messageToSend,
             createdAt: new Date().toISOString(),
+            isTemporary: true
         };
         
         setMessages((prevMessages) => {
@@ -414,21 +834,23 @@ export default function SupportAgentChatPage() {
         
         try {
             const response = await supportApi.agentSendText(selectedConversation.conversationId, messageToSend);
+            console.log("Message sent successfully, WebSocket will broadcast it");
             
-            // Replace optimistic message with real message from server
-            const sentMessage = response.data?.data || response.data;
-            if (sentMessage) {
+            // WebSocket will replace the temporary message with the real one
+            // If WebSocket doesn't receive it within 3 seconds, remove temporary message as fallback
+            setTimeout(() => {
                 setMessages((prevMessages) => {
-                    // Remove optimistic message and add real one
-                    const filtered = prevMessages.filter(msg => msg.messageId !== tempMessageId);
-                    const exists = filtered.some(msg => msg.messageId === sentMessage.messageId);
-                    if (exists) {
-                        return filtered;
+                    // Only remove this specific temporary message if it still exists
+                    // (WebSocket should have replaced it by now)
+                    const stillTemp = prevMessages.find(msg => msg.messageId === tempMessageId);
+                    if (stillTemp) {
+                        console.warn("Temporary message not replaced by WebSocket, removing:", tempMessageId);
+                        return prevMessages.filter(msg => msg.messageId !== tempMessageId);
                     }
-                    const updated = [...filtered, sentMessage];
-                    return updated.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+                    return prevMessages;
                 });
-            }
+            }, 3000);
+            // Don't reload messages - WebSocket will handle all updates
         } catch (error) {
             // Remove optimistic message on error
             setMessages((prevMessages) => {
@@ -436,14 +858,70 @@ export default function SupportAgentChatPage() {
             });
             // Restore message text
             setMessageText(messageToSend);
-            console.error("Error sending message:", error);
+            // Detailed error logging
+            console.error("=== SUPPORT AGENT - SEND MESSAGE ERROR ===");
+            console.error("Error object:", error);
+            console.error("Error type:", typeof error);
+            console.error("Error message:", error.message);
             console.error("Error response:", error.response);
-            const errorMessage = error.response?.data?.message 
-                || error.response?.data?.error 
-                || "Failed to send message.";
+            console.error("Error response status:", error.response?.status);
+            console.error("Error response data:", error.response?.data);
+            console.error("Error response data type:", typeof error.response?.data);
+            console.error("Full error response:", JSON.stringify(error.response, null, 2));
+            
+            let errorMessage = "Failed to send message.";
+            if (error.response?.data) {
+                const errorData = error.response.data;
+                console.log("Error data:", errorData);
+                console.log("Error data type:", typeof errorData);
+                
+                // Handle nested data structure (ApiResponse format)
+                const actualErrorData = errorData?.data || errorData;
+                console.log("Actual error data:", actualErrorData);
+                console.log("Actual error data type:", typeof actualErrorData);
+                
+                if (typeof actualErrorData === "string") {
+                    console.log("Error is string:", actualErrorData);
+                    errorMessage = actualErrorData;
+                } else if (actualErrorData?.message) {
+                    console.log("Error has message property:", actualErrorData.message);
+                    errorMessage = String(actualErrorData.message);
+                } else if (actualErrorData?.error) {
+                    console.log("Error has error property:", actualErrorData.error);
+                    // If error is an object, extract message from it
+                    if (typeof actualErrorData.error === "object" && actualErrorData.error.message) {
+                        errorMessage = String(actualErrorData.error.message);
+                    } else {
+                        errorMessage = String(actualErrorData.error);
+                    }
+                } else if (errorData?.message) {
+                    console.log("ErrorData has message property:", errorData.message);
+                    errorMessage = String(errorData.message);
+                } else if (errorData?.error) {
+                    console.log("ErrorData has error property:", errorData.error);
+                    // If error is an object, extract message from it
+                    if (typeof errorData.error === "object" && errorData.error.message) {
+                        errorMessage = String(errorData.error.message);
+                    } else {
+                        errorMessage = String(errorData.error);
+                    }
+                } else {
+                    console.log("Using fallback - converting to JSON string");
+                    errorMessage = typeof actualErrorData === "object" 
+                        ? JSON.stringify(actualErrorData) 
+                        : String(actualErrorData || "Failed to send message.");
+                }
+            } else if (error.message) {
+                console.log("Using error.message:", error.message);
+                errorMessage = String(error.message);
+            }
+            
+            console.log("Final error message:", errorMessage);
+            console.log("Final error message type:", typeof errorMessage);
+            console.log("=== END ERROR LOG ===");
             
             // If access denied (conversation not claimed), try to claim it
-            if (error.response?.status === 403 || errorMessage.includes("not claimed")) {
+            if (error.response?.status === 403 || String(errorMessage).includes("not claimed")) {
                 if (selectedConversation.status === "OPEN") {
                     try {
                         await handleClaimConversation(selectedConversation.conversationId);
@@ -472,7 +950,7 @@ export default function SupportAgentChatPage() {
                     showError("You don't have access to this conversation. Please claim it first.");
                 }
             } else {
-                showError(errorMessage);
+                showError(String(errorMessage));
             }
             
             // Refresh conversation status
@@ -508,8 +986,68 @@ export default function SupportAgentChatPage() {
                 fileInputRef.current.value = "";
             }
         } catch (error) {
-            console.error("Error uploading file:", error);
-            showError(error.response?.data?.message || "Failed to upload file.");
+            // Detailed error logging
+            console.error("=== SUPPORT AGENT - FILE UPLOAD ERROR ===");
+            console.error("Error object:", error);
+            console.error("Error type:", typeof error);
+            console.error("Error message:", error.message);
+            console.error("Error response:", error.response);
+            console.error("Error response status:", error.response?.status);
+            console.error("Error response data:", error.response?.data);
+            console.error("Error response data type:", typeof error.response?.data);
+            console.error("Full error response:", JSON.stringify(error.response, null, 2));
+            
+            let errorMessage = "Failed to upload file.";
+            if (error.response?.data) {
+                const errorData = error.response.data;
+                console.log("Error data:", errorData);
+                console.log("Error data type:", typeof errorData);
+                
+                // Handle nested data structure (ApiResponse format)
+                const actualErrorData = errorData?.data || errorData;
+                console.log("Actual error data:", actualErrorData);
+                console.log("Actual error data type:", typeof actualErrorData);
+                
+                if (typeof actualErrorData === "string") {
+                    console.log("Error is string:", actualErrorData);
+                    errorMessage = actualErrorData;
+                } else if (actualErrorData?.message) {
+                    console.log("Error has message property:", actualErrorData.message);
+                    errorMessage = String(actualErrorData.message);
+                } else if (actualErrorData?.error) {
+                    console.log("Error has error property:", actualErrorData.error);
+                    // If error is an object, extract message from it
+                    if (typeof actualErrorData.error === "object" && actualErrorData.error.message) {
+                        errorMessage = String(actualErrorData.error.message);
+                    } else {
+                        errorMessage = String(actualErrorData.error);
+                    }
+                } else if (errorData?.message) {
+                    console.log("ErrorData has message property:", errorData.message);
+                    errorMessage = String(errorData.message);
+                } else if (errorData?.error) {
+                    console.log("ErrorData has error property:", errorData.error);
+                    // If error is an object, extract message from it
+                    if (typeof errorData.error === "object" && errorData.error.message) {
+                        errorMessage = String(errorData.error.message);
+                    } else {
+                        errorMessage = String(errorData.error);
+                    }
+                } else {
+                    console.log("Using fallback - converting to JSON string");
+                    errorMessage = typeof actualErrorData === "object" 
+                        ? JSON.stringify(actualErrorData) 
+                        : String(actualErrorData || "Failed to upload file.");
+                }
+            } else if (error.message) {
+                console.log("Using error.message:", error.message);
+                errorMessage = String(error.message);
+            }
+            
+            console.log("Final error message:", errorMessage);
+            console.log("Final error message type:", typeof errorMessage);
+            console.log("=== END ERROR LOG ===");
+            showError(String(errorMessage));
         } finally {
             setUploadingFile(false);
         }
@@ -518,16 +1056,88 @@ export default function SupportAgentChatPage() {
     const handleCloseConversation = async () => {
         if (!selectedConversation) return;
 
+        const conversationId = selectedConversation.conversationId;
         try {
-            await supportApi.closeConversation(selectedConversation.conversationId);
+            await supportApi.closeConversation(conversationId);
+            
+            // Update conversation status in queue immediately
+            setConversations((prevConversations) => {
+                return prevConversations.map((conv) => {
+                    if (conv.conversationId === conversationId) {
+                        return { ...conv, status: "CLOSED" };
+                    }
+                    return conv;
+                });
+            });
+            
             setSelectedConversation(null);
             setMessages([]);
             setCustomerContext(null);
-            await loadQueue();
+            await loadQueue(); // Refresh queue to get latest data
             showSuccess("Conversation closed successfully!");
         } catch (error) {
-            console.error("Error closing conversation:", error);
-            showError(error.response?.data?.message || "Failed to close conversation.");
+            // Detailed error logging
+            console.error("=== SUPPORT AGENT - CLOSE CONVERSATION ERROR ===");
+            console.error("Error object:", error);
+            console.error("Error type:", typeof error);
+            console.error("Error message:", error.message);
+            console.error("Error response:", error.response);
+            console.error("Error response status:", error.response?.status);
+            console.error("Error response data:", error.response?.data);
+            console.error("Error response data type:", typeof error.response?.data);
+            console.error("Full error response:", JSON.stringify(error.response, null, 2));
+            
+            let errorMessage = "Failed to close conversation.";
+            if (error.response?.data) {
+                const errorData = error.response.data;
+                console.log("Error data:", errorData);
+                console.log("Error data type:", typeof errorData);
+                
+                // Handle nested data structure (ApiResponse format)
+                const actualErrorData = errorData?.data || errorData;
+                console.log("Actual error data:", actualErrorData);
+                console.log("Actual error data type:", typeof actualErrorData);
+                
+                if (typeof actualErrorData === "string") {
+                    console.log("Error is string:", actualErrorData);
+                    errorMessage = actualErrorData;
+                } else if (actualErrorData?.message) {
+                    console.log("Error has message property:", actualErrorData.message);
+                    errorMessage = String(actualErrorData.message);
+                } else if (actualErrorData?.error) {
+                    console.log("Error has error property:", actualErrorData.error);
+                    // If error is an object, extract message from it
+                    if (typeof actualErrorData.error === "object" && actualErrorData.error.message) {
+                        errorMessage = String(actualErrorData.error.message);
+                    } else {
+                        errorMessage = String(actualErrorData.error);
+                    }
+                } else if (errorData?.message) {
+                    console.log("ErrorData has message property:", errorData.message);
+                    errorMessage = String(errorData.message);
+                } else if (errorData?.error) {
+                    console.log("ErrorData has error property:", errorData.error);
+                    // If error is an object, extract message from it
+                    if (typeof errorData.error === "object" && errorData.error.message) {
+                        errorMessage = String(errorData.error.message);
+                    } else {
+                        errorMessage = String(errorData.error);
+                    }
+                } else {
+                    console.log("Using fallback - converting to JSON string");
+                    errorMessage = typeof actualErrorData === "object" 
+                        ? JSON.stringify(actualErrorData) 
+                        : String(actualErrorData || "Failed to close conversation.");
+                }
+            } else if (error.message) {
+                console.log("Using error.message:", error.message);
+                errorMessage = String(error.message);
+            }
+            
+            console.log("Final error message:", errorMessage);
+            console.log("Final error message type:", typeof errorMessage);
+            console.log("=== END ERROR LOG ===");
+            showError(String(errorMessage));
         }
     };
 
@@ -544,8 +1154,68 @@ export default function SupportAgentChatPage() {
             document.body.removeChild(link);
             window.URL.revokeObjectURL(url);
         } catch (error) {
-            console.error("Error downloading attachment:", error);
-            showError(error.response?.data?.message || "Failed to download attachment.");
+            // Detailed error logging
+            console.error("=== SUPPORT AGENT - DOWNLOAD ATTACHMENT ERROR ===");
+            console.error("Error object:", error);
+            console.error("Error type:", typeof error);
+            console.error("Error message:", error.message);
+            console.error("Error response:", error.response);
+            console.error("Error response status:", error.response?.status);
+            console.error("Error response data:", error.response?.data);
+            console.error("Error response data type:", typeof error.response?.data);
+            console.error("Full error response:", JSON.stringify(error.response, null, 2));
+            
+            let errorMessage = "Failed to download attachment.";
+            if (error.response?.data) {
+                const errorData = error.response.data;
+                console.log("Error data:", errorData);
+                console.log("Error data type:", typeof errorData);
+                
+                // Handle nested data structure (ApiResponse format)
+                const actualErrorData = errorData?.data || errorData;
+                console.log("Actual error data:", actualErrorData);
+                console.log("Actual error data type:", typeof actualErrorData);
+                
+                if (typeof actualErrorData === "string") {
+                    console.log("Error is string:", actualErrorData);
+                    errorMessage = actualErrorData;
+                } else if (actualErrorData?.message) {
+                    console.log("Error has message property:", actualErrorData.message);
+                    errorMessage = String(actualErrorData.message);
+                } else if (actualErrorData?.error) {
+                    console.log("Error has error property:", actualErrorData.error);
+                    // If error is an object, extract message from it
+                    if (typeof actualErrorData.error === "object" && actualErrorData.error.message) {
+                        errorMessage = String(actualErrorData.error.message);
+                    } else {
+                        errorMessage = String(actualErrorData.error);
+                    }
+                } else if (errorData?.message) {
+                    console.log("ErrorData has message property:", errorData.message);
+                    errorMessage = String(errorData.message);
+                } else if (errorData?.error) {
+                    console.log("ErrorData has error property:", errorData.error);
+                    // If error is an object, extract message from it
+                    if (typeof errorData.error === "object" && errorData.error.message) {
+                        errorMessage = String(errorData.error.message);
+                    } else {
+                        errorMessage = String(errorData.error);
+                    }
+                } else {
+                    console.log("Using fallback - converting to JSON string");
+                    errorMessage = typeof actualErrorData === "object" 
+                        ? JSON.stringify(actualErrorData) 
+                        : String(actualErrorData || "Failed to download attachment.");
+                }
+            } else if (error.message) {
+                console.log("Using error.message:", error.message);
+                errorMessage = String(error.message);
+            }
+            
+            console.log("Final error message:", errorMessage);
+            console.log("Final error message type:", typeof errorMessage);
+            console.log("=== END ERROR LOG ===");
+            showError(String(errorMessage));
         }
     };
 
@@ -765,58 +1435,94 @@ export default function SupportAgentChatPage() {
                             conversations.map((conv) => (
                                 <div
                                     key={conv.conversationId}
-                                    onClick={() => handleSelectConversation(conv)}
                                     style={{
                                         padding: "1rem",
                                         marginBottom: "0.5rem",
                                         background: selectedConversation?.conversationId === conv.conversationId ? "#667eea" : "#f7fafc",
                                         color: selectedConversation?.conversationId === conv.conversationId ? "#fff" : "#2d3748",
                                         borderRadius: "4px",
-                                        cursor: "pointer",
                                         transition: "all 0.2s",
                                         border: selectedConversation?.conversationId === conv.conversationId ? "2px solid #667eea" : "1px solid #e2e8f0",
                                     }}
-                                    onMouseEnter={(e) => {
-                                        if (selectedConversation?.conversationId !== conv.conversationId) {
-                                            e.currentTarget.style.background = "#e2e8f0";
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        if (selectedConversation?.conversationId !== conv.conversationId) {
-                                            e.currentTarget.style.background = "#f7fafc";
-                                        }
-                                    }}
                                 >
-                                    <div style={{ fontWeight: 600, fontSize: "0.95rem", marginBottom: "0.5rem" }}>
-                                        {conv.customerUserId ? (
-                                            <>
-                                                {conv.customerName ? (
-                                                    <div style={{ fontSize: "1rem", marginBottom: "0.25rem" }}>{conv.customerName}</div>
-                                                ) : null}
-                                                <div style={{ fontSize: "0.8rem", opacity: 0.7, fontWeight: 400 }}>
-                                                    {conv.customerEmail || `User ID: ${conv.customerUserId.substring(0, 8)}...`}
-                                                </div>
-                                            </>
-                                        ) : (
-                                            <div>Guest: {conv.guestToken?.substring(0, 12)}...</div>
+                                    <div 
+                                        onClick={() => handleSelectConversation(conv)}
+                                        style={{
+                                            cursor: "pointer",
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            if (selectedConversation?.conversationId !== conv.conversationId) {
+                                                e.currentTarget.parentElement.style.background = "#e2e8f0";
+                                            }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            if (selectedConversation?.conversationId !== conv.conversationId) {
+                                                e.currentTarget.parentElement.style.background = "#f7fafc";
+                                            }
+                                        }}
+                                    >
+                                        <div style={{ fontWeight: 600, fontSize: "0.95rem", marginBottom: "0.5rem" }}>
+                                            {conv.customerUserId ? (
+                                                <>
+                                                    {conv.customerName ? (
+                                                        <div style={{ fontSize: "1rem", marginBottom: "0.25rem" }}>{conv.customerName}</div>
+                                                    ) : null}
+                                                    <div style={{ fontSize: "0.8rem", opacity: 0.7, fontWeight: 400 }}>
+                                                        {conv.customerEmail || `User ID: ${conv.customerUserId.substring(0, 8)}...`}
+                                                    </div>
+                                                </>
+                                            ) : (
+                                                <div>Guest: {conv.guestToken?.substring(0, 12)}...</div>
+                                            )}
+                                        </div>
+                                        <div style={{ 
+                                            display: "inline-block",
+                                            padding: "0.25rem 0.5rem",
+                                            borderRadius: "4px",
+                                            fontSize: "0.75rem",
+                                            fontWeight: 600,
+                                            background: conv.status === "OPEN" ? "#48bb78" : conv.status === "CLAIMED" ? "#667eea" : "#a0aec0",
+                                            color: "#fff",
+                                            marginBottom: "0.5rem"
+                                        }}>
+                                            {conv.status}
+                                        </div>
+                                        {conv.lastMessageAt && (
+                                            <div style={{ fontSize: "0.75rem", opacity: 0.7, marginTop: "0.5rem" }}>
+                                                {new Date(conv.lastMessageAt).toLocaleString()}
+                                            </div>
                                         )}
                                     </div>
-                                    <div style={{ 
-                                        display: "inline-block",
-                                        padding: "0.25rem 0.5rem",
-                                        borderRadius: "4px",
-                                        fontSize: "0.75rem",
-                                        fontWeight: 600,
-                                        background: conv.status === "OPEN" ? "#48bb78" : conv.status === "CLAIMED" ? "#667eea" : "#a0aec0",
-                                        color: "#fff",
-                                        marginBottom: "0.5rem"
-                                    }}>
-                                        {conv.status}
-                                    </div>
-                                    {conv.lastMessageAt && (
-                                        <div style={{ fontSize: "0.75rem", opacity: 0.7, marginTop: "0.5rem" }}>
-                                            {new Date(conv.lastMessageAt).toLocaleString()}
-                                        </div>
+                                    {conv.status === "OPEN" && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleClaimConversation(conv.conversationId);
+                                            }}
+                                            style={{
+                                                width: "100%",
+                                                marginTop: "0.5rem",
+                                                padding: "0.5rem 1rem",
+                                                background: "#48bb78",
+                                                color: "#fff",
+                                                border: "none",
+                                                borderRadius: "4px",
+                                                fontSize: "0.85rem",
+                                                fontWeight: 600,
+                                                cursor: "pointer",
+                                                transition: "all 0.2s",
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.background = "#38a169";
+                                                e.currentTarget.style.transform = "scale(1.02)";
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.background = "#48bb78";
+                                                e.currentTarget.style.transform = "scale(1)";
+                                            }}
+                                        >
+                                            Claim Conversation
+                                        </button>
                                     )}
                                 </div>
                             ))
@@ -866,22 +1572,88 @@ export default function SupportAgentChatPage() {
                                         {selectedConversation.status}
                                     </div>
                                 </div>
-                                <button
-                                    onClick={handleCloseConversation}
-                                    disabled={selectedConversation.status === "CLOSED"}
-                                    style={{
-                                        padding: "0.5rem 1rem",
-                                        background: selectedConversation.status === "CLOSED" ? "#e2e8f0" : "#e53e3e",
-                                        color: selectedConversation.status === "CLOSED" ? "#718096" : "#fff",
-                                        border: "none",
-                                        borderRadius: "4px",
-                                        fontSize: "0.85rem",
-                                        cursor: selectedConversation.status === "CLOSED" ? "not-allowed" : "pointer",
-                                    }}
-                                >
-                                    Close Conversation
-                                </button>
+                                <div style={{ display: "flex", gap: "0.5rem" }}>
+                                    {selectedConversation.status === "OPEN" && (
+                                        <button
+                                            onClick={() => handleClaimConversation(selectedConversation.conversationId)}
+                                            style={{
+                                                padding: "0.5rem 1rem",
+                                                background: "#48bb78",
+                                                color: "#fff",
+                                                border: "none",
+                                                borderRadius: "4px",
+                                                fontSize: "0.85rem",
+                                                fontWeight: 600,
+                                                cursor: "pointer",
+                                                transition: "all 0.2s",
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.background = "#38a169";
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.background = "#48bb78";
+                                            }}
+                                        >
+                                            Claim Conversation
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={handleCloseConversation}
+                                        disabled={selectedConversation.status === "CLOSED"}
+                                        style={{
+                                            padding: "0.5rem 1rem",
+                                            background: selectedConversation.status === "CLOSED" ? "#e2e8f0" : "#e53e3e",
+                                            color: selectedConversation.status === "CLOSED" ? "#718096" : "#fff",
+                                            border: "none",
+                                            borderRadius: "4px",
+                                            fontSize: "0.85rem",
+                                            cursor: selectedConversation.status === "CLOSED" ? "not-allowed" : "pointer",
+                                        }}
+                                    >
+                                        Close Conversation
+                                    </button>
+                                </div>
                             </div>
+                            
+                            {/* Claim Banner for OPEN conversations */}
+                            {selectedConversation.status === "OPEN" && (
+                                <div style={{ 
+                                    marginBottom: "1rem", 
+                                    padding: "1rem", 
+                                    background: "#feebc8", 
+                                    borderRadius: "4px", 
+                                    border: "1px solid #fbd38d",
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center"
+                                }}>
+                                    <div style={{ color: "#c05621", fontSize: "0.9rem", fontWeight: 500 }}>
+                                        ⚠️ This conversation is not claimed. Please claim it to start chatting.
+                                    </div>
+                                    <button
+                                        onClick={() => handleClaimConversation(selectedConversation.conversationId)}
+                                        style={{
+                                            padding: "0.5rem 1rem",
+                                            background: "#48bb78",
+                                            color: "#fff",
+                                            border: "none",
+                                            borderRadius: "4px",
+                                            fontSize: "0.85rem",
+                                            fontWeight: 600,
+                                            cursor: "pointer",
+                                            transition: "all 0.2s",
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.background = "#38a169";
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.background = "#48bb78";
+                                        }}
+                                    >
+                                        Claim Now
+                                    </button>
+                                </div>
+                            )}
 
                             {/* Customer Context */}
                             {customerContext && (
