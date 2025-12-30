@@ -57,15 +57,20 @@ export const subscribeToConversation = (client, conversationId, onMessage) => {
         return null;
     }
 
-    const subscription = client.subscribe(`/topic/support/${conversationId}`, (message) => {
+    const topic = `/topic/support/${conversationId}`;
+    console.log(`Subscribing to topic: ${topic}`);
+    
+    const subscription = client.subscribe(topic, (message) => {
         try {
             const data = JSON.parse(message.body);
+            console.log(`Received message on ${topic}:`, data);
             onMessage(data);
         } catch (error) {
             console.error('Error parsing WebSocket message:', error);
         }
     });
 
+    console.log(`Successfully subscribed to ${topic}`);
     return subscription;
 };
 
@@ -100,6 +105,7 @@ export const sendMessageViaWebSocket = (client, conversationId, text, guestToken
         guestToken,
     };
 
+    console.log(`Sending message via WebSocket to ${destination}:`, payload);
     client.publish({
         destination,
         body: JSON.stringify(payload),
@@ -120,6 +126,7 @@ export const sendAgentMessageViaWebSocket = (client, conversationId, text) => {
         text,
     };
 
+    console.log(`Sending agent message via WebSocket to ${destination}:`, payload);
     client.publish({
         destination,
         body: JSON.stringify(payload),

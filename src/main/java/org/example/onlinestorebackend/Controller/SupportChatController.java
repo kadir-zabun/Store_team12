@@ -8,6 +8,8 @@ import org.example.onlinestorebackend.Dto.SupportMessageDto;
 import org.example.onlinestorebackend.Entity.SupportAttachment;
 import org.example.onlinestorebackend.Entity.SupportConversation;
 import org.example.onlinestorebackend.Entity.SupportMessage;
+import org.example.onlinestorebackend.Entity.User;
+import org.example.onlinestorebackend.Repository.UserRepository;
 import org.example.onlinestorebackend.Service.SupportChatService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -28,6 +30,7 @@ public class SupportChatController {
 
     private final SupportChatService supportChatService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final UserRepository userRepository;
 
     // --- Customer / Guest ---
 
@@ -235,11 +238,24 @@ public class SupportChatController {
     }
 
     private SupportMessageDto toDto(SupportMessage m) {
+        String senderName = null;
+        // Get sender name if sender is a user (not guest)
+        if (m.getSenderType() != null && (m.getSenderType().equals("CUSTOMER") || m.getSenderType().equals("SUPPORT_AGENT"))) {
+            try {
+                User user = userRepository.findByUserId(m.getSenderId()).orElse(null);
+                if (user != null) {
+                    senderName = user.getName() != null ? user.getName() : user.getUsername();
+                }
+            } catch (Exception e) {
+                // Ignore if user not found
+            }
+        }
         return new SupportMessageDto(
                 m.getMessageId(),
                 m.getConversationId(),
                 m.getSenderType(),
                 m.getSenderId(),
+                senderName,
                 m.getType(),
                 m.getText(),
                 m.getAttachmentId(),

@@ -6,6 +6,8 @@ import org.example.onlinestorebackend.Dto.SupportConversationDto;
 import org.example.onlinestorebackend.Dto.SupportMessageDto;
 import org.example.onlinestorebackend.Entity.SupportConversation;
 import org.example.onlinestorebackend.Entity.SupportMessage;
+import org.example.onlinestorebackend.Entity.User;
+import org.example.onlinestorebackend.Repository.UserRepository;
 import org.example.onlinestorebackend.Service.SupportChatService;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -19,6 +21,7 @@ public class SupportChatWsController {
 
     private final SupportChatService supportChatService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final UserRepository userRepository;
 
     /**
      * STOMP send destination: /app/support/send-text
@@ -36,11 +39,23 @@ public class SupportChatWsController {
         String guestToken = (username == null) ? (request != null ? request.getGuestToken() : null) : null;
 
         SupportMessage saved = supportChatService.sendTextAsCustomerOrGuest(conversationId, username, guestToken, text);
+        String senderName = null;
+        if (saved.getSenderType() != null && (saved.getSenderType().equals("CUSTOMER") || saved.getSenderType().equals("SUPPORT_AGENT"))) {
+            try {
+                User user = userRepository.findByUserId(saved.getSenderId()).orElse(null);
+                if (user != null) {
+                    senderName = user.getName() != null ? user.getName() : user.getUsername();
+                }
+            } catch (Exception e) {
+                // Ignore if user not found
+            }
+        }
         SupportMessageDto dto = new SupportMessageDto(
                 saved.getMessageId(),
                 saved.getConversationId(),
                 saved.getSenderType(),
                 saved.getSenderId(),
+                senderName,
                 saved.getType(),
                 saved.getText(),
                 saved.getAttachmentId(),
@@ -71,11 +86,23 @@ public class SupportChatWsController {
         }
 
         SupportMessage saved = supportChatService.sendTextAsAgent(conversationId, username, text);
+        String senderName = null;
+        if (saved.getSenderType() != null && (saved.getSenderType().equals("CUSTOMER") || saved.getSenderType().equals("SUPPORT_AGENT"))) {
+            try {
+                User user = userRepository.findByUserId(saved.getSenderId()).orElse(null);
+                if (user != null) {
+                    senderName = user.getName() != null ? user.getName() : user.getUsername();
+                }
+            } catch (Exception e) {
+                // Ignore if user not found
+            }
+        }
         SupportMessageDto dto = new SupportMessageDto(
                 saved.getMessageId(),
                 saved.getConversationId(),
                 saved.getSenderType(),
                 saved.getSenderId(),
+                senderName,
                 saved.getType(),
                 saved.getText(),
                 saved.getAttachmentId(),

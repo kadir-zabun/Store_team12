@@ -79,8 +79,10 @@ export default function CustomerChatWidget() {
                                 if (exists) {
                                     return prev;
                                 }
+                                // Remove optimistic message if exists (same text and temp ID)
+                                const filtered = prev.filter((m) => !m.messageId.startsWith("temp_"));
                                 // Add new message and sort by createdAt
-                                const updated = [...prev, message];
+                                const updated = [...filtered, message];
                                 return updated.sort((a, b) => {
                                     const dateA = new Date(a.createdAt);
                                     const dateB = new Date(b.createdAt);
@@ -197,12 +199,49 @@ export default function CustomerChatWidget() {
         e.preventDefault();
         if (!messageText.trim() || !conversationId) return;
 
+        const token = localStorage.getItem("access_token");
+        const text = messageText.trim();
+        const tempMessageId = `temp_${Date.now()}`;
+        
+        // Get current user name for optimistic update
+        let currentUserName = null;
+        if (token) {
+            try {
+                const payloadBase64 = token.split(".")[1];
+                const normalized = payloadBase64.replace(/-/g, "+").replace(/_/g, "/");
+                const payloadJson = atob(normalized);
+                const payload = JSON.parse(payloadJson);
+                currentUserName = payload.name || payload.sub || payload.username;
+            } catch (e) {
+                // Ignore
+            }
+        }
+        
+        // Optimistic update - add message immediately
+        const optimisticMessage = {
+            messageId: tempMessageId,
+            conversationId: conversationId,
+            senderType: token ? "CUSTOMER" : "GUEST",
+            senderId: token ? "temp" : guestToken,
+            senderName: currentUserName,
+            type: "TEXT",
+            text: text,
+            attachmentId: null,
+            createdAt: new Date().toISOString(),
+        };
+        
+        setMessages((prev) => {
+            const updated = [...prev, optimisticMessage];
+            return updated.sort((a, b) => {
+                const dateA = new Date(a.createdAt);
+                const dateB = new Date(b.createdAt);
+                return dateA - dateB;
+            });
+        });
+        setMessageText("");
         setSendingMessage(true);
-        try {
-            const token = localStorage.getItem("access_token");
-            const text = messageText.trim();
-            setMessageText("");
 
+        try {
             // Try WebSocket first, fallback to REST API
             if (wsClientRef.current && wsClientRef.current.connected) {
                 const sent = sendMessageViaWebSocket(
@@ -212,7 +251,7 @@ export default function CustomerChatWidget() {
                     token ? null : guestToken
                 );
                 if (sent) {
-                    // Message will be received via WebSocket subscription
+                    // Message will be received via WebSocket subscription and replace optimistic one
                     setSendingMessage(false);
                     return;
                 }
@@ -223,6 +262,8 @@ export default function CustomerChatWidget() {
             // Don't reload messages - wait for WebSocket message
         } catch (error) {
             console.error("Error sending message:", error);
+            // Remove optimistic message on error
+            setMessages((prev) => prev.filter((m) => m.messageId !== tempMessageId));
             showError("Failed to send message. Please try again.");
         } finally {
             setSendingMessage(false);
@@ -392,6 +433,11 @@ export default function CustomerChatWidget() {
                                             boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
                                         }}
                                     >
+                                        {msg.senderType === "SUPPORT_AGENT" && (
+                                            <div style={{ fontSize: "0.75rem", opacity: 0.8, marginBottom: "0.25rem", fontWeight: 600 }}>
+                                                {msg.senderName || "Support Agent"}
+                                            </div>
+                                        )}
                                         {msg.type === "TEXT" ? (
                                             <div style={{ fontSize: "0.9rem" }}>{msg.text}</div>
                                         ) : (

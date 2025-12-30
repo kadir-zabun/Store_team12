@@ -159,8 +159,10 @@ export default function SupportAgentChatPage() {
                                 if (exists) {
                                     return prev;
                                 }
+                                // Remove optimistic message if exists (same text and temp ID)
+                                const filtered = prev.filter((m) => !m.messageId.startsWith("temp_"));
                                 // Add new message and sort by createdAt
-                                const updated = [...prev, message];
+                                const updated = [...filtered, message];
                                 return updated.sort((a, b) => {
                                     const dateA = new Date(a.createdAt);
                                     const dateB = new Date(b.createdAt);
@@ -271,11 +273,49 @@ export default function SupportAgentChatPage() {
             return;
         }
 
+        const text = messageText.trim();
+        const tempMessageId = `temp_${Date.now()}`;
+        
+        // Get current user name for optimistic update
+        const token = localStorage.getItem("access_token");
+        let currentUserName = null;
+        if (token) {
+            try {
+                const payloadBase64 = token.split(".")[1];
+                const normalized = payloadBase64.replace(/-/g, "+").replace(/_/g, "/");
+                const payloadJson = atob(normalized);
+                const payload = JSON.parse(payloadJson);
+                currentUserName = payload.sub || payload.name || payload.username;
+            } catch (e) {
+                // Ignore
+            }
+        }
+        
+        // Optimistic update - add message immediately
+        const optimisticMessage = {
+            messageId: tempMessageId,
+            conversationId: selectedConversation.conversationId,
+            senderType: "SUPPORT_AGENT",
+            senderId: "temp",
+            senderName: currentUserName,
+            type: "TEXT",
+            text: text,
+            attachmentId: null,
+            createdAt: new Date().toISOString(),
+        };
+        
+        setMessages((prev) => {
+            const updated = [...prev, optimisticMessage];
+            return updated.sort((a, b) => {
+                const dateA = new Date(a.createdAt);
+                const dateB = new Date(b.createdAt);
+                return dateA - dateB;
+            });
+        });
+        setMessageText("");
         setSendingMessage(true);
-        try {
-            const text = messageText.trim();
-            setMessageText("");
 
+        try {
             // Try WebSocket first, fallback to REST API
             if (wsClientRef.current && wsClientRef.current.connected) {
                 const sent = sendAgentMessageViaWebSocket(
@@ -284,7 +324,7 @@ export default function SupportAgentChatPage() {
                     text
                 );
                 if (sent) {
-                    // Message will be received via WebSocket subscription
+                    // Message will be received via WebSocket subscription and replace optimistic one
                     setSendingMessage(false);
                     return;
                 }
@@ -295,6 +335,8 @@ export default function SupportAgentChatPage() {
             // Don't reload messages - wait for WebSocket message
         } catch (error) {
             console.error("Error sending message:", error);
+            // Remove optimistic message on error
+            setMessages((prev) => prev.filter((m) => m.messageId !== tempMessageId));
             showError(error.response?.data?.message || "Failed to send message.");
         } finally {
             setSendingMessage(false);
@@ -581,8 +623,12 @@ export default function SupportAgentChatPage() {
                                                     boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
                                                 }}
                                             >
-                                                <div style={{ fontSize: "0.85rem", marginBottom: "0.25rem" }}>
-                                                    {msg.senderType === "SUPPORT_AGENT" ? "You" : msg.senderType === "CUSTOMER" ? "Customer" : "Guest"}
+                                                <div style={{ fontSize: "0.85rem", marginBottom: "0.25rem", fontWeight: 600 }}>
+                                                    {msg.senderType === "SUPPORT_AGENT" 
+                                                        ? "You" 
+                                                        : msg.senderType === "CUSTOMER" 
+                                                            ? (msg.senderName || "Customer")
+                                                            : "Guest"}
                                                 </div>
                                                 {msg.type === "TEXT" ? (
                                                     <div style={{ fontSize: "0.9rem" }}>{msg.text}</div>

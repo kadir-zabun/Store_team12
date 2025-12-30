@@ -14,6 +14,7 @@ public class SupportMessageDto {
     private String conversationId;
     private String senderType;
     private String senderId;
+    private String senderName; // Username for authenticated users, null for guests
     private String type;
     private String text;
     private String attachmentId;
