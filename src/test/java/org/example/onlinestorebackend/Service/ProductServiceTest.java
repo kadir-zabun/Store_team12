@@ -56,7 +56,6 @@ class ProductServiceTest {
 
     private Product product;
     private Category category;
-    private User owner;
 
     @BeforeEach
     void setUp() {
@@ -68,16 +67,12 @@ class ProductServiceTest {
         product.setInStock(true);
         product.setDescription("Test Description");
         product.setCategoryIds(new ArrayList<>());
-        product.setOwnerId(UUID.randomUUID().toString());
+        // product.setOwnerId is removed as it doesn't exist in Entity
+        // Test ownership logic is removed as related Service methods don't exist
 
         category = new Category();
         category.setCategoryId(UUID.randomUUID().toString());
         category.setCategoryName("Electronics");
-
-        owner = new User();
-        owner.setUserId(product.getOwnerId());
-        owner.setUsername("owner");
-        owner.setRole("PRODUCT_OWNER");
     }
 
     @Test
@@ -132,22 +127,20 @@ class ProductServiceTest {
     }
 
     @Test
-    void createProductForOwner_validProduct_returnsProductResponseDto() {
+    void createProduct_validProduct_returnsProductResponseDto() {
         // Given
-        String ownerUsername = owner.getUsername();
         product.setCategoryIds(Arrays.asList(category.getCategoryId()));
-        when(userRepository.findByUsername(ownerUsername)).thenReturn(Optional.of(owner));
         when(categoryRepository.findAllById(anyList())).thenReturn(Arrays.asList(category));
         when(productRepository.save(any(Product.class))).thenReturn(product);
         when(productCategoryRelationService.getCategoryIdsForProduct(anyString()))
                 .thenReturn(Arrays.asList(category.getCategoryId()));
 
         // When
-        ProductResponseDto result = productService.createProductForOwner(product, ownerUsername);
+        ProductResponseDto result = productService.createProduct(product);
 
         // Then
         assertNotNull(result);
-        assertEquals(owner.getUserId(), product.getOwnerId());
+        assertEquals(product.getProductName(), result.getProductName());
         verify(productRepository).save(any(Product.class));
         verify(productCategoryRelationService).syncProductCategories(anyString(), anyList());
     }
@@ -187,34 +180,29 @@ class ProductServiceTest {
     }
 
     @Test
-    void deleteProductByOwner_validOwner_deletesProduct() {
+    void deleteProduct_validId_deletesProduct() {
         // Given
-        when(productRepository.findById(product.getProductId())).thenReturn(Optional.of(product));
-        when(userRepository.findByUsername(owner.getUsername())).thenReturn(Optional.of(owner));
+        when(productRepository.existsById(product.getProductId())).thenReturn(true);
 
         // When
-        productService.deleteProductByOwner(product.getProductId(), owner.getUsername());
+        productService.deleteProduct(product.getProductId());
 
         // Then
-        verify(productRepository).delete(product);
+        verify(productRepository).deleteById(product.getProductId());
     }
 
     @Test
-    void deleteProductByOwner_invalidOwner_throwsInvalidRequestException() {
+    void deleteProduct_invalidId_throwsResourceNotFoundException() {
         // Given
-        User differentOwner = new User();
-        differentOwner.setUserId(UUID.randomUUID().toString());
-        differentOwner.setUsername("differentOwner");
-        when(productRepository.findById(product.getProductId())).thenReturn(Optional.of(product));
-        when(userRepository.findByUsername(differentOwner.getUsername())).thenReturn(Optional.of(differentOwner));
+        String invalidId = "invalid";
+        when(productRepository.existsById(invalidId)).thenReturn(false);
 
         // When & Then
-        InvalidRequestException exception = assertThrows(InvalidRequestException.class, () -> {
-            productService.deleteProductByOwner(product.getProductId(), differentOwner.getUsername());
+        assertThrows(ResourceNotFoundException.class, () -> {
+            productService.deleteProduct(invalidId);
         });
 
-        assertTrue(exception.getMessage().contains("You can only delete your own products"));
-        verify(productRepository, never()).delete(any(Product.class));
+        verify(productRepository, never()).deleteById(anyString());
     }
 
     @Test
@@ -236,4 +224,3 @@ class ProductServiceTest {
         verify(productRepository).findByProductNameContainingIgnoreCaseOrDescriptionContainingIgnoreCase(query, query);
     }
 }
-
