@@ -446,12 +446,6 @@ export default function SalesManagerDashboard() {
                               transition: "all 0.2s",
                             }}
                           >
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => toggleProductSelection(product.productId)}
-                              style={{ cursor: "pointer" }}
-                            />
                             <div style={{ flex: 1 }}>
                               <div style={{ fontWeight: 600, color: isSelected ? "#fff" : "#2d3748" }}>{product.productName}</div>
                               <div style={{ color: isSelected ? "#fff" : "#718096", fontSize: "0.85rem" }}>
