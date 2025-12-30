@@ -30,6 +30,12 @@ const userApi = {
 
     getMyProfile: () =>
         axiosClient.get("/api/users/me/profile"),
+
+    getUserByUserId: (userId) =>
+        axiosClient.get(`/api/users/${userId}`),
+
+    getUsernameByUserId: (userId) =>
+        axiosClient.get(`/api/users/${userId}/username`),
 };
 
 export default userApi;

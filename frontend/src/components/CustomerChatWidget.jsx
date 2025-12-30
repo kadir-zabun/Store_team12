@@ -72,22 +72,26 @@ export default function CustomerChatWidget() {
                         client,
                         conversationId,
                         (message) => {
+                            console.log("[CustomerChatWidget] Received message via WebSocket:", message);
                             // Add new message to the list, sorted by createdAt
                             setMessages((prev) => {
                                 // Check if message already exists
                                 const exists = prev.some((m) => m.messageId === message.messageId);
                                 if (exists) {
+                                    console.log("[CustomerChatWidget] Message already exists, skipping:", message.messageId);
                                     return prev;
                                 }
                                 // Remove optimistic message if exists (same text and temp ID)
                                 const filtered = prev.filter((m) => !m.messageId.startsWith("temp_"));
                                 // Add new message and sort by createdAt
                                 const updated = [...filtered, message];
-                                return updated.sort((a, b) => {
+                                const sorted = updated.sort((a, b) => {
                                     const dateA = new Date(a.createdAt);
                                     const dateB = new Date(b.createdAt);
                                     return dateA - dateB;
                                 });
+                                console.log("[CustomerChatWidget] Updated messages list, total:", sorted.length);
+                                return sorted;
                             });
                         }
                     );
@@ -96,11 +100,14 @@ export default function CustomerChatWidget() {
 
                     // Subscribe to queue updates to detect conversation status changes
                     const queueSub = subscribeToQueue(client, (conversation) => {
+                        console.log("[CustomerChatWidget] Received queue update:", conversation);
                         // If this is our conversation, update status
                         if (conversation.conversationId === conversationId) {
+                            console.log("[CustomerChatWidget] Updating conversation status:", conversation.status);
                             setConversationStatus(conversation.status);
                             // If conversation is closed, close the chat widget
                             if (conversation.status === "CLOSED") {
+                                console.log("[CustomerChatWidget] Conversation closed, closing widget");
                                 setIsOpen(false);
                                 showError("This conversation has been closed by support.");
                             }
@@ -199,6 +206,7 @@ export default function CustomerChatWidget() {
         e.preventDefault();
         if (!messageText.trim() || !conversationId) return;
 
+        console.log("[CustomerChatWidget] Sending message:", messageText.trim());
         const token = localStorage.getItem("access_token");
         const text = messageText.trim();
         const tempMessageId = `temp_${Date.now()}`;
@@ -213,7 +221,7 @@ export default function CustomerChatWidget() {
                 const payload = JSON.parse(payloadJson);
                 currentUserName = payload.name || payload.sub || payload.username;
             } catch (e) {
-                // Ignore
+                console.error("[CustomerChatWidget] Error parsing token:", e);
             }
         }
         
@@ -230,6 +238,7 @@ export default function CustomerChatWidget() {
             createdAt: new Date().toISOString(),
         };
         
+        console.log("[CustomerChatWidget] Adding optimistic message:", optimisticMessage);
         setMessages((prev) => {
             const updated = [...prev, optimisticMessage];
             return updated.sort((a, b) => {
@@ -244,6 +253,7 @@ export default function CustomerChatWidget() {
         try {
             // Try WebSocket first, fallback to REST API
             if (wsClientRef.current && wsClientRef.current.connected) {
+                console.log("[CustomerChatWidget] Sending via WebSocket");
                 const sent = sendMessageViaWebSocket(
                     wsClientRef.current,
                     conversationId,
@@ -251,6 +261,7 @@ export default function CustomerChatWidget() {
                     token ? null : guestToken
                 );
                 if (sent) {
+                    console.log("[CustomerChatWidget] Message sent via WebSocket");
                     // Message will be received via WebSocket subscription and replace optimistic one
                     setSendingMessage(false);
                     return;
@@ -258,10 +269,12 @@ export default function CustomerChatWidget() {
             }
 
             // Fallback to REST API
+            console.log("[CustomerChatWidget] Sending via REST API");
             await supportApi.sendText(conversationId, text, token ? null : guestToken);
+            console.log("[CustomerChatWidget] Message sent via REST API");
             // Don't reload messages - wait for WebSocket message
         } catch (error) {
-            console.error("Error sending message:", error);
+            console.error("[CustomerChatWidget] Error sending message:", error);
             // Remove optimistic message on error
             setMessages((prev) => prev.filter((m) => m.messageId !== tempMessageId));
             showError("Failed to send message. Please try again.");

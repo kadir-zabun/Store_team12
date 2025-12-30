@@ -50,6 +50,16 @@ public class UserController {
         }
     }
 
+    @GetMapping("/{userId}")
+    public ResponseEntity<User> getUserByUserId(@PathVariable String userId) {
+        try {
+            User user = userService.getUserByUserId(userId);
+            return ResponseEntity.ok(user);
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
     @GetMapping("/{userId}/username")
     public ResponseEntity<String> getUsernameByUserId(@PathVariable String userId) {
         try {

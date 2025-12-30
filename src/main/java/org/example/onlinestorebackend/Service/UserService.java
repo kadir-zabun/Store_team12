@@ -47,6 +47,11 @@ public class UserService {
                 .build();
     }
 
+    public User getUserByUserId(String userId) {
+        return userRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("User not found with userID: " + userId));
+    }
+
     public String getUsernameByUserId(String userId) {
         User user = userRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("User not found with userID: " + userId));

@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import supportApi from "../api/supportApi";
+import userApi from "../api/userApi";
 import { useToast } from "../contexts/ToastContext";
 import { useUserRole } from "../hooks/useUserRole";
 import {
@@ -23,6 +24,8 @@ export default function SupportAgentChatPage() {
     const [messageText, setMessageText] = useState("");
     const [sendingMessage, setSendingMessage] = useState(false);
     const [uploadingFile, setUploadingFile] = useState(false);
+    const [userNames, setUserNames] = useState({}); // Map userId -> userName
+    const [currentAgentClaimedConversationId, setCurrentAgentClaimedConversationId] = useState(null);
     const fileInputRef = useRef(null);
     const messagesEndRef = useRef(null);
     const navigate = useNavigate();
@@ -54,9 +57,11 @@ export default function SupportAgentChatPage() {
 
         const loadData = async () => {
             try {
+                console.log("[SupportAgentChatPage] Loading initial data...");
                 await loadQueue();
+                console.log("[SupportAgentChatPage] Initial data loaded successfully");
             } catch (error) {
-                console.error("Error loading data:", error);
+                console.error("[SupportAgentChatPage] Error loading data:", error);
                 showError("Failed to load data. Please try again.");
             } finally {
                 setLoading(false);
@@ -66,10 +71,11 @@ export default function SupportAgentChatPage() {
         loadData();
 
         // Connect WebSocket for real-time updates
+        console.log("[SupportAgentChatPage] Connecting to WebSocket...");
         const client = connectWebSocket(
             null,
             (error) => {
-                console.error("WebSocket error:", error);
+                console.error("[SupportAgentChatPage] WebSocket error:", error);
                 showError("Connection error. Please refresh the page.");
             },
             token
@@ -81,9 +87,11 @@ export default function SupportAgentChatPage() {
         const checkConnection = setInterval(() => {
             if (client && client.connected) {
                 clearInterval(checkConnection);
+                console.log("[SupportAgentChatPage] WebSocket connected, subscribing to queue...");
                 
                 // Subscribe to queue updates
                 const queueSub = subscribeToQueue(client, (conversation) => {
+                    console.log("[SupportAgentChatPage] Received queue update:", conversation);
                     // Update conversation in the list
                     setConversations((prev) => {
                         const index = prev.findIndex((c) => c.conversationId === conversation.conversationId);
@@ -91,25 +99,52 @@ export default function SupportAgentChatPage() {
                             // Update existing conversation
                             const updated = [...prev];
                             updated[index] = conversation;
+                            console.log("[SupportAgentChatPage] Updated conversation in list:", conversation.conversationId);
                             return updated;
                         } else {
                             // Add new conversation
+                            console.log("[SupportAgentChatPage] Added new conversation to list:", conversation.conversationId);
                             return [...prev, conversation];
                         }
                     });
 
                     // Update selected conversation if it's the one being updated
                     if (selectedConversation && selectedConversation.conversationId === conversation.conversationId) {
+                        console.log("[SupportAgentChatPage] Updating selected conversation:", conversation);
                         setSelectedConversation(conversation);
                         // If conversation was closed, clear messages
                         if (conversation.status === "CLOSED") {
+                            console.log("[SupportAgentChatPage] Conversation closed, clearing messages");
                             setMessages([]);
                             setCustomerContext(null);
+                            // If this was the claimed conversation, clear it
+                            if (currentAgentClaimedConversationId === conversation.conversationId) {
+                                setCurrentAgentClaimedConversationId(null);
+                            }
+                        }
+                        // Update claimed conversation ID if this agent claimed it
+                        if (conversation.status === "CLAIMED" && conversation.claimedByAgentId) {
+                            const token = localStorage.getItem("access_token");
+                            if (token) {
+                                try {
+                                    const payloadBase64 = token.split(".")[1];
+                                    const normalized = payloadBase64.replace(/-/g, "+").replace(/_/g, "/");
+                                    const payloadJson = atob(normalized);
+                                    const payload = JSON.parse(payloadJson);
+                                    const currentUsername = payload.sub || payload.name || payload.username;
+                                    // Check if this agent claimed it (we'll need to get agent username from conversation)
+                                    // For now, if conversation is CLAIMED, set it as claimed
+                                    setCurrentAgentClaimedConversationId(conversation.conversationId);
+                                } catch (e) {
+                                    console.error("[SupportAgentChatPage] Error parsing token:", e);
+                                }
+                            }
                         }
                     }
                 });
 
                 queueSubscriptionRef.current = queueSub;
+                console.log("[SupportAgentChatPage] Subscribed to queue updates");
             }
         }, 100);
 
@@ -148,35 +183,41 @@ export default function SupportAgentChatPage() {
                     }
 
                     // Subscribe to new conversation messages
+                    console.log("[SupportAgentChatPage] Subscribing to conversation messages:", selectedConversation.conversationId);
                     const subscription = subscribeToConversation(
                         wsClientRef.current,
                         selectedConversation.conversationId,
                         (message) => {
+                            console.log("[SupportAgentChatPage] Received message via WebSocket:", message);
                             // Add new message to the list, sorted by createdAt
                             setMessages((prev) => {
                                 // Check if message already exists
                                 const exists = prev.some((m) => m.messageId === message.messageId);
                                 if (exists) {
+                                    console.log("[SupportAgentChatPage] Message already exists, skipping:", message.messageId);
                                     return prev;
                                 }
                                 // Remove optimistic message if exists (same text and temp ID)
                                 const filtered = prev.filter((m) => !m.messageId.startsWith("temp_"));
                                 // Add new message and sort by createdAt
                                 const updated = [...filtered, message];
-                                return updated.sort((a, b) => {
+                                const sorted = updated.sort((a, b) => {
                                     const dateA = new Date(a.createdAt);
                                     const dateB = new Date(b.createdAt);
                                     return dateA - dateB;
                                 });
+                                console.log("[SupportAgentChatPage] Updated messages list, total:", sorted.length);
+                                return sorted;
                             });
                         }
                     );
+                    console.log("[SupportAgentChatPage] Subscribed to conversation messages");
 
                     messageSubscriptionRef.current = subscription;
                 }
             }, 100);
 
-            return () => {
+        return () => {
                 clearInterval(checkConnection);
                 if (messageSubscriptionRef.current) {
                     messageSubscriptionRef.current.unsubscribe();
@@ -193,13 +234,70 @@ export default function SupportAgentChatPage() {
     }, [messages]);
 
     const loadQueue = async () => {
+        console.log("[SupportAgentChatPage] Loading queue with filter:", statusFilter);
         setLoadingQueue(true);
         try {
             const response = await supportApi.getQueue(statusFilter || null);
             const conversationsData = response.data?.data || response.data || [];
-            setConversations(Array.isArray(conversationsData) ? conversationsData : []);
+            const conversationsList = Array.isArray(conversationsData) ? conversationsData : [];
+            console.log("[SupportAgentChatPage] Loaded conversations:", conversationsList.length);
+            setConversations(conversationsList);
+            
+            // Load user names for all conversations
+            const userIds = conversationsList
+                .map(c => c.customerUserId)
+                .filter(id => id && !userNames[id]);
+            
+            if (userIds.length > 0) {
+                console.log("[SupportAgentChatPage] Loading user names for:", userIds);
+                const namePromises = userIds.map(async (userId) => {
+                    try {
+                        const userResponse = await userApi.getUserByUserId(userId);
+                        const user = userResponse.data?.data || userResponse.data;
+                        if (user) {
+                            return { userId, userName: user.name || user.username || userId };
+                        }
+                    } catch (error) {
+                        console.error(`[SupportAgentChatPage] Error loading user ${userId}:`, error);
+                        return { userId, userName: userId };
+                    }
+                });
+                
+                const names = await Promise.all(namePromises);
+                const namesMap = {};
+                names.forEach(({ userId, userName }) => {
+                    namesMap[userId] = userName;
+                });
+                setUserNames(prev => ({ ...prev, ...namesMap }));
+                console.log("[SupportAgentChatPage] Loaded user names:", namesMap);
+            }
+            
+            // Check current agent's claimed conversation
+            const token = localStorage.getItem("access_token");
+            if (token) {
+                try {
+                    const payloadBase64 = token.split(".")[1];
+                    const normalized = payloadBase64.replace(/-/g, "+").replace(/_/g, "/");
+                    const payloadJson = atob(normalized);
+                    const payload = JSON.parse(payloadJson);
+                    const currentUsername = payload.sub || payload.name || payload.username;
+                    
+                    // Find conversation claimed by current agent
+                    const claimedConv = conversationsList.find(c => 
+                        c.status === "CLAIMED" && c.claimedByAgentId
+                    );
+                    if (claimedConv) {
+                        // We need to check if it's claimed by current agent
+                        // For now, if there's a CLAIMED conversation, set it
+                        setCurrentAgentClaimedConversationId(claimedConv.conversationId);
+                        console.log("[SupportAgentChatPage] Found claimed conversation:", claimedConv.conversationId);
+                    }
+                } catch (e) {
+                    console.error("[SupportAgentChatPage] Error parsing token:", e);
+                }
+            }
         } catch (error) {
-            console.error("Error loading queue:", error);
+            console.error("[SupportAgentChatPage] Error loading queue:", error);
             showError(error.response?.data?.message || "Failed to load conversation queue.");
         } finally {
             setLoadingQueue(false);
@@ -207,9 +305,11 @@ export default function SupportAgentChatPage() {
     };
 
     const loadMessages = async (conversationId) => {
+        console.log("[SupportAgentChatPage] Loading messages for conversation:", conversationId);
         try {
             const response = await supportApi.agentGetMessages(conversationId);
             const messagesData = response.data?.data || response.data || [];
+            console.log("[SupportAgentChatPage] Loaded messages:", messagesData.length);
             // Sort messages by createdAt to ensure correct order
             const sortedMessages = Array.isArray(messagesData)
                 ? messagesData.sort((a, b) => {
@@ -219,8 +319,9 @@ export default function SupportAgentChatPage() {
                 })
                 : [];
             setMessages(sortedMessages);
+            console.log("[SupportAgentChatPage] Set messages:", sortedMessages.length);
         } catch (error) {
-            console.error("Error loading messages:", error);
+            console.error("[SupportAgentChatPage] Error loading messages:", error);
             showError(error.response?.data?.message || "Failed to load messages.");
         }
     };
@@ -237,25 +338,39 @@ export default function SupportAgentChatPage() {
     };
 
     const handleClaimConversation = async (conversationId) => {
+        console.log("[SupportAgentChatPage] Claiming conversation:", conversationId);
+        
+        // Check if agent already has a claimed conversation
+        if (currentAgentClaimedConversationId && currentAgentClaimedConversationId !== conversationId) {
+            const currentClaimed = conversations.find(c => c.conversationId === currentAgentClaimedConversationId);
+            if (currentClaimed && currentClaimed.status !== "CLOSED") {
+                console.log("[SupportAgentChatPage] Agent already has a claimed conversation:", currentAgentClaimedConversationId);
+                showError("You already have a claimed conversation. Please close it first before claiming another one.");
+                return;
+            }
+        }
+        
         try {
             const response = await supportApi.claimConversation(conversationId);
             const conversation = response.data?.data || response.data;
+            console.log("[SupportAgentChatPage] Conversation claimed successfully:", conversation);
             setSelectedConversation(conversation);
+            setCurrentAgentClaimedConversationId(conversationId);
             await loadMessages(conversationId);
             await loadCustomerContext(conversationId);
             await loadQueue();
             showSuccess("Conversation claimed successfully!");
         } catch (error) {
-            console.error("Error claiming conversation:", error);
+            console.error("[SupportAgentChatPage] Error claiming conversation:", error);
             showError(error.response?.data?.message || "Failed to claim conversation.");
         }
     };
 
     const handleSelectConversation = async (conversation) => {
         // Allow agents to view any conversation, even if not claimed
-        setSelectedConversation(conversation);
-        await loadMessages(conversation.conversationId);
-        await loadCustomerContext(conversation.conversationId);
+            setSelectedConversation(conversation);
+            await loadMessages(conversation.conversationId);
+            await loadCustomerContext(conversation.conversationId);
         
         // If conversation is OPEN and not claimed, show option to claim
         if (conversation.status === "OPEN" && !conversation.claimedByAgentId) {
@@ -266,9 +381,12 @@ export default function SupportAgentChatPage() {
     const handleSendMessage = async (e) => {
         e.preventDefault();
         if (!messageText.trim() || !selectedConversation) return;
+
+        console.log("[SupportAgentChatPage] Sending message:", messageText.trim());
         
         // Don't allow sending messages to unclaimed conversations
         if (selectedConversation.status === "OPEN" && !selectedConversation.claimedByAgentId) {
+            console.log("[SupportAgentChatPage] Cannot send message to unclaimed conversation");
             showError("Please claim the conversation first to send messages.");
             return;
         }
@@ -287,7 +405,7 @@ export default function SupportAgentChatPage() {
                 const payload = JSON.parse(payloadJson);
                 currentUserName = payload.sub || payload.name || payload.username;
             } catch (e) {
-                // Ignore
+                console.error("[SupportAgentChatPage] Error parsing token:", e);
             }
         }
         
@@ -304,6 +422,7 @@ export default function SupportAgentChatPage() {
             createdAt: new Date().toISOString(),
         };
         
+        console.log("[SupportAgentChatPage] Adding optimistic message:", optimisticMessage);
         setMessages((prev) => {
             const updated = [...prev, optimisticMessage];
             return updated.sort((a, b) => {
@@ -318,12 +437,14 @@ export default function SupportAgentChatPage() {
         try {
             // Try WebSocket first, fallback to REST API
             if (wsClientRef.current && wsClientRef.current.connected) {
+                console.log("[SupportAgentChatPage] Sending via WebSocket");
                 const sent = sendAgentMessageViaWebSocket(
                     wsClientRef.current,
                     selectedConversation.conversationId,
                     text
                 );
                 if (sent) {
+                    console.log("[SupportAgentChatPage] Message sent via WebSocket");
                     // Message will be received via WebSocket subscription and replace optimistic one
                     setSendingMessage(false);
                     return;
@@ -331,10 +452,12 @@ export default function SupportAgentChatPage() {
             }
 
             // Fallback to REST API
+            console.log("[SupportAgentChatPage] Sending via REST API");
             await supportApi.agentSendText(selectedConversation.conversationId, text);
+            console.log("[SupportAgentChatPage] Message sent via REST API");
             // Don't reload messages - wait for WebSocket message
         } catch (error) {
-            console.error("Error sending message:", error);
+            console.error("[SupportAgentChatPage] Error sending message:", error);
             // Remove optimistic message on error
             setMessages((prev) => prev.filter((m) => m.messageId !== tempMessageId));
             showError(error.response?.data?.message || "Failed to send message.");
@@ -366,15 +489,18 @@ export default function SupportAgentChatPage() {
     const handleCloseConversation = async () => {
         if (!selectedConversation) return;
 
+        console.log("[SupportAgentChatPage] Closing conversation:", selectedConversation.conversationId);
         try {
             await supportApi.closeConversation(selectedConversation.conversationId);
+            console.log("[SupportAgentChatPage] Conversation closed successfully");
             setSelectedConversation(null);
             setMessages([]);
             setCustomerContext(null);
+            setCurrentAgentClaimedConversationId(null);
             await loadQueue();
             showSuccess("Conversation closed successfully!");
         } catch (error) {
-            console.error("Error closing conversation:", error);
+            console.error("[SupportAgentChatPage] Error closing conversation:", error);
             showError(error.response?.data?.message || "Failed to close conversation.");
         }
     };
@@ -422,8 +548,8 @@ export default function SupportAgentChatPage() {
 
     return (
         <div style={{ minHeight: "calc(100vh - 120px)", padding: "2rem", display: "flex", gap: "1rem" }}>
-            {/* Conversation Queue */}
-            <div
+                {/* Conversation Queue */}
+                <div
                     style={{
                         flex: "0 0 350px",
                         background: "#fff",
@@ -434,9 +560,26 @@ export default function SupportAgentChatPage() {
                         flexDirection: "column",
                     }}
                 >
-                    <h2 style={{ fontSize: "1.25rem", fontWeight: 700, color: "#2d3748", marginBottom: "1rem" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                        <h2 style={{ fontSize: "1.25rem", fontWeight: 700, color: "#2d3748", margin: 0 }}>
                         Conversation Queue
                     </h2>
+                        <button
+                            onClick={loadQueue}
+                            disabled={loadingQueue}
+                            style={{
+                                padding: "0.5rem 1rem",
+                                background: loadingQueue ? "#e2e8f0" : "#667eea",
+                                color: loadingQueue ? "#718096" : "#fff",
+                                border: "none",
+                                borderRadius: "4px",
+                                fontSize: "0.85rem",
+                                cursor: loadingQueue ? "not-allowed" : "pointer",
+                            }}
+                        >
+                            {loadingQueue ? "Refreshing..." : "🔄 Refresh"}
+                        </button>
+                    </div>
                     
                     {/* Filter */}
                     <div style={{ marginBottom: "1rem" }}>
@@ -494,24 +637,55 @@ export default function SupportAgentChatPage() {
                                     }}
                                 >
                                     <div style={{ fontWeight: 600, fontSize: "0.9rem", marginBottom: "0.25rem" }}>
-                                        {conv.customerUserId ? `User: ${conv.customerUserId}` : `Guest: ${conv.guestToken?.substring(0, 8)}...`}
+                                        {conv.customerUserId 
+                                            ? `User: ${userNames[conv.customerUserId] || conv.customerUserId}` 
+                                            : `Guest: ${conv.guestToken?.substring(0, 8)}...`}
                                     </div>
                                     <div style={{ fontSize: "0.85rem", opacity: 0.8 }}>
                                         Status: {conv.status}
+                                        {conv.status === "CLAIMED" && conv.claimedByAgentId && (
+                                            <span style={{ marginLeft: "0.5rem", fontSize: "0.75rem" }}>
+                                                (Claimed)
+                                            </span>
+                                        )}
                                     </div>
                                     {conv.lastMessageAt && (
                                         <div style={{ fontSize: "0.75rem", opacity: 0.7, marginTop: "0.25rem" }}>
                                             {new Date(conv.lastMessageAt).toLocaleString()}
                                         </div>
                                     )}
+                                    {conv.status === "OPEN" && !conv.claimedByAgentId && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleClaimConversation(conv.conversationId);
+                                            }}
+                                            disabled={currentAgentClaimedConversationId && currentAgentClaimedConversationId !== conv.conversationId}
+                                            style={{
+                                                marginTop: "0.5rem",
+                                                padding: "0.4rem 0.8rem",
+                                                background: currentAgentClaimedConversationId && currentAgentClaimedConversationId !== conv.conversationId ? "#e2e8f0" : "#667eea",
+                                                color: currentAgentClaimedConversationId && currentAgentClaimedConversationId !== conv.conversationId ? "#718096" : "#fff",
+                                                border: "none",
+                                                borderRadius: "4px",
+                                                fontSize: "0.75rem",
+                                                cursor: currentAgentClaimedConversationId && currentAgentClaimedConversationId !== conv.conversationId ? "not-allowed" : "pointer",
+                                                width: "100%",
+                                            }}
+                                        >
+                                            {currentAgentClaimedConversationId && currentAgentClaimedConversationId !== conv.conversationId 
+                                                ? "Close current conversation first" 
+                                                : "Claim Conversation"}
+                                        </button>
+                                    )}
                                 </div>
                             ))
                         )}
                     </div>
-            </div>
+                </div>
 
-            {/* Chat Area */}
-            <div
+                {/* Chat Area */}
+                <div
                     style={{
                         flex: 1,
                         display: "flex",
@@ -528,7 +702,9 @@ export default function SupportAgentChatPage() {
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", paddingBottom: "1rem", borderBottom: "1px solid #e2e8f0" }}>
                                 <div>
                                     <h3 style={{ fontSize: "1.1rem", fontWeight: 600, color: "#2d3748", marginBottom: "0.25rem" }}>
-                                        {selectedConversation.customerUserId ? `User: ${selectedConversation.customerUserId}` : `Guest: ${selectedConversation.guestToken?.substring(0, 8)}...`}
+                                        {selectedConversation.customerUserId 
+                                            ? `Customer: ${userNames[selectedConversation.customerUserId] || customerContext?.user?.name || selectedConversation.customerUserId}` 
+                                            : `Guest: ${selectedConversation.guestToken?.substring(0, 8)}...`}
                                     </h3>
                                     <div style={{ fontSize: "0.85rem", color: "#718096" }}>
                                         Status: {selectedConversation.status}
@@ -556,42 +732,83 @@ export default function SupportAgentChatPage() {
                                             Claim Conversation
                                         </button>
                                     )}
-                                    <button
-                                        onClick={handleCloseConversation}
-                                        disabled={selectedConversation.status === "CLOSED"}
-                                        style={{
-                                            padding: "0.5rem 1rem",
-                                            background: selectedConversation.status === "CLOSED" ? "#e2e8f0" : "#e53e3e",
-                                            color: selectedConversation.status === "CLOSED" ? "#718096" : "#fff",
-                                            border: "none",
-                                            borderRadius: "4px",
-                                            fontSize: "0.85rem",
-                                            cursor: selectedConversation.status === "CLOSED" ? "not-allowed" : "pointer",
-                                        }}
-                                    >
-                                        Close Conversation
-                                    </button>
+                                <button
+                                    onClick={handleCloseConversation}
+                                    disabled={selectedConversation.status === "CLOSED"}
+                                    style={{
+                                        padding: "0.5rem 1rem",
+                                        background: selectedConversation.status === "CLOSED" ? "#e2e8f0" : "#e53e3e",
+                                        color: selectedConversation.status === "CLOSED" ? "#718096" : "#fff",
+                                        border: "none",
+                                        borderRadius: "4px",
+                                        fontSize: "0.85rem",
+                                        cursor: selectedConversation.status === "CLOSED" ? "not-allowed" : "pointer",
+                                    }}
+                                >
+                                    Close Conversation
+                                </button>
                                 </div>
                             </div>
 
                             {/* Customer Context */}
                             {customerContext && (
-                                <div style={{ marginBottom: "1rem", padding: "1rem", background: "#f7fafc", borderRadius: "4px", fontSize: "0.85rem" }}>
-                                    <div style={{ fontWeight: 600, marginBottom: "0.5rem", color: "#2d3748" }}>Customer Information:</div>
+                                <div style={{ 
+                                    marginBottom: "1rem", 
+                                    padding: "1.25rem", 
+                                    background: "#ffffff", 
+                                    border: "1px solid #e2e8f0",
+                                    borderRadius: "8px", 
+                                    fontSize: "0.9rem",
+                                    boxShadow: "0 2px 4px rgba(0, 0, 0, 0.05)"
+                                }}>
+                                    <div style={{ 
+                                        fontWeight: 700, 
+                                        marginBottom: "1rem", 
+                                        color: "#2d3748",
+                                        fontSize: "1rem",
+                                        borderBottom: "2px solid #e2e8f0",
+                                        paddingBottom: "0.5rem"
+                                    }}>
+                                        Customer Information
+                                    </div>
                                     {customerContext.user && (
-                                        <div style={{ marginBottom: "0.5rem" }}>
-                                            <strong>Name:</strong> {customerContext.user.name || "N/A"} | 
-                                            <strong> Email:</strong> {customerContext.user.email || "N/A"}
+                                        <div style={{ marginBottom: "0.75rem" }}>
+                                            <div style={{ marginBottom: "0.5rem", display: "flex", alignItems: "center" }}>
+                                                <span style={{ fontWeight: 600, color: "#4a5568", minWidth: "80px" }}>Name:</span>
+                                                <span style={{ color: "#2d3748" }}>{customerContext.user.name || "N/A"}</span>
+                                            </div>
+                                            <div style={{ display: "flex", alignItems: "center" }}>
+                                                <span style={{ fontWeight: 600, color: "#4a5568", minWidth: "80px" }}>Email:</span>
+                                                <span style={{ color: "#2d3748" }}>{customerContext.user.email || "N/A"}</span>
+                                            </div>
                                         </div>
                                     )}
                                     {customerContext.orders && customerContext.orders.length > 0 && (
-                                        <div style={{ marginBottom: "0.5rem" }}>
-                                            <strong>Orders:</strong> {customerContext.orders.length}
+                                        <div style={{ 
+                                            marginBottom: "0.75rem",
+                                            paddingTop: "0.75rem",
+                                            borderTop: "1px solid #e2e8f0"
+                                        }}>
+                                            <div style={{ display: "flex", alignItems: "center" }}>
+                                                <span style={{ fontWeight: 600, color: "#4a5568", minWidth: "80px" }}>Orders:</span>
+                                                <span style={{ color: "#2d3748" }}>{customerContext.orders.length} order(s)</span>
+                                            </div>
                                         </div>
                                     )}
                                     {customerContext.wishListProductIds && customerContext.wishListProductIds.length > 0 && (
-                                        <div>
-                                            <strong>Wishlist Items:</strong> {customerContext.wishListProductIds.length}
+                                        <div style={{ 
+                                            paddingTop: "0.75rem",
+                                            borderTop: "1px solid #e2e8f0"
+                                        }}>
+                                            <div style={{ display: "flex", alignItems: "center" }}>
+                                                <span style={{ fontWeight: 600, color: "#4a5568", minWidth: "80px" }}>Wishlist:</span>
+                                                <span style={{ color: "#2d3748" }}>{customerContext.wishListProductIds.length} item(s)</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {(!customerContext.user || (!customerContext.orders || customerContext.orders.length === 0) && (!customerContext.wishListProductIds || customerContext.wishListProductIds.length === 0)) && (
+                                        <div style={{ color: "#718096", fontStyle: "italic" }}>
+                                            No additional information available
                                         </div>
                                     )}
                                 </div>

@@ -127,7 +127,19 @@ public class SupportChatService {
 
         // If already claimed by another agent -> reject
         if (c.getClaimedByAgentId() != null && !c.getClaimedByAgentId().equals(agent.getUserId())) {
-            throw new InvalidRequestException("Conversation already claimed");
+            throw new InvalidRequestException("Conversation already claimed by another agent");
+        }
+
+        // Check if agent already has another claimed conversation that is not closed
+        List<SupportConversation> agentClaimedConversations = conversationRepository.findByClaimedByAgentId(agent.getUserId());
+        SupportConversation activeClaimed = agentClaimedConversations.stream()
+                .filter(conv -> !STATUS_CLOSED.equals(conv.getStatus()))
+                .filter(conv -> !conv.getConversationId().equals(conversationId))
+                .findFirst()
+                .orElse(null);
+        
+        if (activeClaimed != null) {
+            throw new InvalidRequestException("You already have a claimed conversation. Please close it first before claiming another one.");
         }
 
         c.setClaimedByAgentId(agent.getUserId());
