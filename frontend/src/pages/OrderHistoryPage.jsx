@@ -310,7 +310,8 @@ export default function OrderHistoryPage() {
                                         {order.items && order.items.map((item, index) => {
                                             const orderDate = order.orderDate ? new Date(order.orderDate) : null;
                                             const daysSincePurchase = orderDate ? Math.floor((new Date() - orderDate) / (1000 * 60 * 60 * 24)) : null;
-                                            const canRefund = order.status === "DELIVERED" && daysSincePurchase !== null && daysSincePurchase <= 30;
+                        const refundableStatuses = ["DELIVERED", "REFUND_APPROVED"];
+                        const canRefund = refundableStatuses.includes(order.status) && daysSincePurchase !== null && daysSincePurchase <= 30;
                                             const refundKey = `${order.orderId || order.id}-${item.productId}`;
                                             const refundInfo = refundStatusMap[refundKey];
                                             const isRefundApproved = refundInfo && refundInfo.status === "APPROVED";
