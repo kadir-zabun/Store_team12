@@ -25,7 +25,6 @@ export default function OrderHistoryPage() {
         quantity: 1,
         reason: "",
     });
-    const [refundStatusMap, setRefundStatusMap] = useState({});
     const navigate = useNavigate();
     const { success: showSuccess, error: showError } = useToast();
     const userRole = useUserRole();
@@ -224,16 +223,25 @@ export default function OrderHistoryPage() {
         }
     };
 
-    // Build a lookup for refund status by (orderId, productId)
-    useEffect(() => {
-        const map = {};
-        (myRefunds || []).forEach((r) => {
-            if (!r.orderId || !r.productId) return;
-            const key = `${r.orderId}-${r.productId}`;
-            map[key] = r;
-        });
-        setRefundStatusMap(map);
-    }, [myRefunds]);
+    // Helper: aggregate refund info by orderId+productId
+    const getRefundStats = (orderId, productId) => {
+        const refunds = (myRefunds || []).filter(
+            (r) => r.orderId === orderId && r.productId === productId
+        );
+        return refunds.reduce(
+            (acc, r) => {
+                const qty = r.quantity || 0;
+                if (r.status === "APPROVED") acc.approvedQty += qty;
+                else if (r.status === "PENDING") acc.pendingQty += qty;
+                else if (r.status === "REJECTED") acc.rejectedQty += qty;
+                acc.anyApproved = acc.anyApproved || r.status === "APPROVED";
+                acc.anyPending = acc.anyPending || r.status === "PENDING";
+                acc.anyRejected = acc.anyRejected || r.status === "REJECTED";
+                return acc;
+            },
+            { approvedQty: 0, pendingQty: 0, rejectedQty: 0, anyApproved: false, anyPending: false, anyRejected: false }
+        );
+    };
 
     if (loading) {
         return (
@@ -311,12 +319,18 @@ export default function OrderHistoryPage() {
                                             const orderDate = order.orderDate ? new Date(order.orderDate) : null;
                                             const daysSincePurchase = orderDate ? Math.floor((new Date() - orderDate) / (1000 * 60 * 60 * 24)) : null;
                         const refundableStatuses = ["DELIVERED", "REFUND_APPROVED"];
-                        const canRefund = refundableStatuses.includes(order.status) && daysSincePurchase !== null && daysSincePurchase <= 30;
-                                            const refundKey = `${order.orderId || order.id}-${item.productId}`;
-                                            const refundInfo = refundStatusMap[refundKey];
-                                            const isRefundApproved = refundInfo && refundInfo.status === "APPROVED";
-                                            const isRefundPending = refundInfo && refundInfo.status === "PENDING";
-                        const isRefundRejected = refundInfo && refundInfo.status === "REJECTED";
+                        const refundStats = getRefundStats(order.orderId || order.id, item.productId);
+                        const refundableQty = Math.max(
+                            (item.quantity || 0) - (refundStats.approvedQty + refundStats.pendingQty),
+                            0
+                        );
+                        const canRefund = refundableStatuses.includes(order.status) &&
+                            daysSincePurchase !== null &&
+                            daysSincePurchase <= 30 &&
+                            refundableQty > 0;
+                        const isRefundApproved = refundStats.anyApproved && refundStats.approvedQty > 0;
+                        const isRefundPending = refundStats.anyPending && refundStats.pendingQty > 0;
+                        const isRefundRejected = refundStats.anyRejected && !refundStats.anyPending && !refundStats.anyApproved;
                                             
                                             return (
                                                 <div
@@ -353,17 +367,17 @@ export default function OrderHistoryPage() {
                                                         </div>
                                                             {isRefundApproved && (
                                                                 <span style={{ padding: "0.4rem 0.8rem", background: "#2f855a", color: "#fff", borderRadius: "8px", fontWeight: 600, fontSize: "0.85rem" }}>
-                                                                    Refund Accepted
+                                                                    Refund Accepted{refundStats.approvedQty > 0 ? ` (${refundStats.approvedQty})` : ""}
                                                                 </span>
                                                             )}
                                                             {isRefundPending && !isRefundApproved && (
                                                                 <span style={{ padding: "0.4rem 0.8rem", background: "#d69e2e", color: "#fff", borderRadius: "8px", fontWeight: 600, fontSize: "0.85rem" }}>
-                                                                    Refund Pending
+                                                                    Refund Pending{refundStats.pendingQty > 0 ? ` (${refundStats.pendingQty})` : ""}
                                                                 </span>
                                                             )}
                                                             {isRefundRejected && !isRefundApproved && (
                                                                 <span style={{ padding: "0.4rem 0.8rem", background: "#e53e3e", color: "#fff", borderRadius: "8px", fontWeight: 600, fontSize: "0.85rem" }}>
-                                                                    Refund Rejected
+                                                                    Refund Rejected{refundStats.rejectedQty > 0 ? ` (${refundStats.rejectedQty})` : ""}
                                                                 </span>
                                                             )}
                                                             {canRefund && !isRefundApproved && !isRefundPending && !isRefundRejected && (
@@ -373,7 +387,7 @@ export default function OrderHistoryPage() {
                                                                             orderId: order.orderId || order.id,
                                                                             productId: item.productId,
                                                                             productName: item.productName,
-                                                                            maxQuantity: item.quantity,
+                                                                            maxQuantity: refundableQty,
                                                                             priceAtPurchase: item.priceAtPurchase || item.price || 0,
                                                                         });
                                                                         setRefundForm({
