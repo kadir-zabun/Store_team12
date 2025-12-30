@@ -63,13 +63,6 @@ public class AuthenticationService {
             );
         }
 
-        if (input.getTaxId() == null || input.getTaxId().isBlank()) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "taxId is required"
-            );
-        }
-
         User user = new User();
         user.setUserId(UUID.randomUUID().toString());
         user.setUsername(input.getUsername());
