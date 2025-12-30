@@ -316,6 +316,7 @@ export default function OrderHistoryPage() {
                                             const refundInfo = refundStatusMap[refundKey];
                                             const isRefundApproved = refundInfo && refundInfo.status === "APPROVED";
                                             const isRefundPending = refundInfo && refundInfo.status === "PENDING";
+                        const isRefundRejected = refundInfo && refundInfo.status === "REJECTED";
                                             
                                             return (
                                                 <div
@@ -360,7 +361,12 @@ export default function OrderHistoryPage() {
                                                                     Refund Pending
                                                                 </span>
                                                             )}
-                                                            {canRefund && !isRefundApproved && !isRefundPending && (
+                                                            {isRefundRejected && !isRefundApproved && (
+                                                                <span style={{ padding: "0.4rem 0.8rem", background: "#e53e3e", color: "#fff", borderRadius: "8px", fontWeight: 600, fontSize: "0.85rem" }}>
+                                                                    Refund Rejected
+                                                                </span>
+                                                            )}
+                                                            {canRefund && !isRefundApproved && !isRefundPending && !isRefundRejected && (
                                                                 <button
                                                                     onClick={() => {
                                                                         setRefundingItem({
@@ -486,7 +492,7 @@ export default function OrderHistoryPage() {
                                 </div>
 
                                 {/* Review Forms for each product */}
-                                {order.status === "DELIVERED" && order.items && order.items.length > 0 && (
+                                {["DELIVERED", "REFUND_APPROVED"].includes(order.status) && order.items && order.items.length > 0 && (
                                     <div style={{ marginTop: "1.5rem", paddingTop: "1.5rem", borderTop: "2px solid #e2e8f0" }}>
                                         <h3 style={{ marginBottom: "1rem", color: "#2d3748", fontSize: "1.1rem", fontWeight: 600 }}>Review Products:</h3>
                                         {order.items.map((item, itemIndex) => {
