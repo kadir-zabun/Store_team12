@@ -6,6 +6,7 @@ import {
     connectWebSocket,
     disconnectWebSocket,
     subscribeToConversation,
+    subscribeToQueue,
     sendMessageViaWebSocket,
 } from "../utils/websocketClient";
 
@@ -24,6 +25,9 @@ export default function CustomerChatWidget() {
     const userRole = useUserRole();
     const wsClientRef = useRef(null);
     const subscriptionRef = useRef(null);
+    const queueSubscriptionRef = useRef(null);
+    const messagesLoadedRef = useRef(false);
+    const [conversationStatus, setConversationStatus] = useState(null);
 
     useEffect(() => {
         // Get or create guest token
@@ -38,8 +42,12 @@ export default function CustomerChatWidget() {
     // WebSocket connection and subscription
     useEffect(() => {
         if (isOpen && conversationId) {
-            // Load initial messages
-            loadMessages();
+            // Reset messages loaded flag when conversation changes
+            if (messagesLoadedRef.current === false || messagesLoadedRef.current !== conversationId) {
+                messagesLoadedRef.current = conversationId;
+                // Load initial messages only once
+                loadMessages();
+            }
 
             // Connect WebSocket
             const token = localStorage.getItem("access_token");
@@ -64,19 +72,39 @@ export default function CustomerChatWidget() {
                         client,
                         conversationId,
                         (message) => {
-                            // Add new message to the list
+                            // Add new message to the list, sorted by createdAt
                             setMessages((prev) => {
                                 // Check if message already exists
                                 const exists = prev.some((m) => m.messageId === message.messageId);
                                 if (exists) {
                                     return prev;
                                 }
-                                return [...prev, message];
+                                // Add new message and sort by createdAt
+                                const updated = [...prev, message];
+                                return updated.sort((a, b) => {
+                                    const dateA = new Date(a.createdAt);
+                                    const dateB = new Date(b.createdAt);
+                                    return dateA - dateB;
+                                });
                             });
                         }
                     );
 
                     subscriptionRef.current = subscription;
+
+                    // Subscribe to queue updates to detect conversation status changes
+                    const queueSub = subscribeToQueue(client, (conversation) => {
+                        // If this is our conversation, update status
+                        if (conversation.conversationId === conversationId) {
+                            setConversationStatus(conversation.status);
+                            // If conversation is closed, close the chat widget
+                            if (conversation.status === "CLOSED") {
+                                setIsOpen(false);
+                                showError("This conversation has been closed by support.");
+                            }
+                        }
+                    });
+                    queueSubscriptionRef.current = queueSub;
                 }
             }, 100);
 
@@ -87,12 +115,20 @@ export default function CustomerChatWidget() {
                     subscriptionRef.current.unsubscribe();
                     subscriptionRef.current = null;
                 }
+                if (queueSubscriptionRef.current) {
+                    queueSubscriptionRef.current.unsubscribe();
+                    queueSubscriptionRef.current = null;
+                }
             };
         } else {
             // Disconnect when chat is closed
             if (subscriptionRef.current) {
                 subscriptionRef.current.unsubscribe();
                 subscriptionRef.current = null;
+            }
+            if (queueSubscriptionRef.current) {
+                queueSubscriptionRef.current.unsubscribe();
+                queueSubscriptionRef.current = null;
             }
         }
 
@@ -101,6 +137,10 @@ export default function CustomerChatWidget() {
             if (subscriptionRef.current) {
                 subscriptionRef.current.unsubscribe();
                 subscriptionRef.current = null;
+            }
+            if (queueSubscriptionRef.current) {
+                queueSubscriptionRef.current.unsubscribe();
+                queueSubscriptionRef.current = null;
             }
         };
     }, [isOpen, conversationId]);
@@ -137,7 +177,15 @@ export default function CustomerChatWidget() {
             const token = localStorage.getItem("access_token");
             const response = await supportApi.getMessages(conversationId, token ? null : guestToken);
             const messagesData = response.data?.data || response.data || [];
-            setMessages(Array.isArray(messagesData) ? messagesData : []);
+            // Sort messages by createdAt to ensure correct order
+            const sortedMessages = Array.isArray(messagesData) 
+                ? messagesData.sort((a, b) => {
+                    const dateA = new Date(a.createdAt);
+                    const dateB = new Date(b.createdAt);
+                    return dateA - dateB;
+                })
+                : [];
+            setMessages(sortedMessages);
         } catch (error) {
             console.error("Error loading messages:", error);
         } finally {
@@ -172,7 +220,7 @@ export default function CustomerChatWidget() {
 
             // Fallback to REST API
             await supportApi.sendText(conversationId, text, token ? null : guestToken);
-            await loadMessages();
+            // Don't reload messages - wait for WebSocket message
         } catch (error) {
             console.error("Error sending message:", error);
             showError("Failed to send message. Please try again.");
@@ -190,8 +238,6 @@ export default function CustomerChatWidget() {
             const token = localStorage.getItem("access_token");
             await supportApi.uploadAttachment(conversationId, file, token ? null : guestToken);
             // File uploads trigger WebSocket messages, so we'll receive it via subscription
-            // But reload messages to ensure we have the latest
-            await loadMessages();
             showSuccess("File uploaded successfully!");
             if (fileInputRef.current) {
                 fileInputRef.current.value = "";

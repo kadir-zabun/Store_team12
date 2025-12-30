@@ -109,11 +109,11 @@ public class SupportChatService {
     }
 
     public void assertAgentAccess(SupportConversation c, String agentUsername) {
-        User agent = userRepository.findByUsername(agentUsername)
+        // Removed: Agents can now access any conversation, not just claimed ones
+        // This allows agents to view and close unclaimed conversations
+        // Verify agent exists (role check is done at controller level)
+        userRepository.findByUsername(agentUsername)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + agentUsername));
-        if (c.getClaimedByAgentId() == null || !c.getClaimedByAgentId().equals(agent.getUserId())) {
-            throw new InvalidRequestException("Conversation is not claimed by this agent");
-        }
     }
 
     @Transactional
@@ -138,8 +138,10 @@ public class SupportChatService {
     @Transactional
     public SupportConversation close(String conversationId, String agentUsername) {
         SupportConversation c = getConversation(conversationId);
-        // Only the claiming agent can close
-        assertAgentAccess(c, agentUsername);
+        // Any support agent can close any conversation
+        // Verify agent exists (role check is done at controller level)
+        userRepository.findByUsername(agentUsername)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + agentUsername));
         c.setStatus(STATUS_CLOSED);
         return conversationRepository.save(c);
     }
@@ -350,7 +352,10 @@ public class SupportChatService {
 
     public SupportContextDto getContextForAgent(String conversationId, String agentUsername) {
         SupportConversation c = getConversation(conversationId);
-        assertAgentAccess(c, agentUsername);
+        // Removed assertAgentAccess - agents can view context for any conversation
+        // Verify agent exists (role check is done at controller level)
+        userRepository.findByUsername(agentUsername)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + agentUsername));
         if (c.getCustomerUserId() == null) {
             return new SupportContextDto(null, null, List.of(), List.of(), List.of());
         }

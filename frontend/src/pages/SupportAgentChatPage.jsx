@@ -31,6 +31,7 @@ export default function SupportAgentChatPage() {
     const wsClientRef = useRef(null);
     const messageSubscriptionRef = useRef(null);
     const queueSubscriptionRef = useRef(null);
+    const messagesLoadedRef = useRef(null);
 
     useEffect(() => {
         const token = localStorage.getItem("access_token");
@@ -100,6 +101,11 @@ export default function SupportAgentChatPage() {
                     // Update selected conversation if it's the one being updated
                     if (selectedConversation && selectedConversation.conversationId === conversation.conversationId) {
                         setSelectedConversation(conversation);
+                        // If conversation was closed, clear messages
+                        if (conversation.status === "CLOSED") {
+                            setMessages([]);
+                            setCustomerContext(null);
+                        }
                     }
                 });
 
@@ -124,8 +130,12 @@ export default function SupportAgentChatPage() {
     // Subscribe to conversation messages when a conversation is selected
     useEffect(() => {
         if (selectedConversation && wsClientRef.current) {
-            // Load initial messages
-            loadMessages(selectedConversation.conversationId);
+            // Reset messages loaded flag when conversation changes
+            if (messagesLoadedRef.current !== selectedConversation.conversationId) {
+                messagesLoadedRef.current = selectedConversation.conversationId;
+                // Load initial messages only once when conversation is selected
+                loadMessages(selectedConversation.conversationId);
+            }
 
             // Wait for WebSocket connection and subscribe
             const checkConnection = setInterval(() => {
@@ -142,14 +152,20 @@ export default function SupportAgentChatPage() {
                         wsClientRef.current,
                         selectedConversation.conversationId,
                         (message) => {
-                            // Add new message to the list
+                            // Add new message to the list, sorted by createdAt
                             setMessages((prev) => {
                                 // Check if message already exists
                                 const exists = prev.some((m) => m.messageId === message.messageId);
                                 if (exists) {
                                     return prev;
                                 }
-                                return [...prev, message];
+                                // Add new message and sort by createdAt
+                                const updated = [...prev, message];
+                                return updated.sort((a, b) => {
+                                    const dateA = new Date(a.createdAt);
+                                    const dateB = new Date(b.createdAt);
+                                    return dateA - dateB;
+                                });
                             });
                         }
                     );
@@ -192,7 +208,15 @@ export default function SupportAgentChatPage() {
         try {
             const response = await supportApi.agentGetMessages(conversationId);
             const messagesData = response.data?.data || response.data || [];
-            setMessages(Array.isArray(messagesData) ? messagesData : []);
+            // Sort messages by createdAt to ensure correct order
+            const sortedMessages = Array.isArray(messagesData)
+                ? messagesData.sort((a, b) => {
+                    const dateA = new Date(a.createdAt);
+                    const dateB = new Date(b.createdAt);
+                    return dateA - dateB;
+                })
+                : [];
+            setMessages(sortedMessages);
         } catch (error) {
             console.error("Error loading messages:", error);
             showError(error.response?.data?.message || "Failed to load messages.");
@@ -226,18 +250,26 @@ export default function SupportAgentChatPage() {
     };
 
     const handleSelectConversation = async (conversation) => {
-        if (conversation.status === "OPEN") {
-            await handleClaimConversation(conversation.conversationId);
-        } else {
-            setSelectedConversation(conversation);
-            await loadMessages(conversation.conversationId);
-            await loadCustomerContext(conversation.conversationId);
+        // Allow agents to view any conversation, even if not claimed
+        setSelectedConversation(conversation);
+        await loadMessages(conversation.conversationId);
+        await loadCustomerContext(conversation.conversationId);
+        
+        // If conversation is OPEN and not claimed, show option to claim
+        if (conversation.status === "OPEN" && !conversation.claimedByAgentId) {
+            // Conversation is open but not claimed - agent can view but should claim to respond
         }
     };
 
     const handleSendMessage = async (e) => {
         e.preventDefault();
         if (!messageText.trim() || !selectedConversation) return;
+        
+        // Don't allow sending messages to unclaimed conversations
+        if (selectedConversation.status === "OPEN" && !selectedConversation.claimedByAgentId) {
+            showError("Please claim the conversation first to send messages.");
+            return;
+        }
 
         setSendingMessage(true);
         try {
@@ -260,7 +292,7 @@ export default function SupportAgentChatPage() {
 
             // Fallback to REST API
             await supportApi.agentSendText(selectedConversation.conversationId, text);
-            await loadMessages(selectedConversation.conversationId);
+            // Don't reload messages - wait for WebSocket message
         } catch (error) {
             console.error("Error sending message:", error);
             showError(error.response?.data?.message || "Failed to send message.");
@@ -277,8 +309,6 @@ export default function SupportAgentChatPage() {
         try {
             await supportApi.agentUploadAttachment(selectedConversation.conversationId, file);
             // File uploads trigger WebSocket messages, so we'll receive it via subscription
-            // But reload messages to ensure we have the latest
-            await loadMessages(selectedConversation.conversationId);
             showSuccess("File uploaded successfully!");
             if (fileInputRef.current) {
                 fileInputRef.current.value = "";
@@ -460,23 +490,46 @@ export default function SupportAgentChatPage() {
                                     </h3>
                                     <div style={{ fontSize: "0.85rem", color: "#718096" }}>
                                         Status: {selectedConversation.status}
+                                        {selectedConversation.status === "OPEN" && !selectedConversation.claimedByAgentId && (
+                                            <span style={{ marginLeft: "0.5rem", color: "#f59e0b", fontSize: "0.8rem" }}>
+                                                (Not Claimed)
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
-                                <button
-                                    onClick={handleCloseConversation}
-                                    disabled={selectedConversation.status === "CLOSED"}
-                                    style={{
-                                        padding: "0.5rem 1rem",
-                                        background: selectedConversation.status === "CLOSED" ? "#e2e8f0" : "#e53e3e",
-                                        color: selectedConversation.status === "CLOSED" ? "#718096" : "#fff",
-                                        border: "none",
-                                        borderRadius: "4px",
-                                        fontSize: "0.85rem",
-                                        cursor: selectedConversation.status === "CLOSED" ? "not-allowed" : "pointer",
-                                    }}
-                                >
-                                    Close Conversation
-                                </button>
+                                <div style={{ display: "flex", gap: "0.5rem" }}>
+                                    {selectedConversation.status === "OPEN" && !selectedConversation.claimedByAgentId && (
+                                        <button
+                                            onClick={() => handleClaimConversation(selectedConversation.conversationId)}
+                                            style={{
+                                                padding: "0.5rem 1rem",
+                                                background: "#667eea",
+                                                color: "#fff",
+                                                border: "none",
+                                                borderRadius: "4px",
+                                                fontSize: "0.85rem",
+                                                cursor: "pointer",
+                                            }}
+                                        >
+                                            Claim Conversation
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={handleCloseConversation}
+                                        disabled={selectedConversation.status === "CLOSED"}
+                                        style={{
+                                            padding: "0.5rem 1rem",
+                                            background: selectedConversation.status === "CLOSED" ? "#e2e8f0" : "#e53e3e",
+                                            color: selectedConversation.status === "CLOSED" ? "#718096" : "#fff",
+                                            border: "none",
+                                            borderRadius: "4px",
+                                            fontSize: "0.85rem",
+                                            cursor: selectedConversation.status === "CLOSED" ? "not-allowed" : "pointer",
+                                        }}
+                                    >
+                                        Close Conversation
+                                    </button>
+                                </div>
                             </div>
 
                             {/* Customer Context */}
@@ -568,8 +621,8 @@ export default function SupportAgentChatPage() {
                                     type="text"
                                     value={messageText}
                                     onChange={(e) => setMessageText(e.target.value)}
-                                    placeholder="Type a message..."
-                                    disabled={selectedConversation.status === "CLOSED" || sendingMessage}
+                                    placeholder={selectedConversation.status === "OPEN" && !selectedConversation.claimedByAgentId ? "Claim conversation to send messages..." : "Type a message..."}
+                                    disabled={selectedConversation.status === "CLOSED" || (selectedConversation.status === "OPEN" && !selectedConversation.claimedByAgentId) || sendingMessage}
                                     style={{
                                         flex: 1,
                                         padding: "0.75rem",
@@ -588,7 +641,7 @@ export default function SupportAgentChatPage() {
                                 <button
                                     type="button"
                                     onClick={() => fileInputRef.current?.click()}
-                                    disabled={selectedConversation.status === "CLOSED" || uploadingFile}
+                                    disabled={selectedConversation.status === "CLOSED" || (selectedConversation.status === "OPEN" && !selectedConversation.claimedByAgentId) || uploadingFile}
                                     style={{
                                         padding: "0.75rem 1rem",
                                         background: "#e2e8f0",
@@ -603,15 +656,15 @@ export default function SupportAgentChatPage() {
                                 </button>
                                 <button
                                     type="submit"
-                                    disabled={selectedConversation.status === "CLOSED" || sendingMessage || !messageText.trim()}
+                                    disabled={selectedConversation.status === "CLOSED" || (selectedConversation.status === "OPEN" && !selectedConversation.claimedByAgentId) || sendingMessage || !messageText.trim()}
                                     style={{
                                         padding: "0.75rem 1.5rem",
-                                        background: selectedConversation.status === "CLOSED" || sendingMessage || !messageText.trim() ? "#e2e8f0" : "#667eea",
-                                        color: selectedConversation.status === "CLOSED" || sendingMessage || !messageText.trim() ? "#718096" : "#fff",
+                                        background: selectedConversation.status === "CLOSED" || (selectedConversation.status === "OPEN" && !selectedConversation.claimedByAgentId) || sendingMessage || !messageText.trim() ? "#e2e8f0" : "#667eea",
+                                        color: selectedConversation.status === "CLOSED" || (selectedConversation.status === "OPEN" && !selectedConversation.claimedByAgentId) || sendingMessage || !messageText.trim() ? "#718096" : "#fff",
                                         border: "none",
                                         borderRadius: "4px",
                                         fontSize: "0.85rem",
-                                        cursor: selectedConversation.status === "CLOSED" || sendingMessage || !messageText.trim() ? "not-allowed" : "pointer",
+                                        cursor: selectedConversation.status === "CLOSED" || (selectedConversation.status === "OPEN" && !selectedConversation.claimedByAgentId) || sendingMessage || !messageText.trim() ? "not-allowed" : "pointer",
                                     }}
                                 >
                                     {sendingMessage ? "Sending..." : "Send"}
