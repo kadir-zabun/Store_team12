@@ -205,86 +205,84 @@ export default function Layout() {
                                 Sales Manager
                             </Link>
                         )}
-                        {userRole === "CUSTOMER" && (
-                            <>
-                                <Link
-                                    to="/cart"
+                        <Link
+                            to="/cart"
+                            style={{
+                                color: isActivePath("/cart") ? "#667eea" : "#4a5568",
+                                textDecoration: isActivePath("/cart") ? "underline" : "none",
+                                textDecorationThickness: isActivePath("/cart") ? "2px" : "0",
+                                textUnderlineOffset: isActivePath("/cart") ? "4px" : "0",
+                                padding: "0.5rem 1rem",
+                                borderRadius: "4px",
+                                fontWeight: isActivePath("/cart") ? 600 : 500,
+                                transition: "all 0.2s",
+                                position: "relative",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "0.5rem",
+                            }}
+                            onMouseEnter={(e) => {
+                                if (!isActivePath("/cart")) {
+                                    e.currentTarget.style.background = "#f7fafc";
+                                    e.currentTarget.style.color = "#667eea";
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                if (!isActivePath("/cart")) {
+                                    e.currentTarget.style.background = "transparent";
+                                    e.currentTarget.style.color = "#4a5568";
+                                }
+                            }}
+                        >
+                            <span>Cart</span>
+                            {cartCount > 0 && (
+                                <span
                                     style={{
-                                        color: isActivePath("/cart") ? "#667eea" : "#4a5568",
-                                        textDecoration: isActivePath("/cart") ? "underline" : "none",
-                                        textDecorationThickness: isActivePath("/cart") ? "2px" : "0",
-                                        textUnderlineOffset: isActivePath("/cart") ? "4px" : "0",
-                                        padding: "0.5rem 1rem",
-                                        borderRadius: "4px",
-                                        fontWeight: isActivePath("/cart") ? 600 : 500,
-                                        transition: "all 0.2s",
-                                        position: "relative",
+                                        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                        color: "#fff",
+                                        borderRadius: "50%",
+                                        minWidth: "20px",
+                                        height: "20px",
                                         display: "flex",
                                         alignItems: "center",
-                                        gap: "0.5rem",
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        if (!isActivePath("/cart")) {
-                                            e.currentTarget.style.background = "#f7fafc";
-                                            e.currentTarget.style.color = "#667eea";
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        if (!isActivePath("/cart")) {
-                                            e.currentTarget.style.background = "transparent";
-                                            e.currentTarget.style.color = "#4a5568";
-                                        }
+                                        justifyContent: "center",
+                                        fontSize: "0.75rem",
+                                        fontWeight: 700,
+                                        padding: "0 0.25rem",
                                     }}
                                 >
-                                    <span>Cart</span>
-                                    {cartCount > 0 && (
-                                        <span
-                                            style={{
-                                                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                                                color: "#fff",
-                                                borderRadius: "50%",
-                                                minWidth: "20px",
-                                                height: "20px",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                justifyContent: "center",
-                                                fontSize: "0.75rem",
-                                                fontWeight: 700,
-                                                padding: "0 0.25rem",
-                                            }}
-                                        >
-                                            {cartCount > 99 ? "99+" : cartCount}
-                                        </span>
-                                    )}
-                                </Link>
-                                <Link
-                                    to="/wishlist"
-                                    style={{
-                                        color: isActivePath("/wishlist") ? "#667eea" : "#4a5568",
-                                        textDecoration: isActivePath("/wishlist") ? "underline" : "none",
-                                        textDecorationThickness: isActivePath("/wishlist") ? "2px" : "0",
-                                        textUnderlineOffset: isActivePath("/wishlist") ? "4px" : "0",
-                                        padding: "0.5rem 1rem",
-                                        borderRadius: "4px",
-                                        fontWeight: isActivePath("/wishlist") ? 600 : 500,
-                                        transition: "all 0.2s",
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        if (!isActivePath("/wishlist")) {
-                                            e.currentTarget.style.background = "#f7fafc";
-                                            e.currentTarget.style.color = "#667eea";
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        if (!isActivePath("/wishlist")) {
-                                            e.currentTarget.style.background = "transparent";
-                                            e.currentTarget.style.color = "#4a5568";
-                                        }
-                                    }}
-                                >
-                                    Wishlist
-                                </Link>
-                            </>
+                                    {cartCount > 99 ? "99+" : cartCount}
+                                </span>
+                            )}
+                        </Link>
+                        {userRole === "CUSTOMER" && (
+                            <Link
+                                to="/wishlist"
+                                style={{
+                                    color: isActivePath("/wishlist") ? "#667eea" : "#4a5568",
+                                    textDecoration: isActivePath("/wishlist") ? "underline" : "none",
+                                    textDecorationThickness: isActivePath("/wishlist") ? "2px" : "0",
+                                    textUnderlineOffset: isActivePath("/wishlist") ? "4px" : "0",
+                                    padding: "0.5rem 1rem",
+                                    borderRadius: "4px",
+                                    fontWeight: isActivePath("/wishlist") ? 600 : 500,
+                                    transition: "all 0.2s",
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (!isActivePath("/wishlist")) {
+                                        e.currentTarget.style.background = "#f7fafc";
+                                        e.currentTarget.style.color = "#667eea";
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!isActivePath("/wishlist")) {
+                                        e.currentTarget.style.background = "transparent";
+                                        e.currentTarget.style.color = "#4a5568";
+                                    }
+                                }}
+                            >
+                                Wishlist
+                            </Link>
                         )}
                         {(userRole === "PRODUCT_MANAGER" || localStorage.getItem("user_role") === "PRODUCT_MANAGER") && (
                             <div
@@ -447,8 +445,8 @@ export default function Layout() {
                     }}
                 >
                     {userName ? (
-                        <div 
-                            ref={dropdownRef} 
+                        <div
+                            ref={dropdownRef}
                             style={{ position: "relative" }}
                             onMouseEnter={() => setShowDropdown(true)}
                             onMouseLeave={() => setShowDropdown(false)}
