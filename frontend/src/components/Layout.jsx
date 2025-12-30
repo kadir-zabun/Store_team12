@@ -205,6 +205,35 @@ export default function Layout() {
                                 Sales Manager
                             </Link>
                         )}
+                        {(userRole === "SUPPORT_AGENT" || localStorage.getItem("user_role") === "SUPPORT_AGENT") && (
+                            <Link
+                                to="/support/chat"
+                                style={{
+                                    color: isActivePath("/support/chat") ? "#667eea" : "#4a5568",
+                                    textDecoration: isActivePath("/support/chat") ? "underline" : "none",
+                                    textDecorationThickness: isActivePath("/support/chat") ? "2px" : "0",
+                                    textUnderlineOffset: isActivePath("/support/chat") ? "4px" : "0",
+                                    padding: "0.5rem 1rem",
+                                    borderRadius: "4px",
+                                    fontWeight: isActivePath("/support/chat") ? 600 : 500,
+                                    transition: "all 0.2s",
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (!isActivePath("/support/chat")) {
+                                        e.currentTarget.style.background = "#f7fafc";
+                                        e.currentTarget.style.color = "#667eea";
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!isActivePath("/support/chat")) {
+                                        e.currentTarget.style.background = "transparent";
+                                        e.currentTarget.style.color = "#4a5568";
+                                    }
+                                }}
+                            >
+                                Support Chat
+                            </Link>
+                        )}
                         {userRole === "CUSTOMER" && (
                             <>
                                 <Link
@@ -679,6 +708,35 @@ export default function Layout() {
                                             >
                                                 <span>💰</span>
                                                 <span>Sales Manager</span>
+                                            </Link>
+                                        )}
+                                        {(userRole === "SUPPORT_AGENT" || localStorage.getItem("user_role") === "SUPPORT_AGENT") && (
+                                            <Link
+                                                to="/support/chat"
+                                                onClick={() => setShowDropdown(false)}
+                                                style={{
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: "0.8rem",
+                                                    padding: "0.75rem 1rem",
+                                                    color: "#4a5568",
+                                                    textDecoration: "none",
+                                                    fontSize: "0.9rem",
+                                                    borderBottom: "1px solid #f1f5f9",
+                                                    background: "transparent",
+                                                    transition: "all 0.2s",
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.background = "#667eea";
+                                                    e.currentTarget.style.color = "#fff";
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.background = "transparent";
+                                                    e.currentTarget.style.color = "#4a5568";
+                                                }}
+                                            >
+                                                <span>💬</span>
+                                                <span>Support Chat</span>
                                             </Link>
                                         )}
                                         <Link

@@ -38,6 +38,10 @@ public class SupportChatController {
                 ? supportChatService.startForUser(userDetails.getUsername())
                 : supportChatService.startForGuest(guestToken);
 
+        // Notify agents about new conversation
+        SupportConversationDto convDto = toDto(c);
+        messagingTemplate.convertAndSend("/topic/support/queue", convDto);
+
         return ResponseEntity.ok(new StartConversationResponse(
                 c.getConversationId(),
                 c.getCustomerUserId() == null ? c.getGuestToken() : null,
@@ -88,6 +92,12 @@ public class SupportChatController {
         );
         SupportMessageDto dto = toDto(saved);
         messagingTemplate.convertAndSend("/topic/support/" + conversationId, dto);
+        
+        // Notify agents about new message in conversation queue
+        SupportConversation conv = supportChatService.getConversation(conversationId);
+        SupportConversationDto convDto = toDto(conv);
+        messagingTemplate.convertAndSend("/topic/support/queue", convDto);
+        
         return ResponseEntity.ok(dto);
     }
 
@@ -137,7 +147,10 @@ public class SupportChatController {
     public ResponseEntity<SupportConversationDto> claim(@PathVariable String conversationId,
                                                         @AuthenticationPrincipal UserDetails userDetails) {
         SupportConversation c = supportChatService.claim(conversationId, userDetails.getUsername());
-        return ResponseEntity.ok(toDto(c));
+        SupportConversationDto dto = toDto(c);
+        // Notify all agents about conversation status change
+        messagingTemplate.convertAndSend("/topic/support/queue", dto);
+        return ResponseEntity.ok(dto);
     }
 
     @PostMapping("/agent/conversations/{conversationId}/close")
@@ -145,7 +158,10 @@ public class SupportChatController {
     public ResponseEntity<SupportConversationDto> close(@PathVariable String conversationId,
                                                         @AuthenticationPrincipal UserDetails userDetails) {
         SupportConversation c = supportChatService.close(conversationId, userDetails.getUsername());
-        return ResponseEntity.ok(toDto(c));
+        SupportConversationDto dto = toDto(c);
+        // Notify all agents about conversation status change
+        messagingTemplate.convertAndSend("/topic/support/queue", dto);
+        return ResponseEntity.ok(dto);
     }
 
     @PostMapping("/agent/conversations/{conversationId}/messages")
@@ -156,6 +172,12 @@ public class SupportChatController {
         SupportMessage saved = supportChatService.sendTextAsAgent(conversationId, userDetails.getUsername(), text);
         SupportMessageDto dto = toDto(saved);
         messagingTemplate.convertAndSend("/topic/support/" + conversationId, dto);
+        
+        // Update conversation in queue
+        SupportConversation conv = supportChatService.getConversation(conversationId);
+        SupportConversationDto convDto = toDto(conv);
+        messagingTemplate.convertAndSend("/topic/support/queue", convDto);
+        
         return ResponseEntity.ok(dto);
     }
 
@@ -167,6 +189,12 @@ public class SupportChatController {
         SupportMessage saved = supportChatService.uploadAttachmentAsAgent(conversationId, userDetails.getUsername(), file);
         SupportMessageDto dto = toDto(saved);
         messagingTemplate.convertAndSend("/topic/support/" + conversationId, dto);
+        
+        // Update conversation in queue
+        SupportConversation conv = supportChatService.getConversation(conversationId);
+        SupportConversationDto convDto = toDto(conv);
+        messagingTemplate.convertAndSend("/topic/support/queue", convDto);
+        
         return ResponseEntity.ok(dto);
     }
 

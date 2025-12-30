@@ -2,6 +2,12 @@ import { useState, useEffect, useRef } from "react";
 import supportApi from "../api/supportApi";
 import { useToast } from "../contexts/ToastContext";
 import { useUserRole } from "../hooks/useUserRole";
+import {
+    connectWebSocket,
+    disconnectWebSocket,
+    subscribeToConversation,
+    sendMessageViaWebSocket,
+} from "../utils/websocketClient";
 
 export default function CustomerChatWidget() {
     const [isOpen, setIsOpen] = useState(false);
@@ -16,7 +22,8 @@ export default function CustomerChatWidget() {
     const messagesEndRef = useRef(null);
     const { success: showSuccess, error: showError } = useToast();
     const userRole = useUserRole();
-    const [pollingInterval, setPollingInterval] = useState(null);
+    const wsClientRef = useRef(null);
+    const subscriptionRef = useRef(null);
 
     useEffect(() => {
         // Get or create guest token
@@ -28,18 +35,74 @@ export default function CustomerChatWidget() {
         setGuestToken(token);
     }, []);
 
+    // WebSocket connection and subscription
     useEffect(() => {
         if (isOpen && conversationId) {
+            // Load initial messages
             loadMessages();
-            // Poll for new messages every 3 seconds
-            const interval = setInterval(() => {
-                loadMessages();
-            }, 3000);
-            setPollingInterval(interval);
+
+            // Connect WebSocket
+            const token = localStorage.getItem("access_token");
+            const client = connectWebSocket(
+                null,
+                (error) => {
+                    console.error("WebSocket error:", error);
+                    showError("Connection error. Please refresh the page.");
+                },
+                token
+            );
+
+            wsClientRef.current = client;
+
+            // Wait for connection and subscribe
+            const checkConnection = setInterval(() => {
+                if (client && client.connected) {
+                    clearInterval(checkConnection);
+                    
+                    // Subscribe to conversation messages
+                    const subscription = subscribeToConversation(
+                        client,
+                        conversationId,
+                        (message) => {
+                            // Add new message to the list
+                            setMessages((prev) => {
+                                // Check if message already exists
+                                const exists = prev.some((m) => m.messageId === message.messageId);
+                                if (exists) {
+                                    return prev;
+                                }
+                                return [...prev, message];
+                            });
+                        }
+                    );
+
+                    subscriptionRef.current = subscription;
+                }
+            }, 100);
+
+            // Cleanup
             return () => {
-                if (interval) clearInterval(interval);
+                clearInterval(checkConnection);
+                if (subscriptionRef.current) {
+                    subscriptionRef.current.unsubscribe();
+                    subscriptionRef.current = null;
+                }
             };
+        } else {
+            // Disconnect when chat is closed
+            if (subscriptionRef.current) {
+                subscriptionRef.current.unsubscribe();
+                subscriptionRef.current = null;
+            }
         }
+
+        return () => {
+            // Cleanup on unmount
+            if (subscriptionRef.current) {
+                subscriptionRef.current.unsubscribe();
+                subscriptionRef.current = null;
+            }
+        };
     }, [isOpen, conversationId]);
 
     useEffect(() => {
@@ -50,20 +113,20 @@ export default function CustomerChatWidget() {
 
     const handleOpenChat = async () => {
         setIsOpen(true);
-        if (!conversationId) {
-            try {
-                const token = localStorage.getItem("access_token");
-                const response = await supportApi.startConversation(token ? null : guestToken);
-                const convData = response.data?.data || response.data;
-                setConversationId(convData.conversationId);
-                if (convData.guestToken) {
-                    setGuestToken(convData.guestToken);
-                    localStorage.setItem("guest_token", convData.guestToken);
-                }
-            } catch (error) {
-                console.error("Error starting conversation:", error);
-                showError("Failed to start conversation. Please try again.");
+        // Always create a new conversation when opening chat
+        try {
+            const token = localStorage.getItem("access_token");
+            const response = await supportApi.startConversation(token ? null : guestToken);
+            const convData = response.data?.data || response.data;
+            setConversationId(convData.conversationId);
+            setMessages([]); // Clear previous messages
+            if (convData.guestToken) {
+                setGuestToken(convData.guestToken);
+                localStorage.setItem("guest_token", convData.guestToken);
             }
+        } catch (error) {
+            console.error("Error starting conversation:", error);
+            showError("Failed to start conversation. Please try again.");
         }
     };
 
@@ -89,8 +152,26 @@ export default function CustomerChatWidget() {
         setSendingMessage(true);
         try {
             const token = localStorage.getItem("access_token");
-            await supportApi.sendText(conversationId, messageText.trim(), token ? null : guestToken);
+            const text = messageText.trim();
             setMessageText("");
+
+            // Try WebSocket first, fallback to REST API
+            if (wsClientRef.current && wsClientRef.current.connected) {
+                const sent = sendMessageViaWebSocket(
+                    wsClientRef.current,
+                    conversationId,
+                    text,
+                    token ? null : guestToken
+                );
+                if (sent) {
+                    // Message will be received via WebSocket subscription
+                    setSendingMessage(false);
+                    return;
+                }
+            }
+
+            // Fallback to REST API
+            await supportApi.sendText(conversationId, text, token ? null : guestToken);
             await loadMessages();
         } catch (error) {
             console.error("Error sending message:", error);
@@ -108,6 +189,8 @@ export default function CustomerChatWidget() {
         try {
             const token = localStorage.getItem("access_token");
             await supportApi.uploadAttachment(conversationId, file, token ? null : guestToken);
+            // File uploads trigger WebSocket messages, so we'll receive it via subscription
+            // But reload messages to ensure we have the latest
             await loadMessages();
             showSuccess("File uploaded successfully!");
             if (fileInputRef.current) {

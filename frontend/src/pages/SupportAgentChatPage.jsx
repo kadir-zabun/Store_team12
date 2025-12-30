@@ -1,11 +1,17 @@
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import supportApi from "../api/supportApi";
 import { useToast } from "../contexts/ToastContext";
 import { useUserRole } from "../hooks/useUserRole";
+import {
+    connectWebSocket,
+    disconnectWebSocket,
+    subscribeToConversation,
+    subscribeToQueue,
+    sendAgentMessageViaWebSocket,
+} from "../utils/websocketClient";
 
 export default function SupportAgentChatPage() {
-    const [userName, setUserName] = useState(null);
     const [conversations, setConversations] = useState([]);
     const [selectedConversation, setSelectedConversation] = useState(null);
     const [messages, setMessages] = useState([]);
@@ -22,9 +28,9 @@ export default function SupportAgentChatPage() {
     const navigate = useNavigate();
     const { success: showSuccess, error: showError } = useToast();
     const userRole = useUserRole();
-    const dropdownRef = useRef(null);
-    const [showDropdown, setShowDropdown] = useState(false);
-    const [pollingInterval, setPollingInterval] = useState(null);
+    const wsClientRef = useRef(null);
+    const messageSubscriptionRef = useRef(null);
+    const queueSubscriptionRef = useRef(null);
 
     useEffect(() => {
         const token = localStorage.getItem("access_token");
@@ -47,13 +53,6 @@ export default function SupportAgentChatPage() {
 
         const loadData = async () => {
             try {
-                const payloadBase64 = token.split(".")[1];
-                const normalized = payloadBase64.replace(/-/g, "+").replace(/_/g, "/");
-                const payloadJson = atob(normalized);
-                const payload = JSON.parse(payloadJson);
-                const username = payload.sub || payload.name || payload.username;
-                setUserName(username);
-
                 await loadQueue();
             } catch (error) {
                 console.error("Error loading data:", error);
@@ -65,18 +64,109 @@ export default function SupportAgentChatPage() {
 
         loadData();
 
-        // Poll for new messages every 3 seconds if a conversation is selected
-        const interval = setInterval(() => {
-            if (selectedConversation) {
-                loadMessages(selectedConversation.conversationId);
+        // Connect WebSocket for real-time updates
+        const client = connectWebSocket(
+            null,
+            (error) => {
+                console.error("WebSocket error:", error);
+                showError("Connection error. Please refresh the page.");
+            },
+            token
+        );
+
+        wsClientRef.current = client;
+
+        // Subscribe to queue updates
+        const checkConnection = setInterval(() => {
+            if (client && client.connected) {
+                clearInterval(checkConnection);
+                
+                // Subscribe to queue updates
+                const queueSub = subscribeToQueue(client, (conversation) => {
+                    // Update conversation in the list
+                    setConversations((prev) => {
+                        const index = prev.findIndex((c) => c.conversationId === conversation.conversationId);
+                        if (index >= 0) {
+                            // Update existing conversation
+                            const updated = [...prev];
+                            updated[index] = conversation;
+                            return updated;
+                        } else {
+                            // Add new conversation
+                            return [...prev, conversation];
+                        }
+                    });
+
+                    // Update selected conversation if it's the one being updated
+                    if (selectedConversation && selectedConversation.conversationId === conversation.conversationId) {
+                        setSelectedConversation(conversation);
+                    }
+                });
+
+                queueSubscriptionRef.current = queueSub;
             }
-        }, 3000);
-        setPollingInterval(interval);
+        }, 100);
 
         return () => {
-            if (interval) clearInterval(interval);
+            clearInterval(checkConnection);
+            if (messageSubscriptionRef.current) {
+                messageSubscriptionRef.current.unsubscribe();
+                messageSubscriptionRef.current = null;
+            }
+            if (queueSubscriptionRef.current) {
+                queueSubscriptionRef.current.unsubscribe();
+                queueSubscriptionRef.current = null;
+            }
+            disconnectWebSocket();
         };
-    }, [navigate, userRole, showError, selectedConversation]);
+    }, [navigate, userRole, showError]);
+
+    // Subscribe to conversation messages when a conversation is selected
+    useEffect(() => {
+        if (selectedConversation && wsClientRef.current) {
+            // Load initial messages
+            loadMessages(selectedConversation.conversationId);
+
+            // Wait for WebSocket connection and subscribe
+            const checkConnection = setInterval(() => {
+                if (wsClientRef.current && wsClientRef.current.connected) {
+                    clearInterval(checkConnection);
+
+                    // Unsubscribe from previous conversation if any
+                    if (messageSubscriptionRef.current) {
+                        messageSubscriptionRef.current.unsubscribe();
+                    }
+
+                    // Subscribe to new conversation messages
+                    const subscription = subscribeToConversation(
+                        wsClientRef.current,
+                        selectedConversation.conversationId,
+                        (message) => {
+                            // Add new message to the list
+                            setMessages((prev) => {
+                                // Check if message already exists
+                                const exists = prev.some((m) => m.messageId === message.messageId);
+                                if (exists) {
+                                    return prev;
+                                }
+                                return [...prev, message];
+                            });
+                        }
+                    );
+
+                    messageSubscriptionRef.current = subscription;
+                }
+            }, 100);
+
+            return () => {
+                clearInterval(checkConnection);
+                if (messageSubscriptionRef.current) {
+                    messageSubscriptionRef.current.unsubscribe();
+                    messageSubscriptionRef.current = null;
+                }
+            };
+        }
+    }, [selectedConversation]);
 
     useEffect(() => {
         if (messagesEndRef.current) {
@@ -151,8 +241,25 @@ export default function SupportAgentChatPage() {
 
         setSendingMessage(true);
         try {
-            await supportApi.agentSendText(selectedConversation.conversationId, messageText.trim());
+            const text = messageText.trim();
             setMessageText("");
+
+            // Try WebSocket first, fallback to REST API
+            if (wsClientRef.current && wsClientRef.current.connected) {
+                const sent = sendAgentMessageViaWebSocket(
+                    wsClientRef.current,
+                    selectedConversation.conversationId,
+                    text
+                );
+                if (sent) {
+                    // Message will be received via WebSocket subscription
+                    setSendingMessage(false);
+                    return;
+                }
+            }
+
+            // Fallback to REST API
+            await supportApi.agentSendText(selectedConversation.conversationId, text);
             await loadMessages(selectedConversation.conversationId);
         } catch (error) {
             console.error("Error sending message:", error);
@@ -169,6 +276,8 @@ export default function SupportAgentChatPage() {
         setUploadingFile(true);
         try {
             await supportApi.agentUploadAttachment(selectedConversation.conversationId, file);
+            // File uploads trigger WebSocket messages, so we'll receive it via subscription
+            // But reload messages to ensure we have the latest
             await loadMessages(selectedConversation.conversationId);
             showSuccess("File uploaded successfully!");
             if (fileInputRef.current) {
@@ -216,29 +325,22 @@ export default function SupportAgentChatPage() {
         }
     };
 
-    const handleLogout = () => {
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("user_role");
-        setUserName(null);
-        setShowDropdown(false);
-        navigate("/login");
-    };
 
     const storedRole = localStorage.getItem("user_role");
     const currentRole = userRole || storedRole;
 
     if (loading || (currentRole === null || currentRole === undefined)) {
         return (
-            <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <div style={{ color: "#fff", fontSize: "1.5rem" }}>Loading...</div>
+            <div style={{ minHeight: "calc(100vh - 120px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ color: "#667eea", fontSize: "1.5rem" }}>Loading...</div>
             </div>
         );
     }
 
     if (currentRole !== "SUPPORT_AGENT") {
         return (
-            <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <div style={{ background: "rgba(255, 255, 255, 0.95)", padding: "2rem", borderRadius: "8px", textAlign: "center" }}>
+            <div style={{ minHeight: "calc(100vh - 120px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ background: "rgba(255, 255, 255, 0.95)", padding: "2rem", borderRadius: "8px", textAlign: "center", boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)" }}>
                     <h2 style={{ color: "#2d3748" }}>Access Denied</h2>
                     <p style={{ color: "#718096" }}>This page is only accessible to Support Agents.</p>
                 </div>
@@ -247,127 +349,12 @@ export default function SupportAgentChatPage() {
     }
 
     return (
-        <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}>
-            <nav
-                style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "1.2rem 4rem",
-                    background: "rgba(255, 255, 255, 0.95)",
-                    backdropFilter: "blur(10px)",
-                    boxShadow: "0 4px 6px rgba(0, 0, 0, 0.1)",
-                    position: "sticky",
-                    top: 0,
-                    zIndex: 100,
-                }}
-            >
-                <div style={{ display: "flex", alignItems: "center", gap: "3rem" }}>
-                    <Link
-                        to="/"
-                        style={{
-                            fontSize: "1.5rem",
-                            fontWeight: 700,
-                            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                            WebkitBackgroundClip: "text",
-                            WebkitTextFillColor: "transparent",
-                            textDecoration: "none",
-                        }}
-                    >
-                        🛍️ TeknoSU
-                    </Link>
-                    <div style={{ display: "flex", alignItems: "center", gap: "2rem" }}>
-                        <Link 
-                            to="/support/chat" 
-                            style={{ color: "#667eea", textDecoration: "underline", padding: "0.5rem 1rem", borderRadius: "4px", fontWeight: 600, transition: "all 0.2s" }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.color = "#764ba2";
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.color = "#667eea";
-                            }}
-                        >
-                            Support Chat
-                        </Link>
-                    </div>
-                </div>
-
-                <div style={{ display: "flex", alignItems: "center", gap: "1rem", position: "relative" }}>
-                    {userName && (
-                        <div ref={dropdownRef} style={{ position: "relative" }}
-                            onMouseEnter={() => setShowDropdown(true)}
-                            onMouseLeave={() => setShowDropdown(false)}
-                        >
-                            <button
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "0.6rem",
-                                    padding: "0.6rem 1.2rem",
-                                    borderRadius: "4px",
-                                    border: "none",
-                                    background: showDropdown ? "#f7fafc" : "transparent",
-                                    color: showDropdown ? "#667eea" : "#4a5568",
-                                    transition: "all 0.2s",
-                                    fontSize: "0.95rem",
-                                    fontWeight: 500,
-                                    cursor: "pointer",
-                                }}
-                            >
-                                <span>{userName}</span>
-                                <span style={{ fontSize: "0.7rem" }}>{showDropdown ? "▲" : "▼"}</span>
-                            </button>
-                            {showDropdown && (
-                                <div
-                                    style={{
-                                        position: "absolute",
-                                        top: "100%",
-                                        right: 0,
-                                        marginTop: "0.25rem",
-                                        background: "#fff",
-                                        border: "1px solid #e2e8f0",
-                                        borderRadius: "4px",
-                                        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
-                                        minWidth: "200px",
-                                        zIndex: 1000,
-                                    }}
-                                >
-                                    <button
-                                        onClick={handleLogout}
-                                        style={{
-                                            width: "100%",
-                                            textAlign: "left",
-                                            padding: "0.75rem 1rem",
-                                            background: "transparent",
-                                            border: "none",
-                                            color: "#e53e3e",
-                                            fontSize: "0.9rem",
-                                            cursor: "pointer",
-                                            transition: "all 0.2s",
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            e.currentTarget.style.background = "#fee";
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            e.currentTarget.style.background = "transparent";
-                                        }}
-                                    >
-                                        Logout
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
-            </nav>
-
-            <div style={{ display: "flex", height: "calc(100vh - 80px)", padding: "2rem", gap: "1rem" }}>
-                {/* Conversation Queue */}
-                <div
+        <div style={{ minHeight: "calc(100vh - 120px)", padding: "2rem", display: "flex", gap: "1rem" }}>
+            {/* Conversation Queue */}
+            <div
                     style={{
                         flex: "0 0 350px",
-                        background: "rgba(255, 255, 255, 0.95)",
-                        backdropFilter: "blur(10px)",
+                        background: "#fff",
                         borderRadius: "8px",
                         padding: "1.5rem",
                         boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
@@ -449,16 +436,15 @@ export default function SupportAgentChatPage() {
                             ))
                         )}
                     </div>
-                </div>
+            </div>
 
-                {/* Chat Area */}
-                <div
+            {/* Chat Area */}
+            <div
                     style={{
                         flex: 1,
                         display: "flex",
                         flexDirection: "column",
-                        background: "rgba(255, 255, 255, 0.95)",
-                        backdropFilter: "blur(10px)",
+                        background: "#fff",
                         borderRadius: "8px",
                         padding: "1.5rem",
                         boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
@@ -637,7 +623,6 @@ export default function SupportAgentChatPage() {
                             Select a conversation to start chatting
                         </div>
                     )}
-                </div>
             </div>
         </div>
     );
