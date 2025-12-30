@@ -13,4 +13,5 @@ public class ProfileResponseDto {
     private String name;
     private String email;
     private String homeAddress;
+    private String taxId;
 }

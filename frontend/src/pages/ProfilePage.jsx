@@ -312,6 +312,23 @@ export default function ProfilePage() {
 
                             <div>
                                 <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600, color: "#4a5568", fontSize: "0.85rem" }}>
+                                    Tax ID
+                                </label>
+                                <div
+                                    style={{
+                                        padding: "0.75rem",
+                                        background: "#f7fafc",
+                                        borderRadius: "4px",
+                                        color: "#2d3748",
+                                        fontSize: "0.9rem",
+                                    }}
+                                >
+                                    {profile.taxId || "N/A"}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600, color: "#4a5568", fontSize: "0.85rem" }}>
                                     Home Address
                                 </label>
                                 <div

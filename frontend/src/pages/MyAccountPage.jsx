@@ -228,6 +228,12 @@ export default function MyAccountPage() {
                                             })()}
                                         </div>
                                     </div>
+                                    <div>
+                                        <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#4a5568", marginBottom: "0.25rem" }}>
+                                            Tax ID
+                                        </label>
+                                        <div style={{ fontSize: "1rem", color: "#2d3748" }}>{profile.taxId || "N/A"}</div>
+                                    </div>
                                     {profile.taxId && (
                                         <div>
                                             <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#4a5568", marginBottom: "0.25rem" }}>
