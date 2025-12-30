@@ -44,6 +44,7 @@ public class UserService {
                 .name(user.getName())
                 .email(user.getEmail())
                 .homeAddress(user.getHomeAddress())
+                .taxId(user.getTaxId())
                 .build();
     }
 
