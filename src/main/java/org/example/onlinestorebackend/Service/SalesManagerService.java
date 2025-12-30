@@ -2,14 +2,11 @@ package org.example.onlinestorebackend.Service;
 
 import lombok.RequiredArgsConstructor;
 import org.example.onlinestorebackend.Dto.SalesMetricResponse;
-import org.example.onlinestorebackend.Entity.Invoice;
-import org.example.onlinestorebackend.Entity.Order;
-import org.example.onlinestorebackend.Entity.OrderItem;
-import org.example.onlinestorebackend.Entity.Product;
-import org.example.onlinestorebackend.Entity.WishList;
+import org.example.onlinestorebackend.Entity.*;
 import org.example.onlinestorebackend.Repository.InvoiceRepository;
 import org.example.onlinestorebackend.Repository.OrderRepository;
 import org.example.onlinestorebackend.Repository.ProductRepository;
+import org.example.onlinestorebackend.Repository.RefundRequestRepository;
 import org.example.onlinestorebackend.exception.InvalidRequestException;
 import org.example.onlinestorebackend.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
@@ -31,6 +28,7 @@ public class SalesManagerService {
     private final WishListService wishListService;
     private final UserService userService;
     private final MailService mailService;
+    private final RefundRequestRepository refundRequestRepository;
 
     @Transactional
     public List<Product> setDiscount(List<String> productIds, BigDecimal discountPercent) {
@@ -110,20 +108,32 @@ public class SalesManagerService {
         BigDecimal totalRevenue = BigDecimal.ZERO;
         BigDecimal totalCost = BigDecimal.ZERO;
 
+        // invoice aralığındaki order'ları cache'leyelim + hangi güne yazılacaklarını bilelim
+        Map<String, LocalDate> orderDayMap = new HashMap<>();
+        Map<String, Order> orderCache = new HashMap<>();
+
         for (Invoice inv : invoices) {
             LocalDateTime invDate = inv.getInvoiceDate() != null ? inv.getInvoiceDate() : from;
             LocalDate key = invDate.toLocalDate();
 
-            Order order = orderRepository.findByOrderId(inv.getOrderId()).orElse(null);
+            String orderId = inv.getOrderId();
+            orderDayMap.put(orderId, key);
+
+            Order order = orderCache.computeIfAbsent(orderId, id ->
+                    orderRepository.findByOrderId(id).orElse(null)
+            );
+
             if (order == null || order.getItems() == null) {
                 continue;
             }
 
             BigDecimal revenue = BigDecimal.ZERO;
             BigDecimal cost = BigDecimal.ZERO;
+
             for (OrderItem item : order.getItems()) {
                 BigDecimal unitPrice = item.getPriceAtPurchase() != null ? item.getPriceAtPurchase() : BigDecimal.ZERO;
                 int qty = item.getQuantity() != null ? item.getQuantity() : 0;
+
                 revenue = revenue.add(unitPrice.multiply(BigDecimal.valueOf(qty)));
 
                 BigDecimal unitCost = item.getCostAtPurchase();
@@ -141,6 +151,57 @@ public class SalesManagerService {
             t.cost = t.cost.add(cost);
         }
 
+        // ✅ REFUND DÜŞME: invoice range'ine giren order'lar için APPROVED refund'ları çek ve geri düş
+        if (!orderDayMap.isEmpty()) {
+            List<RefundRequest> approvedRefunds =
+                    refundRequestRepository.findByStatusIgnoreCaseAndOrderIdIn("APPROVED", new ArrayList<>(orderDayMap.keySet()));
+
+            for (RefundRequest refund : approvedRefunds) {
+                String orderId = refund.getOrderId();
+                LocalDate dayKey = orderDayMap.get(orderId);
+                if (dayKey == null) {
+                    continue; // bu refund bu metrics'in invoice set'inde yok
+                }
+
+                Order order = orderCache.computeIfAbsent(orderId, id ->
+                        orderRepository.findByOrderId(id).orElse(null)
+                );
+                if (order == null || order.getItems() == null) {
+                    continue;
+                }
+
+                // ilgili product'ın order item'ını bul
+                OrderItem item = order.getItems().stream()
+                        .filter(i -> refund.getProductId() != null && refund.getProductId().equals(i.getProductId()))
+                        .findFirst()
+                        .orElse(null);
+
+                if (item == null) continue;
+
+                int refundQty = refund.getQuantity() != null ? refund.getQuantity() : 0;
+                if (refundQty <= 0) continue;
+
+                BigDecimal unitPrice = item.getPriceAtPurchase() != null ? item.getPriceAtPurchase() : BigDecimal.ZERO;
+
+                BigDecimal unitCost = item.getCostAtPurchase();
+                if (unitCost == null) {
+                    unitCost = unitPrice.multiply(BigDecimal.valueOf(0.5)).setScale(2, RoundingMode.HALF_UP);
+                }
+
+                BigDecimal refundRevenue = unitPrice.multiply(BigDecimal.valueOf(refundQty));
+                BigDecimal refundCost = unitCost.multiply(BigDecimal.valueOf(refundQty));
+
+                // totals'tan düş
+                totalRevenue = totalRevenue.subtract(refundRevenue);
+                totalCost = totalCost.subtract(refundCost);
+
+                // günlükten düş
+                Totals t = byDay.computeIfAbsent(dayKey, k -> new Totals());
+                t.revenue = t.revenue.subtract(refundRevenue);
+                t.cost = t.cost.subtract(refundCost);
+            }
+        }
+
         List<SalesMetricResponse.Point> points = new ArrayList<>();
         for (Map.Entry<LocalDate, Totals> e : byDay.entrySet()) {
             BigDecimal profit = e.getValue().revenue.subtract(e.getValue().cost);
@@ -155,10 +216,9 @@ public class SalesManagerService {
         return resp;
     }
 
+
     private static class Totals {
         BigDecimal revenue = BigDecimal.ZERO;
         BigDecimal cost = BigDecimal.ZERO;
     }
 }
-
-

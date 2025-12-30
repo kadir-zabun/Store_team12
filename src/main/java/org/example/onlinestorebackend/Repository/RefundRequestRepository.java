@@ -12,4 +12,5 @@ public interface RefundRequestRepository extends MongoRepository<RefundRequest, 
     List<RefundRequest> findByUserId(String userId);
     List<RefundRequest> findByApproved(Boolean approved);
     List<RefundRequest> findByRequestDateBetween(LocalDateTime start, LocalDateTime end);
+    List<RefundRequest> findByStatusIgnoreCaseAndOrderIdIn(String status, List<String> orderIds);
 }
