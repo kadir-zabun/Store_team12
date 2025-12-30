@@ -12,6 +12,7 @@ export default function OrderHistoryPage() {
     const [userId, setUserId] = useState(null);
     const [orders, setOrders] = useState([]);
     const [deliveredOrders, setDeliveredOrders] = useState([]);
+    const [myRefunds, setMyRefunds] = useState([]); // User's refund requests
     const [myReviews, setMyReviews] = useState([]); // User's existing reviews
     const [loading, setLoading] = useState(true);
     const [reviewingProduct, setReviewingProduct] = useState(null);
@@ -24,6 +25,7 @@ export default function OrderHistoryPage() {
         quantity: 1,
         reason: "",
     });
+    const [refundStatusMap, setRefundStatusMap] = useState({});
     const navigate = useNavigate();
     const { success: showSuccess, error: showError } = useToast();
     const userRole = useUserRole();
@@ -125,6 +127,16 @@ export default function OrderHistoryPage() {
                         } catch (error) {
                             console.error("Error loading reviews:", error);
                         }
+
+                        // Load user's refund requests
+                        try {
+                            const refundsResponse = await orderApi.getMyRefunds();
+                            const refundsData = refundsResponse.data?.data || refundsResponse.data || [];
+                            console.log("Loaded refunds:", refundsData);
+                            setMyRefunds(Array.isArray(refundsData) ? refundsData : []);
+                        } catch (error) {
+                            console.error("Error loading refunds:", error);
+                        }
                     } catch (error) {
                         console.error("Error getting userId or orders:", error);
                         console.error("Error response:", error.response);
@@ -212,6 +224,17 @@ export default function OrderHistoryPage() {
         }
     };
 
+    // Build a lookup for refund status by (orderId, productId)
+    useEffect(() => {
+        const map = {};
+        (myRefunds || []).forEach((r) => {
+            if (!r.orderId || !r.productId) return;
+            const key = `${r.orderId}-${r.productId}`;
+            map[key] = r;
+        });
+        setRefundStatusMap(map);
+    }, [myRefunds]);
+
     if (loading) {
         return (
             <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -288,6 +311,10 @@ export default function OrderHistoryPage() {
                                             const orderDate = order.orderDate ? new Date(order.orderDate) : null;
                                             const daysSincePurchase = orderDate ? Math.floor((new Date() - orderDate) / (1000 * 60 * 60 * 24)) : null;
                                             const canRefund = order.status === "DELIVERED" && daysSincePurchase !== null && daysSincePurchase <= 30;
+                                            const refundKey = `${order.orderId || order.id}-${item.productId}`;
+                                            const refundInfo = refundStatusMap[refundKey];
+                                            const isRefundApproved = refundInfo && refundInfo.status === "APPROVED";
+                                            const isRefundPending = refundInfo && refundInfo.status === "PENDING";
                                             
                                             return (
                                                 <div
@@ -322,42 +349,52 @@ export default function OrderHistoryPage() {
                                                         <div style={{ fontWeight: 600, color: "#667eea" }}>
                                                             ${((item.priceAtPurchase || item.price || 0) * item.quantity).toFixed(2)}
                                                         </div>
-                                                        {canRefund && (
-                                                            <button
-                                                                onClick={() => {
-                                                                    setRefundingItem({
-                                                                        orderId: order.orderId || order.id,
-                                                                        productId: item.productId,
-                                                                        productName: item.productName,
-                                                                        maxQuantity: item.quantity,
-                                                                        priceAtPurchase: item.priceAtPurchase || item.price || 0,
-                                                                    });
-                                                                    setRefundForm({
-                                                                        quantity: 1,
-                                                                        reason: "",
-                                                                    });
-                                                                }}
-                                                                style={{
-                                                                    padding: "0.5rem 1rem",
-                                                                    background: "#d69e2e",
-                                                                    color: "#fff",
-                                                                    border: "none",
-                                                                    borderRadius: "8px",
-                                                                    fontWeight: 600,
-                                                                    fontSize: "0.85rem",
-                                                                    cursor: "pointer",
-                                                                    transition: "all 0.2s",
-                                                                }}
-                                                                onMouseEnter={(e) => {
-                                                                    e.currentTarget.style.background = "#b7791f";
-                                                                }}
-                                                                onMouseLeave={(e) => {
-                                                                    e.currentTarget.style.background = "#d69e2e";
-                                                                }}
-                                                            >
-                                                                Request Refund
-                                                            </button>
-                                                        )}
+                                                            {isRefundApproved && (
+                                                                <span style={{ padding: "0.4rem 0.8rem", background: "#2f855a", color: "#fff", borderRadius: "8px", fontWeight: 600, fontSize: "0.85rem" }}>
+                                                                    Refund Accepted
+                                                                </span>
+                                                            )}
+                                                            {isRefundPending && !isRefundApproved && (
+                                                                <span style={{ padding: "0.4rem 0.8rem", background: "#d69e2e", color: "#fff", borderRadius: "8px", fontWeight: 600, fontSize: "0.85rem" }}>
+                                                                    Refund Pending
+                                                                </span>
+                                                            )}
+                                                            {canRefund && !isRefundApproved && !isRefundPending && (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setRefundingItem({
+                                                                            orderId: order.orderId || order.id,
+                                                                            productId: item.productId,
+                                                                            productName: item.productName,
+                                                                            maxQuantity: item.quantity,
+                                                                            priceAtPurchase: item.priceAtPurchase || item.price || 0,
+                                                                        });
+                                                                        setRefundForm({
+                                                                            quantity: 1,
+                                                                            reason: "",
+                                                                        });
+                                                                    }}
+                                                                    style={{
+                                                                        padding: "0.5rem 1rem",
+                                                                        background: "#d69e2e",
+                                                                        color: "#fff",
+                                                                        border: "none",
+                                                                        borderRadius: "8px",
+                                                                        fontWeight: 600,
+                                                                        fontSize: "0.85rem",
+                                                                        cursor: "pointer",
+                                                                        transition: "all 0.2s",
+                                                                    }}
+                                                                    onMouseEnter={(e) => {
+                                                                        e.currentTarget.style.background = "#b7791f";
+                                                                    }}
+                                                                    onMouseLeave={(e) => {
+                                                                        e.currentTarget.style.background = "#d69e2e";
+                                                                    }}
+                                                                >
+                                                                    Request Refund
+                                                                </button>
+                                                            )}
                                                     </div>
                                                 </div>
                                             );
@@ -771,6 +808,14 @@ export default function OrderHistoryPage() {
                                             const ordersResponse = await orderApi.getOrdersByCustomer(userId);
                                             const ordersData = ordersResponse.data?.data || ordersResponse.data || [];
                                             setOrders(Array.isArray(ordersData) ? ordersData : []);
+                                            // Reload refunds to update statuses
+                                            try {
+                                                const refundsResponse = await orderApi.getMyRefunds();
+                                                const refundsData = refundsResponse.data?.data || refundsResponse.data || [];
+                                                setMyRefunds(Array.isArray(refundsData) ? refundsData : []);
+                                            } catch (err) {
+                                                console.error("Error reloading refunds:", err);
+                                            }
                                         } catch (error) {
                                             showError(error.response?.data?.message || "Failed to request refund. Please try again.");
                                         }
