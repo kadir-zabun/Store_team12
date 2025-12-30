@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import authApi from "../api/authApi";
+import authApi from "../api/AuthApi";
 import { useToast } from "../contexts/ToastContext";
 import { useUserRole } from "../hooks/useUserRole";
 import { getRegisterErrorMessage } from "../utils/errorHandler";
@@ -11,6 +11,7 @@ export default function RegisterPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
+    const [taxId, setTaxId] = useState("");
     const [role] = useState("CUSTOMER"); // Only CUSTOMER role available
     const [error, setError] = useState("");
     const [userName, setUserName] = useState(null);
@@ -90,8 +91,8 @@ export default function RegisterPage() {
         e.preventDefault();
         setError("");
 
-        if (!name || !username || !email || !password || !confirmPassword) {
-            setError("Please fill in all fields.");
+        if (!name || !username || !email || !password || !confirmPassword || !taxId) {
+            setError("Please fill in all fields (Tax ID is required).");
             return;
         }
 
@@ -101,7 +102,7 @@ export default function RegisterPage() {
         }
 
         try {
-            const res = await authApi.register(name, username, email, password, confirmPassword, role);
+            const res = await authApi.register(name, username, email, password, confirmPassword, role, taxId);
             showSuccess("Registration successful! Redirecting to login...");
             setTimeout(() => {
                 navigate("/login");
@@ -472,6 +473,30 @@ export default function RegisterPage() {
                         placeholder="Email Address"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
+                        style={{
+                            padding: "1rem",
+                            fontSize: "1rem",
+                            borderRadius: "12px",
+                            border: "2px solid #e2e8f0",
+                            background: "#fff",
+                            color: "#2d3748",
+                            transition: "all 0.2s",
+                        }}
+                        onFocus={(e) => {
+                            e.currentTarget.style.borderColor = "#667eea";
+                            e.currentTarget.style.boxShadow = "0 0 0 3px rgba(102, 126, 234, 0.1)";
+                        }}
+                        onBlur={(e) => {
+                            e.currentTarget.style.borderColor = "#e2e8f0";
+                            e.currentTarget.style.boxShadow = "none";
+                        }}
+                    />
+
+                    <input
+                        type="text"
+                        placeholder="Tax ID"
+                        value={taxId}
+                        onChange={(e) => setTaxId(e.target.value)}
                         style={{
                             padding: "1rem",
                             fontSize: "1rem",

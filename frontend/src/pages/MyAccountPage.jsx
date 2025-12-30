@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useUserRole } from "../hooks/useUserRole";
 import { useToast } from "../contexts/ToastContext";
 import userApi from "../api/userApi";
-import authApi from "../api/authApi";
+import authApi from "../api/AuthApi";
 
 export default function MyAccountPage() {
     const navigate = useNavigate();
