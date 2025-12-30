@@ -59,7 +59,16 @@ public class SupportChatService {
 
     @Transactional
     public SupportConversation startForGuest(String existingGuestToken) {
-        // Simple: always create a new conversation if no guestToken is supplied.
+        if (existingGuestToken != null && !existingGuestToken.isBlank()) {
+            // Check for existing active conversation
+            List<SupportConversation> active = conversationRepository
+                    .findByGuestTokenAndStatusNot(existingGuestToken.trim(), STATUS_CLOSED);
+            if (!active.isEmpty()) {
+                return active.get(0);
+            }
+        }
+
+        // Create new
         SupportConversation c = new SupportConversation();
         c.setConversationId(UUID.randomUUID().toString());
         c.setGuestToken(existingGuestToken != null && !existingGuestToken.isBlank()
@@ -75,6 +84,13 @@ public class SupportChatService {
     public SupportConversation startForUser(String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + username));
+
+        // Check for existing active conversation
+        List<SupportConversation> active = conversationRepository.findByCustomerUserIdAndStatusNot(user.getUserId(),
+                STATUS_CLOSED);
+        if (!active.isEmpty()) {
+            return active.get(0);
+        }
 
         SupportConversation c = new SupportConversation();
         c.setConversationId(UUID.randomUUID().toString());
@@ -146,9 +162,9 @@ public class SupportChatService {
 
     @Transactional
     public SupportMessage sendTextAsCustomerOrGuest(String conversationId,
-                                                    String usernameOrNull,
-                                                    String guestTokenOrNull,
-                                                    String text) {
+            String usernameOrNull,
+            String guestTokenOrNull,
+            String text) {
         if (text == null || text.isBlank()) {
             throw new InvalidRequestException("text is required");
         }
@@ -211,10 +227,10 @@ public class SupportChatService {
     }
 
     public List<SupportMessage> listMessages(String conversationId,
-                                             String usernameOrNull,
-                                             String guestTokenOrNull,
-                                             String agentUsernameOrNull,
-                                             boolean agentAccess) {
+            String usernameOrNull,
+            String guestTokenOrNull,
+            String agentUsernameOrNull,
+            boolean agentAccess) {
         SupportConversation c = getConversation(conversationId);
         if (agentAccess) {
             assertAgentAccess(c, agentUsernameOrNull);
@@ -233,9 +249,9 @@ public class SupportChatService {
 
     @Transactional
     public SupportMessage uploadAttachmentAsCustomerOrGuest(String conversationId,
-                                                            String usernameOrNull,
-                                                            String guestTokenOrNull,
-                                                            MultipartFile file) {
+            String usernameOrNull,
+            String guestTokenOrNull,
+            MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new InvalidRequestException("file is required");
         }
@@ -292,8 +308,8 @@ public class SupportChatService {
 
     @Transactional
     public SupportMessage uploadAttachmentAsAgent(String conversationId,
-                                                  String agentUsername,
-                                                  MultipartFile file) {
+            String agentUsername,
+            MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new InvalidRequestException("file is required");
         }
@@ -375,8 +391,7 @@ public class SupportChatService {
                 user.getUsername(),
                 user.getName(),
                 user.getEmail(),
-                user.getRole()
-        );
+                user.getRole());
 
         Cart cart = cartRepository.findByUserId(userId).orElse(null);
         List<Order> orders = orderRepository.findByCustomerId(userId);
