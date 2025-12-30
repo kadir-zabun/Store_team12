@@ -115,20 +115,24 @@ public class RefundService {
             product.setInStock(Boolean.TRUE);
             productRepository.save(product);
 
-            order.setStatus("REFUND_APPROVED");
-            orderRepository.save(order);
+            // Siparişi DELIVERED durumda bırak ki diğer ürünler için de yeni refund istekleri yapılabilsin
+            // (tek bir kalem onaylandığında tüm siparişi bloklamayalım)
+            if (!"DELIVERED".equalsIgnoreCase(order.getStatus())) {
+                order.setStatus("DELIVERED");
+                orderRepository.save(order);
+            }
 
             refund.setStatus("APPROVED");
-            sendRefundMail(order, refund, true);
+            sendRefundMail(order, refund, true, product.getProductName());
         } else {
             refund.setStatus("REJECTED");
-            sendRefundMail(order, refund, false);
+            sendRefundMail(order, refund, false, product.getProductName());
         }
 
         return refundRequestRepository.save(refund);
     }
 
-    private void sendRefundMail(Order order, RefundRequest refund, boolean approved) {
+    private void sendRefundMail(Order order, RefundRequest refund, boolean approved, String productName) {
         try {
             String email = userRepository.findByUserId(order.getCustomerId())
                     .map(User::getEmail)
@@ -137,9 +141,24 @@ public class RefundService {
                 log.warn("Email not found for user {}", order.getCustomerId());
                 return;
             }
+
+            // Ürün adı: önce order item içinden, yoksa parametre, yoksa productId
+            String resolvedProductName = productName;
+            if (order.getItems() != null) {
+                resolvedProductName = order.getItems().stream()
+                        .filter(i -> refund.getProductId().equals(i.getProductId()))
+                        .map(OrderItem::getProductName)
+                        .filter(n -> n != null && !n.isBlank())
+                        .findFirst()
+                        .orElse(resolvedProductName);
+            }
+            if (resolvedProductName == null || resolvedProductName.isBlank()) {
+                resolvedProductName = refund.getProductId();
+            }
+
             mailService.sendRefundNotificationEmail(
                     email,
-                    refund.getProductId(),
+                    resolvedProductName,
                     refund.getRefundAmount(),
                     approved,
                     refund.getReason(),

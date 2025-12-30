@@ -413,51 +413,6 @@ export default function OrderHistoryPage() {
                                                 Cancel Order
                                             </button>
                                         )}
-                                        {order.status === "DELIVERED" && (
-                                            <button
-                                                onClick={async () => {
-                                                    try {
-                                                        const orderId = order.orderId || order.id;
-                                                        if (!orderId || !order.items || order.items.length === 0) {
-                                                            showError("Order information is incomplete.");
-                                                            return;
-                                                        }
-                                                        // For simplicity, request refund for first item
-                                                        // In a real app, user would select which items to refund
-                                                        const firstItem = order.items[0];
-                                                        const refundData = {
-                                                            orderId: orderId,
-                                                            productId: firstItem.productId,
-                                                            quantity: firstItem.quantity,
-                                                            reason: "Customer requested refund",
-                                                        };
-                                                        await orderApi.requestRefund(orderId, refundData);
-                                                        showSuccess("Refund request submitted successfully!");
-                                                    } catch (error) {
-                                                        showError(error.response?.data?.message || "Failed to request refund. Please try again.");
-                                                    }
-                                                }}
-                                                style={{
-                                                    padding: "0.5rem 1rem",
-                                                    background: "#d69e2e",
-                                                    color: "#fff",
-                                                    border: "none",
-                                                    borderRadius: "8px",
-                                                    fontWeight: 600,
-                                                    fontSize: "0.9rem",
-                                                    cursor: "pointer",
-                                                    transition: "all 0.3s",
-                                                }}
-                                                onMouseEnter={(e) => {
-                                                    e.currentTarget.style.background = "#b7791f";
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    e.currentTarget.style.background = "#d69e2e";
-                                                }}
-                                            >
-                                                Request Refund
-                                            </button>
-                                        )}
                                         <button
                                             onClick={async () => {
                                                 try {
