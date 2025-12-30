@@ -26,6 +26,7 @@ export default function ProductsPage() {
     const [filterInStock, setFilterInStock] = useState(false);
     const [minPrice, setMinPrice] = useState("");
     const [maxPrice, setMaxPrice] = useState("");
+    const [isFiltering, setIsFiltering] = useState(false);
     const getInitialCategory = () => {
         const urlParams = new URLSearchParams(location.search);
         return urlParams.get("category") || "";
@@ -58,7 +59,11 @@ export default function ProductsPage() {
 
     useEffect(() => {
         const loadProducts = async () => {
+            // Immediately clear products and set loading when filters change
+            setProducts([]);
             setLoading(true);
+            setIsFiltering(true);
+            
             try {
                 console.log("📥 Fetching products from database...");
                 
@@ -115,6 +120,15 @@ export default function ProductsPage() {
                     if (minPrice || maxPrice) {
                         const min = minPrice ? parseFloat(minPrice) : 0;
                         const max = maxPrice ? parseFloat(maxPrice) : 999999;
+                        
+                        // Validate price range
+                        if (isNaN(min) || isNaN(max) || min < 0 || max < 0 || min > max) {
+                            setProducts([]);
+                            setLoading(false);
+                            setIsFiltering(false);
+                            return;
+                        }
+                        
                         filteredProducts = filteredProducts.filter(p => {
                             const finalPrice = p.finalPrice || p.price || 0;
                             return finalPrice >= min && finalPrice <= max;
@@ -155,6 +169,7 @@ export default function ProductsPage() {
                         }
                     });
                     
+                    // Only update products if we're still in the same filter state
                     setProducts(filteredProducts);
                     console.log(`✅ Loaded ${filteredProducts.length} products from database`);
                 } else {
@@ -168,15 +183,24 @@ export default function ProductsPage() {
                 setProducts([]);
             } finally {
                 setLoading(false);
+                setIsFiltering(false);
             }
         };
 
-        // Debounce search query to avoid too many API calls
+        // Debounce for search query and price filters
+        const hasSearchQuery = searchQuery.trim().length > 0;
+        const hasPriceFilter = minPrice || maxPrice;
+        const debounceDelay = hasSearchQuery ? 500 : (hasPriceFilter ? 300 : 0);
+        
         const timeoutId = setTimeout(() => {
             loadProducts();
-        }, searchQuery.trim() ? 500 : 0);
+        }, debounceDelay);
 
-        return () => clearTimeout(timeoutId);
+        return () => {
+            clearTimeout(timeoutId);
+            // Cancel any pending requests by clearing products immediately
+            setProducts([]);
+        };
     }, [searchQuery, sortBy, filterInStock, minPrice, maxPrice, selectedCategory, showError]);
 
     const handleAddToCart = async (productId) => {
