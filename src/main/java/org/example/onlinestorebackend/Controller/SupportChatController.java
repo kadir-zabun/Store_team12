@@ -31,7 +31,7 @@ public class SupportChatController {
 
     // --- Customer / Guest ---
 
-    @PostMapping("/conversations/start")
+    @PostMapping(value = "/conversations/start", consumes = MediaType.ALL_VALUE)
     public ResponseEntity<StartConversationResponse> start(@AuthenticationPrincipal UserDetails userDetails,
                                                            @RequestParam(required = false) String guestToken) {
         SupportConversation c = (userDetails != null)
@@ -59,9 +59,9 @@ public class SupportChatController {
         return ResponseEntity.ok(messages.stream().map(this::toDto).toList());
     }
 
-    @PostMapping("/conversations/{conversationId}/messages")
+    @PostMapping(value = "/conversations/{conversationId}/messages", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<SupportMessageDto> sendText(@PathVariable String conversationId,
-                                                      @RequestParam String text,
+                                                      @RequestPart("text") String text,
                                                       @AuthenticationPrincipal UserDetails userDetails,
                                                       @RequestHeader(value = "X-Guest-Token", required = false) String guestToken) {
         SupportMessage saved = supportChatService.sendTextAsCustomerOrGuest(
@@ -123,6 +123,21 @@ public class SupportChatController {
         );
     }
 
+    @PostMapping("/conversations/{conversationId}/close")
+    public ResponseEntity<SupportConversationDto> customerClose(@PathVariable String conversationId,
+                                                               @AuthenticationPrincipal UserDetails userDetails,
+                                                               @RequestHeader(value = "X-Guest-Token", required = false) String guestToken) {
+        SupportConversation c = supportChatService.closeByCustomerOrGuest(
+                conversationId,
+                userDetails != null ? userDetails.getUsername() : null,
+                userDetails == null ? guestToken : null
+        );
+        SupportConversationDto dto = toDto(c);
+        // Broadcast conversation status change via WebSocket
+        messagingTemplate.convertAndSend("/topic/support/" + conversationId + "/status", dto);
+        return ResponseEntity.ok(dto);
+    }
+
     // --- Support Agent ---
 
     @GetMapping("/agent/queue")
@@ -137,7 +152,10 @@ public class SupportChatController {
     public ResponseEntity<SupportConversationDto> claim(@PathVariable String conversationId,
                                                         @AuthenticationPrincipal UserDetails userDetails) {
         SupportConversation c = supportChatService.claim(conversationId, userDetails.getUsername());
-        return ResponseEntity.ok(toDto(c));
+        SupportConversationDto dto = toDto(c);
+        // Broadcast conversation status change via WebSocket
+        messagingTemplate.convertAndSend("/topic/support/" + conversationId + "/status", dto);
+        return ResponseEntity.ok(dto);
     }
 
     @PostMapping("/agent/conversations/{conversationId}/close")
@@ -145,13 +163,16 @@ public class SupportChatController {
     public ResponseEntity<SupportConversationDto> close(@PathVariable String conversationId,
                                                         @AuthenticationPrincipal UserDetails userDetails) {
         SupportConversation c = supportChatService.close(conversationId, userDetails.getUsername());
-        return ResponseEntity.ok(toDto(c));
+        SupportConversationDto dto = toDto(c);
+        // Broadcast conversation status change via WebSocket
+        messagingTemplate.convertAndSend("/topic/support/" + conversationId + "/status", dto);
+        return ResponseEntity.ok(dto);
     }
 
-    @PostMapping("/agent/conversations/{conversationId}/messages")
+    @PostMapping(value = "/agent/conversations/{conversationId}/messages", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('SUPPORT_AGENT')")
     public ResponseEntity<SupportMessageDto> agentSendText(@PathVariable String conversationId,
-                                                           @RequestParam String text,
+                                                           @RequestPart("text") String text,
                                                            @AuthenticationPrincipal UserDetails userDetails) {
         SupportMessage saved = supportChatService.sendTextAsAgent(conversationId, userDetails.getUsername(), text);
         SupportMessageDto dto = toDto(saved);
@@ -220,9 +241,24 @@ public class SupportChatController {
     }
 
     private SupportConversationDto toDto(SupportConversation c) {
+        String customerName = null;
+        String customerEmail = null;
+        if (c.getCustomerUserId() != null) {
+            try {
+                var user = supportChatService.getUserById(c.getCustomerUserId());
+                if (user != null) {
+                    customerName = user.getName();
+                    customerEmail = user.getEmail();
+                }
+            } catch (Exception e) {
+                // User not found or error - keep name/email as null
+            }
+        }
         return new SupportConversationDto(
                 c.getConversationId(),
                 c.getCustomerUserId(),
+                customerName,
+                customerEmail,
                 c.getGuestToken(),
                 c.getClaimedByAgentId(),
                 c.getStatus(),

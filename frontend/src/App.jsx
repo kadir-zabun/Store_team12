@@ -58,10 +58,12 @@ function App() {
                             <Route path="/owner-dashboard" element={<OwnerDashboard />} />
                             <Route path="/sales-manager" element={<SalesManagerDashboard />} />
                             <Route path="/wishlist" element={<WishlistPage />} />
-                            <Route path="/support/chat" element={<SupportAgentChatPage />} />
                             <Route path="/my-account" element={<MyAccountPage />} />
                             <Route path="/my-reviews" element={<MyReviewsPage />} />
                         </Route>
+                        
+                        {/* Routes without Layout (full page) */}
+                        <Route path="/support/chat" element={<SupportAgentChatPage />} />
                     </Routes>
                     <Toast />
                     <CustomerChatWidget />

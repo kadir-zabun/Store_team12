@@ -12,6 +12,8 @@ import java.time.LocalDateTime;
 public class SupportConversationDto {
     private String conversationId;
     private String customerUserId;
+    private String customerName;
+    private String customerEmail;
     private String guestToken;
     private String claimedByAgentId;
     private String status;

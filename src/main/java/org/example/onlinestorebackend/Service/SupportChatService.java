@@ -59,12 +59,26 @@ public class SupportChatService {
 
     @Transactional
     public SupportConversation startForGuest(String existingGuestToken) {
-        // Simple: always create a new conversation if no guestToken is supplied.
+        String guestToken = existingGuestToken != null && !existingGuestToken.isBlank()
+                ? existingGuestToken.trim()
+                : UUID.randomUUID().toString();
+        
+        // Check if there's an existing OPEN or CLAIMED conversation for this guest
+        List<SupportConversation> existing = conversationRepository.findByGuestTokenAndStatusIn(
+                guestToken, List.of(STATUS_OPEN, STATUS_CLAIMED)
+        );
+        
+        if (!existing.isEmpty()) {
+            // Return the most recent one
+            return existing.stream()
+                    .max((a, b) -> a.getCreatedAt().compareTo(b.getCreatedAt()))
+                    .orElse(existing.get(0));
+        }
+        
+        // Create a new conversation
         SupportConversation c = new SupportConversation();
         c.setConversationId(UUID.randomUUID().toString());
-        c.setGuestToken(existingGuestToken != null && !existingGuestToken.isBlank()
-                ? existingGuestToken.trim()
-                : UUID.randomUUID().toString());
+        c.setGuestToken(guestToken);
         c.setStatus(STATUS_OPEN);
         c.setCreatedAt(LocalDateTime.now());
         c.setLastMessageAt(LocalDateTime.now());
@@ -76,6 +90,19 @@ public class SupportChatService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + username));
 
+        // Check if there's an existing OPEN or CLAIMED conversation for this user
+        List<SupportConversation> existing = conversationRepository.findByCustomerUserIdAndStatusIn(
+                user.getUserId(), List.of(STATUS_OPEN, STATUS_CLAIMED)
+        );
+        
+        if (!existing.isEmpty()) {
+            // Return the most recent one
+            return existing.stream()
+                    .max((a, b) -> a.getCreatedAt().compareTo(b.getCreatedAt()))
+                    .orElse(existing.get(0));
+        }
+
+        // Create a new conversation
         SupportConversation c = new SupportConversation();
         c.setConversationId(UUID.randomUUID().toString());
         c.setCustomerUserId(user.getUserId());
@@ -140,6 +167,17 @@ public class SupportChatService {
         SupportConversation c = getConversation(conversationId);
         // Only the claiming agent can close
         assertAgentAccess(c, agentUsername);
+        c.setStatus(STATUS_CLOSED);
+        return conversationRepository.save(c);
+    }
+
+    @Transactional
+    public SupportConversation closeByCustomerOrGuest(String conversationId, String usernameOrNull, String guestTokenOrNull) {
+        SupportConversation c = getConversation(conversationId);
+        assertCustomerOrGuestAccess(c, usernameOrNull, guestTokenOrNull);
+        if (STATUS_CLOSED.equals(c.getStatus())) {
+            throw new InvalidRequestException("Conversation is already closed");
+        }
         c.setStatus(STATUS_CLOSED);
         return conversationRepository.save(c);
     }
@@ -229,6 +267,10 @@ public class SupportChatService {
             return conversationRepository.findAll();
         }
         return conversationRepository.findByStatus(status);
+    }
+
+    public User getUserById(String userId) {
+        return userRepository.findByUserId(userId).orElse(null);
     }
 
     @Transactional

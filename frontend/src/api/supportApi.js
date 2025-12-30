@@ -2,10 +2,14 @@ import axiosClient from "./axiosClient";
 
 const supportApi = {
     // Customer/Guest endpoints
-    startConversation: (guestToken = null) =>
-        axiosClient.post("/api/support/conversations/start", null, {
+    startConversation: (guestToken = null) => {
+        const config = {
             params: guestToken ? { guestToken } : {},
-        }),
+        };
+        // Remove Content-Type header for this request since backend expects query params only
+        config.headers = { "Content-Type": "" };
+        return axiosClient.post("/api/support/conversations/start", null, config);
+    },
 
     getMessages: (conversationId, guestToken = null) =>
         axiosClient.get(`/api/support/conversations/${conversationId}/messages`, {
@@ -15,16 +19,28 @@ const supportApi = {
     sendText: (conversationId, text, guestToken = null) => {
         const formData = new FormData();
         formData.append("text", text);
+        const headers = {};
+        if (guestToken) {
+            headers["X-Guest-Token"] = guestToken;
+        }
+        // Remove Content-Type header to let axios set it automatically for FormData
+        headers["Content-Type"] = undefined;
         return axiosClient.post(`/api/support/conversations/${conversationId}/messages`, formData, {
-            headers: guestToken ? { "X-Guest-Token": guestToken } : {},
+            headers,
         });
     },
 
     uploadAttachment: (conversationId, file, guestToken = null) => {
         const formData = new FormData();
         formData.append("file", file);
+        const headers = {};
+        if (guestToken) {
+            headers["X-Guest-Token"] = guestToken;
+        }
+        // Remove Content-Type header to let axios set it automatically for FormData
+        headers["Content-Type"] = undefined;
         return axiosClient.post(`/api/support/conversations/${conversationId}/attachments`, formData, {
-            headers: guestToken ? { "X-Guest-Token": guestToken } : {},
+            headers,
         });
     },
 
@@ -32,6 +48,11 @@ const supportApi = {
         axiosClient.get(`/api/support/attachments/${attachmentId}`, {
             headers: guestToken ? { "X-Guest-Token": guestToken } : {},
             responseType: "blob",
+        }),
+
+    customerCloseConversation: (conversationId, guestToken = null) =>
+        axiosClient.post(`/api/support/conversations/${conversationId}/close`, null, {
+            headers: guestToken ? { "X-Guest-Token": guestToken } : {},
         }),
 
     // Support Agent endpoints
@@ -52,13 +73,23 @@ const supportApi = {
     agentSendText: (conversationId, text) => {
         const formData = new FormData();
         formData.append("text", text);
-        return axiosClient.post(`/api/support/agent/conversations/${conversationId}/messages`, formData);
+        // Remove Content-Type header to let axios set it automatically for FormData
+        return axiosClient.post(`/api/support/agent/conversations/${conversationId}/messages`, formData, {
+            headers: {
+                "Content-Type": undefined,
+            },
+        });
     },
 
     agentUploadAttachment: (conversationId, file) => {
         const formData = new FormData();
         formData.append("file", file);
-        return axiosClient.post(`/api/support/agent/conversations/${conversationId}/attachments`, formData);
+        // Remove Content-Type header to let axios set it automatically for FormData
+        return axiosClient.post(`/api/support/agent/conversations/${conversationId}/attachments`, formData, {
+            headers: {
+                "Content-Type": undefined,
+            },
+        });
     },
 
     getAttachment: (attachmentId) =>
