@@ -216,6 +216,26 @@ export default function SalesManagerDashboard() {
     const refundsData = response.data?.data || response.data || [];
     setPendingRefunds(Array.isArray(refundsData) ? refundsData : []);
   };
+  
+  useEffect(() => {
+    if (activeTab !== "refunds") return;
+
+    (async () => {
+        if (loadingRefunds) return; // aynı anda 2 kere çağırmasın
+        setLoadingRefunds(true);
+        try {
+        await refreshPendingRefunds();
+        // İstersen burada toast gösterme, her tab'a girince spam olur.
+        // showSuccess("Refund requests loaded!");
+        } catch (error) {
+        console.error("Error loading refunds:", error);
+        showError(error.response?.data?.message || "Failed to load refund requests.");
+        } finally {
+        setLoadingRefunds(false);
+        }
+    })();
+  }, [activeTab]); // tab değişince çalışır
+
 
   if (loading) {
     return (
