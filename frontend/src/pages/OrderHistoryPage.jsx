@@ -60,13 +60,13 @@ export default function OrderHistoryPage() {
                         console.log("Got userId from API:", customerId);
                         console.log("userIdResponse:", userIdResponse);
                         console.log("userIdResponse.data:", userIdResponse.data);
-                        
+
                         if (!customerId) {
                             console.error("userId is null or undefined");
                             showError("Failed to get user ID. Please try logging in again.");
                             return;
                         }
-                        
+
                         setUserId(customerId);
 
                         // Get all orders using userId as customerId
@@ -74,7 +74,7 @@ export default function OrderHistoryPage() {
                         const ordersResponse = await orderApi.getOrdersByCustomer(customerId);
                         console.log("Orders response:", ordersResponse);
                         console.log("Orders response.data:", ordersResponse.data);
-                        
+
                         // Handle both wrapped and direct response formats
                         let ordersData = [];
                         if (ordersResponse.data) {
@@ -88,7 +88,7 @@ export default function OrderHistoryPage() {
                                 ordersData = [];
                             }
                         }
-                        
+
                         console.log("Orders data (parsed):", ordersData);
                         console.log("Orders count:", ordersData.length);
                         setOrders(Array.isArray(ordersData) ? ordersData : []);
@@ -98,7 +98,7 @@ export default function OrderHistoryPage() {
                         const deliveredResponse = await orderApi.getDeliveredOrdersByCustomer(customerId);
                         console.log("Delivered orders response:", deliveredResponse);
                         console.log("Delivered orders response.data:", deliveredResponse.data);
-                        
+
                         // Handle both wrapped and direct response formats
                         let deliveredData = [];
                         if (deliveredResponse.data) {
@@ -112,11 +112,11 @@ export default function OrderHistoryPage() {
                                 deliveredData = [];
                             }
                         }
-                        
+
                         console.log("Delivered orders data (parsed):", deliveredData);
                         console.log("Delivered orders count:", deliveredData.length);
                         setDeliveredOrders(Array.isArray(deliveredData) ? deliveredData : []);
-                        
+
                         // Get user's reviews
                         try {
                             const reviewsResponse = await userApi.getMyReviews();
@@ -156,9 +156,9 @@ export default function OrderHistoryPage() {
     const handleReviewClick = (orderId, productId) => {
         // Check if user already reviewed this product
         const existingReview = myReviews.find(r => r.productId === productId);
-        
+
         setReviewingProduct({ orderId, productId });
-        
+
         if (existingReview) {
             // Load existing review data
             setReviewForm({
@@ -191,7 +191,7 @@ export default function OrderHistoryPage() {
             showSuccess(result);
             setReviewingProduct(null);
             setReviewForm({ rating: 0, comment: "" });
-            
+
             // Reload reviews to update UI
             try {
                 const reviewsResponse = await userApi.getMyReviews();
@@ -223,7 +223,7 @@ export default function OrderHistoryPage() {
         }
     };
 
-    // Helper: aggregate refund info by orderId+productId
+    // Helper: aggregate refund info by orderId+productId (qty-based)
     const getRefundStats = (orderId, productId) => {
         const refunds = (myRefunds || []).filter(
             (r) => r.orderId === orderId && r.productId === productId
@@ -234,12 +234,9 @@ export default function OrderHistoryPage() {
                 if (r.status === "APPROVED") acc.approvedQty += qty;
                 else if (r.status === "PENDING") acc.pendingQty += qty;
                 else if (r.status === "REJECTED") acc.rejectedQty += qty;
-                acc.anyApproved = acc.anyApproved || r.status === "APPROVED";
-                acc.anyPending = acc.anyPending || r.status === "PENDING";
-                acc.anyRejected = acc.anyRejected || r.status === "REJECTED";
                 return acc;
             },
-            { approvedQty: 0, pendingQty: 0, rejectedQty: 0, anyApproved: false, anyPending: false, anyRejected: false }
+            { approvedQty: 0, pendingQty: 0, rejectedQty: 0 }
         );
     };
 
@@ -318,20 +315,17 @@ export default function OrderHistoryPage() {
                                         {order.items && order.items.map((item, index) => {
                                             const orderDate = order.orderDate ? new Date(order.orderDate) : null;
                                             const daysSincePurchase = orderDate ? Math.floor((new Date() - orderDate) / (1000 * 60 * 60 * 24)) : null;
-                        const refundableStatuses = ["DELIVERED", "REFUND_APPROVED"];
-                        const refundStats = getRefundStats(order.orderId || order.id, item.productId);
-                        const refundableQty = Math.max(
-                            (item.quantity || 0) - (refundStats.approvedQty + refundStats.pendingQty),
-                            0
-                        );
-                        const canRefund = refundableStatuses.includes(order.status) &&
-                            daysSincePurchase !== null &&
-                            daysSincePurchase <= 30 &&
-                            refundableQty > 0;
-                        const isRefundApproved = refundStats.anyApproved && refundStats.approvedQty > 0;
-                        const isRefundPending = refundStats.anyPending && refundStats.pendingQty > 0;
-                        const isRefundRejected = refundStats.anyRejected && !refundStats.anyPending && !refundStats.anyApproved;
-                                            
+                                            const refundableStatuses = ["DELIVERED", "REFUND_APPROVED"];
+                                            const refundStats = getRefundStats(order.orderId || order.id, item.productId);
+                                            const refundableQty = Math.max(
+                                                (item.quantity || 0) - (refundStats.approvedQty + refundStats.pendingQty + refundStats.rejectedQty),
+                                                0
+                                            );
+                                            const canRefund = refundableStatuses.includes(order.status) &&
+                                                daysSincePurchase !== null &&
+                                                daysSincePurchase <= 30 &&
+                                                refundableQty > 0;
+
                                             return (
                                                 <div
                                                     key={index}
@@ -354,7 +348,7 @@ export default function OrderHistoryPage() {
                                                         {order.status === "DELIVERED" && (
                                                             <div style={{ fontSize: "0.85rem", color: daysSincePurchase !== null && daysSincePurchase <= 30 ? "#2f855a" : "#e53e3e", marginTop: "0.25rem" }}>
                                                                 {daysSincePurchase !== null ? (
-                                                                    daysSincePurchase <= 30 
+                                                                    daysSincePurchase <= 30
                                                                         ? `${30 - daysSincePurchase} days left for refund`
                                                                         : "Refund window expired"
                                                                 ) : ""}
@@ -365,57 +359,57 @@ export default function OrderHistoryPage() {
                                                         <div style={{ fontWeight: 600, color: "#667eea" }}>
                                                             ${((item.priceAtPurchase || item.price || 0) * item.quantity).toFixed(2)}
                                                         </div>
-                                                            {isRefundApproved && (
-                                                                <span style={{ padding: "0.4rem 0.8rem", background: "#2f855a", color: "#fff", borderRadius: "8px", fontWeight: 600, fontSize: "0.85rem" }}>
-                                                                    Refund Accepted{refundStats.approvedQty > 0 ? ` (${refundStats.approvedQty})` : ""}
+                                                        {refundStats.approvedQty > 0 && (
+                                                            <span style={{ padding: "0.4rem 0.8rem", background: "#2f855a", color: "#fff", borderRadius: "8px", fontWeight: 600, fontSize: "0.85rem" }}>
+                                                                    Refund Accepted{` (${refundStats.approvedQty})`}
                                                                 </span>
-                                                            )}
-                                                            {isRefundPending && !isRefundApproved && (
-                                                                <span style={{ padding: "0.4rem 0.8rem", background: "#d69e2e", color: "#fff", borderRadius: "8px", fontWeight: 600, fontSize: "0.85rem" }}>
-                                                                    Refund Pending{refundStats.pendingQty > 0 ? ` (${refundStats.pendingQty})` : ""}
+                                                        )}
+                                                        {refundStats.pendingQty > 0 && (
+                                                            <span style={{ padding: "0.4rem 0.8rem", background: "#d69e2e", color: "#fff", borderRadius: "8px", fontWeight: 600, fontSize: "0.85rem" }}>
+                                                                    Refund Pending{` (${refundStats.pendingQty})`}
                                                                 </span>
-                                                            )}
-                                                            {isRefundRejected && !isRefundApproved && (
-                                                                <span style={{ padding: "0.4rem 0.8rem", background: "#e53e3e", color: "#fff", borderRadius: "8px", fontWeight: 600, fontSize: "0.85rem" }}>
-                                                                    Refund Rejected{refundStats.rejectedQty > 0 ? ` (${refundStats.rejectedQty})` : ""}
+                                                        )}
+                                                        {refundStats.rejectedQty > 0 && (
+                                                            <span style={{ padding: "0.4rem 0.8rem", background: "#e53e3e", color: "#fff", borderRadius: "8px", fontWeight: 600, fontSize: "0.85rem" }}>
+                                                                    Refund Rejected{` (${refundStats.rejectedQty})`}
                                                                 </span>
-                                                            )}
-                                                            {canRefund && !isRefundApproved && !isRefundPending && !isRefundRejected && (
-                                                                <button
-                                                                    onClick={() => {
-                                                                        setRefundingItem({
-                                                                            orderId: order.orderId || order.id,
-                                                                            productId: item.productId,
-                                                                            productName: item.productName,
-                                                                            maxQuantity: refundableQty,
-                                                                            priceAtPurchase: item.priceAtPurchase || item.price || 0,
-                                                                        });
-                                                                        setRefundForm({
-                                                                            quantity: 1,
-                                                                            reason: "",
-                                                                        });
-                                                                    }}
-                                                                    style={{
-                                                                        padding: "0.5rem 1rem",
-                                                                        background: "#d69e2e",
-                                                                        color: "#fff",
-                                                                        border: "none",
-                                                                        borderRadius: "8px",
-                                                                        fontWeight: 600,
-                                                                        fontSize: "0.85rem",
-                                                                        cursor: "pointer",
-                                                                        transition: "all 0.2s",
-                                                                    }}
-                                                                    onMouseEnter={(e) => {
-                                                                        e.currentTarget.style.background = "#b7791f";
-                                                                    }}
-                                                                    onMouseLeave={(e) => {
-                                                                        e.currentTarget.style.background = "#d69e2e";
-                                                                    }}
-                                                                >
-                                                                    Request Refund
-                                                                </button>
-                                                            )}
+                                                        )}
+                                                        {canRefund && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    setRefundingItem({
+                                                                        orderId: order.orderId || order.id,
+                                                                        productId: item.productId,
+                                                                        productName: item.productName,
+                                                                        maxQuantity: refundableQty,
+                                                                        priceAtPurchase: item.priceAtPurchase || item.price || 0,
+                                                                    });
+                                                                    setRefundForm({
+                                                                        quantity: 1,
+                                                                        reason: "",
+                                                                    });
+                                                                }}
+                                                                style={{
+                                                                    padding: "0.5rem 1rem",
+                                                                    background: "#d69e2e",
+                                                                    color: "#fff",
+                                                                    border: "none",
+                                                                    borderRadius: "8px",
+                                                                    fontWeight: 600,
+                                                                    fontSize: "0.85rem",
+                                                                    cursor: "pointer",
+                                                                    transition: "all 0.2s",
+                                                                }}
+                                                                onMouseEnter={(e) => {
+                                                                    e.currentTarget.style.background = "#b7791f";
+                                                                }}
+                                                                onMouseLeave={(e) => {
+                                                                    e.currentTarget.style.background = "#d69e2e";
+                                                                }}
+                                                            >
+                                                                Request Refund{` (${refundableQty})`}
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             );
@@ -516,7 +510,7 @@ export default function OrderHistoryPage() {
                                                 r => r.productId && item.productId && String(r.productId) === String(item.productId)
                                             );
                                             const hasReview = !!existingReview;
-                                            
+
                                             // Debug logs
                                             console.log(`Product ${item.productId}:`, {
                                                 hasReview,
@@ -525,64 +519,187 @@ export default function OrderHistoryPage() {
                                             });
 
                                             return (
-                                            <div key={itemIndex} style={{ marginBottom: "1.5rem" }}>
-                                                <div style={{ marginBottom: "0.75rem", fontWeight: 600, color: "#4a5568", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                                                    <span>{item.productName || `Product ${item.productId}`}</span>
-                                                </div>
-                                                
-                                                {/* Show existing review if exists */}
-                                                {hasReview && !(reviewingProduct && reviewingProduct.orderId === (order.orderId || order.id) && reviewingProduct.productId === item.productId) && (
-                                                    <div
-                                                        style={{
-                                                            padding: "1rem",
-                                                            background: "#f7fafc",
-                                                            borderRadius: "12px",
-                                                            border: "1px solid #e2e8f0",
-                                                            marginBottom: "0.75rem",
-                                                        }}
-                                                    >
-                                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-                                                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                                                <span style={{ fontWeight: 600, color: "#2d3748" }}>Your Rating:</span>
-                                                                <span style={{ fontSize: "1.2rem", fontWeight: 700, color: "#667eea" }}>
+                                                <div key={itemIndex} style={{ marginBottom: "1.5rem" }}>
+                                                    <div style={{ marginBottom: "0.75rem", fontWeight: 600, color: "#4a5568", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                                        <span>{item.productName || `Product ${item.productId}`}</span>
+                                                    </div>
+
+                                                    {/* Show existing review if exists */}
+                                                    {hasReview && !(reviewingProduct && reviewingProduct.orderId === (order.orderId || order.id) && reviewingProduct.productId === item.productId) && (
+                                                        <div
+                                                            style={{
+                                                                padding: "1rem",
+                                                                background: "#f7fafc",
+                                                                borderRadius: "12px",
+                                                                border: "1px solid #e2e8f0",
+                                                                marginBottom: "0.75rem",
+                                                            }}
+                                                        >
+                                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                                                                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                                                    <span style={{ fontWeight: 600, color: "#2d3748" }}>Your Rating:</span>
+                                                                    <span style={{ fontSize: "1.2rem", fontWeight: 700, color: "#667eea" }}>
                                                                     {existingReview.rating}/10
                                                                 </span>
-                                                            </div>
-                                                            <span style={{ fontSize: "0.85rem", color: "#2f855a", fontWeight: 500 }}>
+                                                                </div>
+                                                                <span style={{ fontSize: "0.85rem", color: "#2f855a", fontWeight: 500 }}>
                                                                 ✓ Reviewed
                                                             </span>
-                                                        </div>
-                                                        {existingReview.comment && (
-                                                            <div style={{ marginTop: "0.75rem" }}>
-                                                                <div style={{ fontSize: "0.9rem", fontWeight: 600, color: "#4a5568", marginBottom: "0.25rem" }}>
-                                                                    Your Comment:
-                                                                </div>
-                                                                <div style={{ 
-                                                                    padding: "0.75rem", 
-                                                                    background: "#fff", 
-                                                                    borderRadius: "8px",
-                                                                    color: "#2d3748",
-                                                                    fontSize: "0.95rem",
-                                                                    lineHeight: "1.5",
-                                                                }}>
-                                                                    {existingReview.comment}
-                                                                </div>
-                                                                <div style={{ marginTop: "0.5rem", fontSize: "0.85rem", color: "#718096" }}>
-                                                                    Status: {existingReview.approved ? (
+                                                            </div>
+                                                            {existingReview.comment && (
+                                                                <div style={{ marginTop: "0.75rem" }}>
+                                                                    <div style={{ fontSize: "0.9rem", fontWeight: 600, color: "#4a5568", marginBottom: "0.25rem" }}>
+                                                                        Your Comment:
+                                                                    </div>
+                                                                    <div style={{
+                                                                        padding: "0.75rem",
+                                                                        background: "#fff",
+                                                                        borderRadius: "8px",
+                                                                        color: "#2d3748",
+                                                                        fontSize: "0.95rem",
+                                                                        lineHeight: "1.5",
+                                                                    }}>
+                                                                        {existingReview.comment}
+                                                                    </div>
+                                                                    <div style={{ marginTop: "0.5rem", fontSize: "0.85rem", color: "#718096" }}>
+                                                                        Status: {existingReview.approved ? (
                                                                         <span style={{ color: "#2f855a", fontWeight: 600 }}>✓ Approved (Visible)</span>
                                                                     ) : (
                                                                         <span style={{ color: "#d69e2e", fontWeight: 600 }}>⏳ Pending Approval</span>
                                                                     )}
+                                                                    </div>
                                                                 </div>
-                                                            </div>
-                                                        )}
+                                                            )}
+                                                            <button
+                                                                onClick={() => handleReviewClick(order.orderId || order.id, item.productId)}
+                                                                style={{
+                                                                    marginTop: "0.75rem",
+                                                                    padding: "0.5rem 1rem",
+                                                                    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                                                    color: "#fff",
+                                                                    border: "none",
+                                                                    borderRadius: "8px",
+                                                                    fontWeight: 600,
+                                                                    cursor: "pointer",
+                                                                    fontSize: "0.9rem",
+                                                                }}
+                                                            >
+                                                                Update Review
+                                                            </button>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Show review form when editing or writing new review */}
+                                                    {reviewingProduct &&
+                                                    reviewingProduct.orderId === (order.orderId || order.id) &&
+                                                    reviewingProduct.productId === item.productId ? (
+                                                        <div
+                                                            style={{
+                                                                padding: "1.5rem",
+                                                                background: "#f7fafc",
+                                                                borderRadius: "12px",
+                                                                border: "2px solid #e2e8f0",
+                                                            }}
+                                                        >
+                                                            <h4 style={{ marginBottom: "1rem", color: "#2d3748" }}>
+                                                                {hasReview ? "Update Review" : "Write a Review"}
+                                                            </h4>
+                                                            <form onSubmit={handleSubmitReview}>
+                                                                <div style={{ marginBottom: "1rem" }}>
+                                                                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600, color: "#4a5568" }}>
+                                                                        Rating (1-10):
+                                                                    </label>
+                                                                    <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                                                                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                                                                            <button
+                                                                                key={num}
+                                                                                type="button"
+                                                                                onClick={() => setReviewForm({ ...reviewForm, rating: num })}
+                                                                                style={{
+                                                                                    width: "40px",
+                                                                                    height: "40px",
+                                                                                    borderRadius: "8px",
+                                                                                    border: "2px solid",
+                                                                                    borderColor: reviewForm.rating === num ? "#667eea" : "#e2e8f0",
+                                                                                    background: reviewForm.rating === num ? "#667eea" : "#fff",
+                                                                                    color: reviewForm.rating === num ? "#fff" : "#4a5568",
+                                                                                    fontWeight: 600,
+                                                                                    cursor: "pointer",
+                                                                                    transition: "all 0.2s",
+                                                                                }}
+                                                                            >
+                                                                                {num}
+                                                                            </button>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                                <div style={{ marginBottom: "1rem" }}>
+                                                                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600, color: "#4a5568" }}>
+                                                                        Comment (optional):
+                                                                    </label>
+                                                                    <textarea
+                                                                        value={reviewForm.comment}
+                                                                        onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
+                                                                        placeholder="Share your experience..."
+                                                                        rows="4"
+                                                                        style={{
+                                                                            width: "100%",
+                                                                            padding: "0.75rem",
+                                                                            borderRadius: "8px",
+                                                                            border: "2px solid #e2e8f0",
+                                                                            fontSize: "1rem",
+                                                                            fontFamily: "inherit",
+                                                                            resize: "vertical",
+                                                                            outline: "none",
+                                                                            background: "#fff",
+                                                                            color: "#2d3748",
+                                                                            boxSizing: "border-box",
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                                <div style={{ display: "flex", gap: "1rem" }}>
+                                                                    <button
+                                                                        type="submit"
+                                                                        style={{
+                                                                            padding: "0.75rem 1.5rem",
+                                                                            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                                                            color: "#fff",
+                                                                            border: "none",
+                                                                            borderRadius: "10px",
+                                                                            fontWeight: 600,
+                                                                            cursor: "pointer",
+                                                                        }}
+                                                                    >
+                                                                        {hasReview ? "Update Review" : "Submit Review"}
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setReviewingProduct(null);
+                                                                            setReviewForm({ rating: 0, comment: "" });
+                                                                        }}
+                                                                        style={{
+                                                                            padding: "0.75rem 1.5rem",
+                                                                            background: "#e2e8f0",
+                                                                            color: "#4a5568",
+                                                                            border: "none",
+                                                                            borderRadius: "10px",
+                                                                            fontWeight: 600,
+                                                                            cursor: "pointer",
+                                                                        }}
+                                                                    >
+                                                                        Cancel
+                                                                    </button>
+                                                                </div>
+                                                            </form>
+                                                        </div>
+                                                    ) : !hasReview && (
                                                         <button
                                                             onClick={() => handleReviewClick(order.orderId || order.id, item.productId)}
                                                             style={{
-                                                                marginTop: "0.75rem",
                                                                 padding: "0.5rem 1rem",
-                                                                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                                                                color: "#fff",
+                                                                background: "#e2e8f0",
+                                                                color: "#4a5568",
                                                                 border: "none",
                                                                 borderRadius: "8px",
                                                                 fontWeight: 600,
@@ -590,134 +707,11 @@ export default function OrderHistoryPage() {
                                                                 fontSize: "0.9rem",
                                                             }}
                                                         >
-                                                            Update Review
+                                                            Write Review
                                                         </button>
-                                                    </div>
-                                                )}
-                                                
-                                                {/* Show review form when editing or writing new review */}
-                                                {reviewingProduct && 
-                                                 reviewingProduct.orderId === (order.orderId || order.id) && 
-                                                 reviewingProduct.productId === item.productId ? (
-                                                    <div
-                                                        style={{
-                                                            padding: "1.5rem",
-                                                            background: "#f7fafc",
-                                                            borderRadius: "12px",
-                                                            border: "2px solid #e2e8f0",
-                                                        }}
-                                                    >
-                                                        <h4 style={{ marginBottom: "1rem", color: "#2d3748" }}>
-                                                            {hasReview ? "Update Review" : "Write a Review"}
-                                                        </h4>
-                                                        <form onSubmit={handleSubmitReview}>
-                                                            <div style={{ marginBottom: "1rem" }}>
-                                                                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600, color: "#4a5568" }}>
-                                                                    Rating (1-10):
-                                                                </label>
-                                                                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                                                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
-                                                                        <button
-                                                                            key={num}
-                                                                            type="button"
-                                                                            onClick={() => setReviewForm({ ...reviewForm, rating: num })}
-                                                                            style={{
-                                                                                width: "40px",
-                                                                                height: "40px",
-                                                                                borderRadius: "8px",
-                                                                                border: "2px solid",
-                                                                                borderColor: reviewForm.rating === num ? "#667eea" : "#e2e8f0",
-                                                                                background: reviewForm.rating === num ? "#667eea" : "#fff",
-                                                                                color: reviewForm.rating === num ? "#fff" : "#4a5568",
-                                                                                fontWeight: 600,
-                                                                                cursor: "pointer",
-                                                                                transition: "all 0.2s",
-                                                                            }}
-                                                                        >
-                                                                            {num}
-                                                                        </button>
-                                                                    ))}
-                                                                </div>
-                                                            </div>
-                                                            <div style={{ marginBottom: "1rem" }}>
-                                                                <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600, color: "#4a5568" }}>
-                                                                    Comment (optional):
-                                                                </label>
-                                                                <textarea
-                                                                    value={reviewForm.comment}
-                                                                    onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
-                                                                    placeholder="Share your experience..."
-                                                                    rows="4"
-                                                                    style={{
-                                                                        width: "100%",
-                                                                        padding: "0.75rem",
-                                                                        borderRadius: "8px",
-                                                                        border: "2px solid #e2e8f0",
-                                                                        fontSize: "1rem",
-                                                                        fontFamily: "inherit",
-                                                                        resize: "vertical",
-                                                                        outline: "none",
-                                                                        background: "#fff",
-                                                                        color: "#2d3748",
-                                                                        boxSizing: "border-box",
-                                                                    }}
-                                                                />
-                                                            </div>
-                                                            <div style={{ display: "flex", gap: "1rem" }}>
-                                                                <button
-                                                                    type="submit"
-                                                                    style={{
-                                                                        padding: "0.75rem 1.5rem",
-                                                                        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                                                                        color: "#fff",
-                                                                        border: "none",
-                                                                        borderRadius: "10px",
-                                                                        fontWeight: 600,
-                                                                        cursor: "pointer",
-                                                                    }}
-                                                                >
-                                                                    {hasReview ? "Update Review" : "Submit Review"}
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => {
-                                                                        setReviewingProduct(null);
-                                                                        setReviewForm({ rating: 0, comment: "" });
-                                                                    }}
-                                                                    style={{
-                                                                        padding: "0.75rem 1.5rem",
-                                                                        background: "#e2e8f0",
-                                                                        color: "#4a5568",
-                                                                        border: "none",
-                                                                        borderRadius: "10px",
-                                                                        fontWeight: 600,
-                                                                        cursor: "pointer",
-                                                                    }}
-                                                                >
-                                                                    Cancel
-                                                                </button>
-                                                            </div>
-                                                        </form>
-                                                    </div>
-                                                ) : !hasReview && (
-                                                    <button
-                                                        onClick={() => handleReviewClick(order.orderId || order.id, item.productId)}
-                                                        style={{
-                                                            padding: "0.5rem 1rem",
-                                                            background: "#e2e8f0",
-                                                            color: "#4a5568",
-                                                            border: "none",
-                                                            borderRadius: "8px",
-                                                            fontWeight: 600,
-                                                            cursor: "pointer",
-                                                            fontSize: "0.9rem",
-                                                        }}
-                                                    >
-                                                        Write Review
-                                                    </button>
-                                                )}
-                                            </div>
-                                        );
+                                                    )}
+                                                </div>
+                                            );
                                         })}
                                     </div>
                                 )}
