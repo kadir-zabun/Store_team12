@@ -412,22 +412,28 @@ export default function ProductDetailPage() {
                                                     ? "#cbd5e0"
                                                     : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
                                                 color: "#fff",
-                                                border: "none",
+                                                border: (product.quantity || 0) === 0 ? "none" : "2px solid transparent",
                                                 borderRadius: "10px",
                                                 fontSize: "1rem",
                                                 fontWeight: 600,
                                                 cursor: (product.quantity || 0) === 0 ? "not-allowed" : "pointer",
-                                                transition: "all 0.3s",
+                                                transition: "all 0.2s",
                                                 boxShadow: (product.quantity || 0) > 0 ? "0 2px 4px rgba(102, 126, 234, 0.3)" : "none",
                                             }}
                                             onMouseEnter={(e) => {
                                                 if ((product.quantity || 0) > 0 && !addingToCart) {
+                                                    e.currentTarget.style.background = "#fff";
+                                                    e.currentTarget.style.color = "#667eea";
+                                                    e.currentTarget.style.borderColor = "#667eea";
                                                     e.currentTarget.style.transform = "translateY(-2px)";
                                                     e.currentTarget.style.boxShadow = "0 4px 8px rgba(102, 126, 234, 0.4)";
                                                 }
                                             }}
                                             onMouseLeave={(e) => {
                                                 if ((product.quantity || 0) > 0) {
+                                                    e.currentTarget.style.background = "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+                                                    e.currentTarget.style.color = "#fff";
+                                                    e.currentTarget.style.borderColor = "transparent";
                                                     e.currentTarget.style.transform = "translateY(0)";
                                                     e.currentTarget.style.boxShadow = "0 2px 4px rgba(102, 126, 234, 0.3)";
                                                 }
@@ -463,24 +469,29 @@ export default function ProductDetailPage() {
                                         style={{
                                             width: "100%",
                                             padding: "1rem 2rem",
-                                            background: isInWishlist
-                                                ? "linear-gradient(135deg, #e53e3e 0%, #c53030 100%)"
-                                                : "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
+                                            background: addingToWishlist
+                                                ? "#cbd5e0"
+                                                : isInWishlist
+                                                    ? "linear-gradient(135deg, #e53e3e 0%, #c53030 100%)"
+                                                    : "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
                                             color: "#fff",
-                                            border: "none",
+                                            border: addingToWishlist ? "none" : "2px solid transparent",
                                             borderRadius: "10px",
                                             fontSize: "1rem",
                                             fontWeight: 600,
                                             cursor: addingToWishlist ? "not-allowed" : "pointer",
-                                            transition: "all 0.3s",
+                                            transition: "all 0.2s",
                                             display: "flex",
                                             alignItems: "center",
                                             justifyContent: "center",
                                             gap: "0.5rem",
-                                            boxShadow: !addingToWishlist ? "0 2px 4px rgba(245, 87, 108, 0.3)" : "none",
+                                            opacity: addingToWishlist ? 0.6 : 1,
                                         }}
                                         onMouseEnter={(e) => {
                                             if (!addingToWishlist) {
+                                                e.currentTarget.style.background = "#fff";
+                                                e.currentTarget.style.color = isInWishlist ? "#e53e3e" : "#f5576c";
+                                                e.currentTarget.style.borderColor = isInWishlist ? "#e53e3e" : "#f5576c";
                                                 e.currentTarget.style.transform = "translateY(-2px)";
                                                 e.currentTarget.style.boxShadow = isInWishlist 
                                                     ? "0 4px 8px rgba(229, 62, 62, 0.4)"
@@ -489,10 +500,13 @@ export default function ProductDetailPage() {
                                         }}
                                         onMouseLeave={(e) => {
                                             if (!addingToWishlist) {
+                                                e.currentTarget.style.background = isInWishlist
+                                                    ? "linear-gradient(135deg, #e53e3e 0%, #c53030 100%)"
+                                                    : "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)";
+                                                e.currentTarget.style.color = "#fff";
+                                                e.currentTarget.style.borderColor = "transparent";
                                                 e.currentTarget.style.transform = "translateY(0)";
-                                                e.currentTarget.style.boxShadow = isInWishlist
-                                                    ? "0 2px 4px rgba(229, 62, 62, 0.3)"
-                                                    : "0 2px 4px rgba(245, 87, 108, 0.3)";
+                                                e.currentTarget.style.boxShadow = "none";
                                             }
                                         }}
                                     >

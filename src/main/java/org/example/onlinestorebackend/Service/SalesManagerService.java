@@ -1,12 +1,14 @@
 package org.example.onlinestorebackend.Service;
 
 import lombok.RequiredArgsConstructor;
+import org.example.onlinestorebackend.Dto.InvoiceWithOrderDto;
 import org.example.onlinestorebackend.Dto.SalesMetricResponse;
 import org.example.onlinestorebackend.Entity.*;
 import org.example.onlinestorebackend.Repository.InvoiceRepository;
 import org.example.onlinestorebackend.Repository.OrderRepository;
 import org.example.onlinestorebackend.Repository.ProductRepository;
 import org.example.onlinestorebackend.Repository.RefundRequestRepository;
+import org.example.onlinestorebackend.Repository.UserRepository;
 import org.example.onlinestorebackend.exception.InvalidRequestException;
 import org.example.onlinestorebackend.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
@@ -25,6 +27,7 @@ public class SalesManagerService {
     private final ProductRepository productRepository;
     private final InvoiceRepository invoiceRepository;
     private final OrderRepository orderRepository;
+    private final UserRepository userRepository;
     private final WishListService wishListService;
     private final UserService userService;
     private final MailService mailService;
@@ -91,18 +94,48 @@ public class SalesManagerService {
         return productRepository.save(p);
     }
 
-    public List<Invoice> getInvoices(LocalDateTime from, LocalDateTime to) {
+    public List<InvoiceWithOrderDto> getInvoices(LocalDateTime from, LocalDateTime to) {
         if (from == null || to == null) {
             throw new InvalidRequestException("from/to are required");
         }
         if (to.isBefore(from)) {
             throw new InvalidRequestException("to must be after from");
         }
-        return invoiceRepository.findByInvoiceDateBetween(from, to);
+        List<Invoice> invoices = invoiceRepository.findByInvoiceDateBetween(from, to);
+        List<InvoiceWithOrderDto> result = new ArrayList<>();
+        
+        for (Invoice invoice : invoices) {
+            InvoiceWithOrderDto dto = new InvoiceWithOrderDto();
+            dto.setInvoiceId(invoice.getInvoiceId());
+            dto.setOrderId(invoice.getOrderId());
+            dto.setInvoiceDate(invoice.getInvoiceDate());
+            
+            // Get order details
+            Order order = orderRepository.findByOrderId(invoice.getOrderId()).orElse(null);
+            if (order != null) {
+                dto.setCustomerId(order.getCustomerId());
+                dto.setOrderDate(order.getOrderDate());
+                if (order.getTotalPrice() != null) {
+                    dto.setTotalAmount(BigDecimal.valueOf(order.getTotalPrice()));
+                }
+                
+                // Get customer details
+                if (order.getCustomerId() != null) {
+                    userRepository.findById(order.getCustomerId()).ifPresent(user -> {
+                        dto.setCustomerName(user.getName());
+                        dto.setCustomerEmail(user.getEmail());
+                    });
+                }
+            }
+            
+            result.add(dto);
+        }
+        
+        return result;
     }
 
     public SalesMetricResponse getMetrics(LocalDateTime from, LocalDateTime to) {
-        List<Invoice> invoices = getInvoices(from, to);
+        List<Invoice> invoices = invoiceRepository.findByInvoiceDateBetween(from, to);
 
         Map<LocalDate, Totals> byDay = new TreeMap<>();
         BigDecimal totalRevenue = BigDecimal.ZERO;

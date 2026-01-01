@@ -5,17 +5,33 @@ import { useUserRole } from "../hooks/useUserRole";
 import { useToast } from "../contexts/ToastContext";
 import salesApi from "../api/salesApi";
 import productApi from "../api/productApi";
+import categoryApi from "../api/categoryApi";
 import CustomSelect from "../components/CustomSelect";
 
 export default function SalesManagerDashboard() {
   const [activeTab, setActiveTab] = useState("pricing");
   const [products, setProducts] = useState([]);
+  const [filteredProducts, setFilteredProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingProducts, setLoadingProducts] = useState(false);
+
+  // Search and filter states for pricing tab
+  const [productSearchQuery, setProductSearchQuery] = useState("");
+  const [priceSortBy, setPriceSortBy] = useState("name"); // name, price-low, price-high
+  const [currentPage, setCurrentPage] = useState(1);
+  const productsPerPage = 10;
 
   // Form states
   const [priceForm, setPriceForm] = useState({ productId: "", price: "" });
   const [discountForm, setDiscountForm] = useState({ productIds: [], discountPercent: "" });
+
+  // Discount tab states
+  const [discountProductSearchQuery, setDiscountProductSearchQuery] = useState("");
+  const [discountCategoryFilter, setDiscountCategoryFilter] = useState("");
+  const [discountSortBy, setDiscountSortBy] = useState("name");
+  const [categories, setCategories] = useState([]);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState([]);
 
   // Invoice states
   const [invoices, setInvoices] = useState([]);
@@ -52,7 +68,18 @@ export default function SalesManagerDashboard() {
 
   useEffect(() => {
     loadProducts();
+    loadCategories();
   }, []);
+
+  const loadCategories = async () => {
+    try {
+      const response = await categoryApi.getAllCategories();
+      const categoriesData = response?.data?.data || response?.data || [];
+      setCategories(Array.isArray(categoriesData) ? categoriesData : []);
+    } catch (error) {
+      console.error("Error loading categories:", error);
+    }
+  };
 
   const loadProducts = async () => {
     setLoadingProducts(true);
@@ -64,7 +91,9 @@ export default function SalesManagerDashboard() {
         response.data?.data ||
         response.data ||
         [];
-      setProducts(Array.isArray(productsData) ? productsData : []);
+      const productsArray = Array.isArray(productsData) ? productsData : [];
+      setProducts(productsArray);
+      setFilteredProducts(productsArray);
     } catch (error) {
       console.error("Error loading products:", error);
       showError("Failed to load products.");
@@ -73,6 +102,34 @@ export default function SalesManagerDashboard() {
       setLoading(false);
     }
   };
+
+  // Filter and sort products
+  useEffect(() => {
+    let filtered = [...products];
+
+    // Apply search filter
+    if (productSearchQuery.trim()) {
+      filtered = filtered.filter((product) =>
+        product.productName?.toLowerCase().includes(productSearchQuery.toLowerCase())
+      );
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      switch (priceSortBy) {
+        case "price-low":
+          return (a.price || 0) - (b.price || 0);
+        case "price-high":
+          return (b.price || 0) - (a.price || 0);
+        case "name":
+        default:
+          return (a.productName || "").localeCompare(b.productName || "");
+      }
+    });
+
+    setFilteredProducts(filtered);
+    setCurrentPage(1); // Reset to first page when filters change
+  }, [productSearchQuery, priceSortBy, products]);
 
   const handleSetPrice = async (e) => {
     e.preventDefault();
@@ -112,6 +169,99 @@ export default function SalesManagerDashboard() {
         productIds: isSelected ? prev.productIds.filter((id) => id !== productId) : [...prev.productIds, productId],
       };
     });
+  };
+
+  // Filter products for discount tab (but keep selected products even if filtered out)
+  const getFilteredProductsForDiscount = () => {
+    let filtered = [...products];
+
+    // Apply search filter
+    if (discountProductSearchQuery.trim()) {
+      filtered = filtered.filter((product) =>
+        product.productName?.toLowerCase().includes(discountProductSearchQuery.toLowerCase())
+      );
+    }
+
+    // Apply category filter
+    if (discountCategoryFilter) {
+      filtered = filtered.filter((product) => {
+        const productCategories = product.categoryIds || [];
+        return productCategories.includes(discountCategoryFilter);
+      });
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      switch (discountSortBy) {
+        case "price-low":
+          return (a.price || 0) - (b.price || 0);
+        case "price-high":
+          return (b.price || 0) - (a.price || 0);
+        case "name":
+        default:
+          return (a.productName || "").localeCompare(b.productName || "");
+      }
+    });
+
+    return filtered;
+  };
+
+  // Get all products including selected ones that might be filtered out
+  const getDisplayProductsForDiscount = () => {
+    const filtered = getFilteredProductsForDiscount();
+    const filteredIds = new Set(filtered.map(p => p.productId));
+    
+    // Add selected products that are not in filtered list
+    const selectedProducts = products.filter(p => 
+      discountForm.productIds.includes(p.productId) && !filteredIds.has(p.productId)
+    );
+
+    return [...filtered, ...selectedProducts];
+  };
+
+  const handleSelectAllFiltered = () => {
+    const filtered = getFilteredProductsForDiscount();
+    const filteredIds = filtered.map(p => p.productId);
+    const allSelected = filteredIds.every(id => discountForm.productIds.includes(id));
+    
+    if (allSelected) {
+      // Deselect all filtered products
+      setDiscountForm(prev => ({
+        ...prev,
+        productIds: prev.productIds.filter(id => !filteredIds.includes(id))
+      }));
+    } else {
+      // Select all filtered products (keep existing selections)
+      setDiscountForm(prev => ({
+        ...prev,
+        productIds: [...new Set([...prev.productIds, ...filteredIds])]
+      }));
+    }
+  };
+
+  const handleApplyCategoryDiscount = () => {
+    if (selectedCategoryIds.length === 0) {
+      showError("Please select at least one category.");
+      return;
+    }
+
+    // Get all products in selected categories
+    const categoryProductIds = products
+      .filter(product => {
+        const productCategories = product.categoryIds || [];
+        return selectedCategoryIds.some(catId => productCategories.includes(catId));
+      })
+      .map(product => product.productId);
+
+    // Add to selected products
+    setDiscountForm(prev => ({
+      ...prev,
+      productIds: [...new Set([...prev.productIds, ...categoryProductIds])]
+    }));
+
+    setShowCategoryModal(false);
+    setSelectedCategoryIds([]);
+    showSuccess(`Added ${categoryProductIds.length} products from selected categories.`);
   };
 
   const formatCurrency = (amount) => {
@@ -237,16 +387,63 @@ export default function SalesManagerDashboard() {
   }, [activeTab]); // tab değişince çalışır
 
 
-  if (loading) {
-    return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div>Loading...</div>
-      </div>
-    );
-  }
-
   return (
     <div style={{ minHeight: "calc(100vh - 80px)", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" }}>
+      <style>
+        {`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+          .price-input::-webkit-outer-spin-button,
+          .price-input::-webkit-inner-spin-button {
+              -webkit-appearance: none;
+              margin: 0;
+          }
+          .price-input[type=number] {
+              -moz-appearance: textfield;
+          }
+          .price-input-wrapper {
+              position: relative;
+          }
+          .price-input-spinner {
+              position: absolute;
+              right: 0.5rem;
+              top: 50%;
+              transform: translateY(-50%);
+              display: flex;
+              flex-direction: column;
+              gap: 0.125rem;
+              pointer-events: none;
+          }
+          .price-input-spinner button {
+              width: 1.25rem;
+              height: 1rem;
+              border: 1px solid transparent;
+              border-radius: 4px;
+              background: #667eea;
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              padding: 0;
+              pointer-events: auto;
+              color: #fff;
+              font-size: 0.625rem;
+              transition: all 0.2s;
+          }
+          .price-input-spinner button:hover {
+              background: #fff;
+              color: #667eea;
+              border-color: #667eea;
+          }
+          .price-input-spinner button:active {
+              background: #f7fafc;
+              color: #667eea;
+              border-color: #667eea;
+          }
+        `}
+      </style>
       <div style={{ padding: "2rem" }}>
         <div
           style={{
@@ -314,91 +511,277 @@ export default function SalesManagerDashboard() {
             ))}
           </div>
 
+          {/* Loading Spinner */}
+          {loading ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "4rem", minHeight: "400px" }}>
+              <div style={{ width: "50px", height: "50px", border: "4px solid rgba(102, 126, 234, 0.3)", borderTop: "4px solid #667eea", borderRadius: "50%", animation: "spin 1s linear infinite" }}></div>
+              <div style={{ marginTop: "1rem", color: "#718096", fontSize: "1rem" }}>Loading...</div>
+            </div>
+          ) : (
+            <>
           {/* Pricing Tab */}
           {activeTab === "pricing" && (
             <div>
               <h2 style={{ fontSize: "1.25rem", fontWeight: 600, marginBottom: "1.5rem", color: "#2d3748" }}>
-                Set Product Price
+                Product Price Management
               </h2>
-              <form
-                onSubmit={handleSetPrice}
-                style={{ background: "#f7fafc", padding: "1.5rem", borderRadius: "4px", marginBottom: "2rem" }}
-              >
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: "1rem", alignItems: "end" }}>
-                  <div>
-                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, color: "#2d3748", fontSize: "0.85rem" }}>
-                      Select Product
-                    </label>
-                    <CustomSelect
-                      value={priceForm.productId}
-                      onChange={(e) => setPriceForm({ ...priceForm, productId: e.target.value })}
-                      options={[
-                        { value: "", label: "Select a product..." },
-                        ...products.map((product) => ({
-                          value: product.productId,
-                          label: `${product.productName} - ${formatCurrency(product.price)}`,
-                        })),
-                      ]}
-                      placeholder="Select a product..."
-                    />
+
+              {/* Search and Filter Section */}
+              <div style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem", flexWrap: "wrap" }}>
+                <input
+                  type="text"
+                  placeholder="Search products..."
+                  value={productSearchQuery}
+                  onChange={(e) => setProductSearchQuery(e.target.value)}
+                  style={{
+                    flex: 1,
+                    minWidth: "250px",
+                    padding: "0.75rem",
+                    border: "2px solid #e2e8f0",
+                    borderRadius: "8px",
+                    fontSize: "0.9rem",
+                    boxSizing: "border-box",
+                    background: "#fff",
+                    color: "#2d3748",
+                  }}
+                />
+                <CustomSelect
+                  value={priceSortBy}
+                  onChange={(e) => setPriceSortBy(e.target.value)}
+                  options={[
+                    { value: "name", label: "Sort by Name" },
+                    { value: "price-low", label: "Price: Low to High" },
+                    { value: "price-high", label: "Price: High to Low" }
+                  ]}
+                  placeholder="Sort by"
+                  minWidth="180px"
+                />
+              </div>
+
+              {/* Pagination Info */}
+              {filteredProducts.length > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", paddingBottom: "1rem", borderBottom: "1px solid #e2e8f0" }}>
+                  <div style={{ color: "#2d3748", fontSize: "0.9rem", fontWeight: 500 }}>
+                    {(() => {
+                      const startIndex = (currentPage - 1) * productsPerPage + 1;
+                      const endIndex = Math.min(currentPage * productsPerPage, filteredProducts.length);
+                      return `${startIndex}–${endIndex} of ${filteredProducts.length}`;
+                    })()}
                   </div>
-                  <div>
-                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, color: "#2d3748" }}>
-                      New Price (₺)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={priceForm.price}
-                      onChange={(e) => setPriceForm({ ...priceForm, price: e.target.value })}
-                      required
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
                       style={{
-                        width: "100%",
-                        padding: "0.75rem",
+                        padding: "0.5rem",
+                        background: currentPage === 1 ? "#e2e8f0" : "#fff",
+                        color: currentPage === 1 ? "#a0aec0" : "#4a5568",
+                        border: "1px solid #e2e8f0",
                         borderRadius: "4px",
-                        border: "2px solid #e2e8f0",
-                        fontSize: "0.85rem",
-                        backgroundColor: "#fff",
-                        color: "#2d3748",
+                        cursor: currentPage === 1 ? "not-allowed" : "pointer",
+                        fontSize: "1rem",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        transition: "all 0.2s",
                       }}
-                    />
+                      onMouseEnter={(e) => {
+                        if (currentPage !== 1) {
+                          e.currentTarget.style.background = "#f7fafc";
+                          e.currentTarget.style.borderColor = "#cbd5e0";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (currentPage !== 1) {
+                          e.currentTarget.style.background = "#fff";
+                          e.currentTarget.style.borderColor = "#e2e8f0";
+                        }
+                      }}
+                    >
+                      ‹
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredProducts.length / productsPerPage), prev + 1))}
+                      disabled={currentPage >= Math.ceil(filteredProducts.length / productsPerPage)}
+                      style={{
+                        padding: "0.5rem",
+                        background: currentPage >= Math.ceil(filteredProducts.length / productsPerPage) ? "#e2e8f0" : "#fff",
+                        color: currentPage >= Math.ceil(filteredProducts.length / productsPerPage) ? "#a0aec0" : "#4a5568",
+                        border: "1px solid #e2e8f0",
+                        borderRadius: "4px",
+                        cursor: currentPage >= Math.ceil(filteredProducts.length / productsPerPage) ? "not-allowed" : "pointer",
+                        fontSize: "1rem",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        transition: "all 0.2s",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (currentPage < Math.ceil(filteredProducts.length / productsPerPage)) {
+                          e.currentTarget.style.background = "#f7fafc";
+                          e.currentTarget.style.borderColor = "#cbd5e0";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (currentPage < Math.ceil(filteredProducts.length / productsPerPage)) {
+                          e.currentTarget.style.background = "#fff";
+                          e.currentTarget.style.borderColor = "#e2e8f0";
+                        }
+                      }}
+                    >
+                      ›
+                    </button>
                   </div>
-                  <button
-                    type="submit"
-                    style={{
-                      padding: "0.75rem 2rem",
-                      background: "#fff",
-                      color: "#667eea",
-                      border: "2px solid #667eea",
-                      borderRadius: "4px",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      fontSize: "1rem",
-                      transition: "all 0.2s",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "#667eea";
-                      e.currentTarget.style.color = "#fff";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "#fff";
-                      e.currentTarget.style.color = "#667eea";
-                    }}
-                  >
-                    Update Price
-                  </button>
                 </div>
-              </form>
+              )}
+
+              {/* Product List */}
+              {loadingProducts ? (
+                <div style={{ textAlign: "center", padding: "3rem", color: "#718096" }}>Loading products...</div>
+              ) : filteredProducts.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "3rem", color: "#718096" }}>
+                  {productSearchQuery ? "No products found matching your search." : "No products available."}
+                </div>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "1.5rem" }}>
+                  {filteredProducts.slice((currentPage - 1) * productsPerPage, currentPage * productsPerPage).map((product) => (
+                    <div
+                      key={product.productId}
+                      onClick={() => navigate(`/sales-manager/products/${product.productId}`)}
+                      style={{
+                        background: "#fff",
+                        border: "2px solid #e2e8f0",
+                        borderRadius: "8px",
+                        padding: "1.5rem",
+                        cursor: "pointer",
+                        transition: "all 0.2s",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = "#667eea";
+                        e.currentTarget.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.15)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = "#e2e8f0";
+                        e.currentTarget.style.boxShadow = "none";
+                      }}
+                    >
+                      <div style={{ marginBottom: "1rem" }}>
+                        <h3 style={{ fontSize: "1.1rem", fontWeight: 600, color: "#2d3748", marginBottom: "0.5rem" }}>
+                          {product.productName}
+                        </h3>
+                        {product.description && (
+                          <p style={{ fontSize: "0.85rem", color: "#718096", lineHeight: "1.5", marginBottom: "0.5rem" }}>
+                            {product.description.length > 100 ? `${product.description.substring(0, 100)}...` : product.description}
+                          </p>
+                        )}
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1rem", paddingTop: "1rem", borderTop: "1px solid #e2e8f0" }}>
+                        <div>
+                          <div style={{ fontSize: "0.85rem", color: "#718096", marginBottom: "0.25rem" }}>Current Price</div>
+                          <div style={{ fontSize: "1.25rem", fontWeight: 700, color: "#667eea" }}>
+                            {formatCurrency(product.price)}
+                          </div>
+                        </div>
+                        {product.discount && product.discount > 0 && (
+                          <div style={{ textAlign: "right" }}>
+                            <div style={{ fontSize: "0.85rem", color: "#718096", marginBottom: "0.25rem" }}>Discount</div>
+                            <div style={{ fontSize: "1rem", fontWeight: 600, color: "#c53030" }}>
+                              {product.discount}%
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ marginTop: "1rem", fontSize: "0.85rem", color: "#667eea", fontWeight: 500 }}>
+                        Click to edit →
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
           {/* Discount Tab */}
           {activeTab === "discount" && (
             <div>
-              <h2 style={{ fontSize: "1.25rem", fontWeight: 600, marginBottom: "1.5rem", color: "#2d3748" }}>
-                Apply Discount to Products
-              </h2>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                <h2 style={{ fontSize: "1.25rem", fontWeight: 600, color: "#2d3748" }}>
+                  Apply Discount to Products
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setShowCategoryModal(true)}
+                  style={{
+                    padding: "0.75rem 1.5rem",
+                    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: "8px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    fontSize: "0.9rem",
+                    transition: "all 0.2s",
+                    whiteSpace: "nowrap",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.boxShadow = "0 4px 8px rgba(102, 126, 234, 0.4)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.boxShadow = "none";
+                  }}
+                >
+                  Choose by Category
+                </button>
+              </div>
+              <div style={{ fontSize: "1rem", fontWeight: 600, color: "#667eea", marginBottom: "1.5rem" }}>
+                {discountForm.productIds.length} product{discountForm.productIds.length !== 1 ? "s" : ""} selected
+              </div>
+
+              {/* Search and Filter Section */}
+              <div style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem", flexWrap: "wrap", alignItems: "center" }}>
+                <input
+                  type="text"
+                  placeholder="Search products..."
+                  value={discountProductSearchQuery}
+                  onChange={(e) => setDiscountProductSearchQuery(e.target.value)}
+                  style={{
+                    flex: 1,
+                    minWidth: "250px",
+                    padding: "0.75rem",
+                    border: "2px solid #e2e8f0",
+                    borderRadius: "8px",
+                    fontSize: "0.9rem",
+                    boxSizing: "border-box",
+                    background: "#fff",
+                    color: "#2d3748",
+                  }}
+                />
+                <CustomSelect
+                  value={discountCategoryFilter}
+                  onChange={(e) => setDiscountCategoryFilter(e.target.value)}
+                  options={[
+                    { value: "", label: "All Categories" },
+                    ...categories.map((cat) => ({
+                      value: cat.categoryId,
+                      label: cat.categoryName,
+                    })),
+                  ]}
+                  placeholder="Filter by Category"
+                  minWidth="180px"
+                />
+                <CustomSelect
+                  value={discountSortBy}
+                  onChange={(e) => setDiscountSortBy(e.target.value)}
+                  options={[
+                    { value: "name", label: "Sort by Name" },
+                    { value: "price-low", label: "Price: Low to High" },
+                    { value: "price-high", label: "Price: High to Low" }
+                  ]}
+                  placeholder="Sort by"
+                  minWidth="180px"
+                />
+              </div>
+
               <form
                 onSubmit={handleSetDiscount}
                 style={{ background: "#f7fafc", padding: "1.5rem", borderRadius: "4px", marginBottom: "2rem" }}
@@ -407,106 +790,377 @@ export default function SalesManagerDashboard() {
                   <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, color: "#2d3748", fontSize: "0.85rem" }}>
                     Discount Rate (%)
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    max="100"
-                    value={discountForm.discountPercent}
-                    onChange={(e) => setDiscountForm({ ...discountForm, discountPercent: e.target.value })}
-                    required
-                    style={{
-                      width: "100%",
-                      maxWidth: "300px",
-                      padding: "0.75rem",
-                      borderRadius: "4px",
-                      border: "2px solid #e2e8f0",
-                      fontSize: "0.85rem",
-                      backgroundColor: "#fff",
-                      color: "#2d3748",
-                    }}
-                  />
+                  <div className="price-input-wrapper" style={{ position: "relative", maxWidth: "300px" }}>
+                    <input
+                      type="number"
+                      className="price-input"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      value={discountForm.discountPercent}
+                      onChange={(e) => setDiscountForm({ ...discountForm, discountPercent: e.target.value })}
+                      required
+                      style={{
+                        width: "100%",
+                        padding: "0.75rem 2.5rem 0.75rem 0.75rem",
+                        borderRadius: "8px",
+                        border: "2px solid #e2e8f0",
+                        fontSize: "0.85rem",
+                        backgroundColor: "#fff",
+                        color: "#2d3748",
+                        boxSizing: "border-box",
+                        transition: "border-color 0.2s",
+                        outline: "none",
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = "#667eea";
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = "#e2e8f0";
+                      }}
+                    />
+                    <div className="price-input-spinner">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const current = parseFloat(discountForm.discountPercent) || 0;
+                          if (current < 100) {
+                            setDiscountForm({ ...discountForm, discountPercent: Math.min(100, current + 0.01).toFixed(2) });
+                          }
+                        }}
+                        aria-label="Increase"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const current = parseFloat(discountForm.discountPercent) || 0;
+                          if (current > 0) {
+                            setDiscountForm({ ...discountForm, discountPercent: Math.max(0, current - 0.01).toFixed(2) });
+                          }
+                        }}
+                        aria-label="Decrease"
+                      >
+                        ▼
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 <div style={{ marginBottom: "1.5rem" }}>
-                  <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 500, color: "#2d3748", fontSize: "0.85rem" }}>
-                    Products to Apply Discount ({discountForm.productIds.length} selected)
-                  </label>
-                  <div
-                    style={{
-                      maxHeight: "300px",
-                      overflowY: "auto",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: "4px",
-                      padding: "1rem",
-                      background: "#fff",
-                    }}
-                  >
-                    {loadingProducts ? (
-                      <div style={{ color: "#2d3748" }}>Loading...</div>
-                    ) : products.length === 0 ? (
-                      <div style={{ color: "#2d3748" }}>No products found.</div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+                    <label style={{ fontWeight: 500, color: "#2d3748", fontSize: "0.85rem" }}>
+                      Products to Apply Discount ({discountForm.productIds.length} selected)
+                    </label>
+                    {(() => {
+                      const filtered = getFilteredProductsForDiscount();
+                      const filteredIds = filtered.map(p => p.productId);
+                      const allSelected = filteredIds.length > 0 && filteredIds.every(id => discountForm.productIds.includes(id));
+                      return (
+                        <button
+                          type="button"
+                          onClick={handleSelectAllFiltered}
+                          style={{
+                            padding: "0.5rem 1rem",
+                            background: allSelected ? "#e53e3e" : "#667eea",
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: "4px",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            fontSize: "0.85rem",
+                            transition: "all 0.2s",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.opacity = "0.9";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.opacity = "1";
+                          }}
+                        >
+                          {allSelected ? "Deselect All Filtered" : "Select All Filtered"}
+                        </button>
+                      );
+                    })()}
+                  </div>
+                  {loadingProducts ? (
+                    <div style={{ textAlign: "center", padding: "3rem", color: "#718096" }}>Loading products...</div>
+                  ) : (() => {
+                    const displayProducts = getDisplayProductsForDiscount();
+                    const filtered = getFilteredProductsForDiscount();
+                    const filteredIds = new Set(filtered.map(p => p.productId));
+                    
+                    return displayProducts.length === 0 ? (
+                      <div style={{ textAlign: "center", padding: "3rem", color: "#718096" }}>
+                        {discountProductSearchQuery || discountCategoryFilter ? "No products found matching your filters." : "No products available."}
+                      </div>
                     ) : (
-                      products.map((product) => {
-                        const isSelected = discountForm.productIds.includes(product.productId);
-                        return (
-                          <div
-                            key={product.productId}
-                            onClick={() => toggleProductSelection(product.productId)}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "1rem",
-                              padding: "0.75rem",
-                              marginBottom: "0.5rem",
-                              borderRadius: "4px",
-                              cursor: "pointer",
-                              background: isSelected ? "#667eea" : "#fff",
-                              border: `2px solid ${isSelected ? "#667eea" : "#e2e8f0"}`,
-                              transition: "all 0.2s",
-                            }}
-                          >
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontWeight: 600, color: isSelected ? "#fff" : "#2d3748" }}>{product.productName}</div>
-                              <div style={{ color: isSelected ? "#fff" : "#718096", fontSize: "0.85rem" }}>
-                                {formatCurrency(product.price)}
-                                {product.discount > 0 && (
-                                  <span style={{ marginLeft: "0.5rem", color: "#e53e3e" }}>(%{product.discount} discount)</span>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "1.5rem" }}>
+                        {displayProducts.map((product) => {
+                          const isSelected = discountForm.productIds.includes(product.productId);
+                          const isFilteredOut = !filteredIds.has(product.productId);
+                          return (
+                            <div
+                              key={product.productId}
+                              onClick={() => toggleProductSelection(product.productId)}
+                              style={{
+                                background: isSelected ? "#667eea" : "#fff",
+                                border: `2px solid ${isSelected ? "#667eea" : "#e2e8f0"}`,
+                                borderRadius: "8px",
+                                padding: "1.5rem",
+                                cursor: "pointer",
+                                transition: "all 0.2s",
+                                opacity: isFilteredOut ? 0.6 : 1,
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!isFilteredOut) {
+                                  e.currentTarget.style.borderColor = "#667eea";
+                                  e.currentTarget.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.15)";
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!isFilteredOut) {
+                                  e.currentTarget.style.borderColor = isSelected ? "#667eea" : "#e2e8f0";
+                                  e.currentTarget.style.boxShadow = "none";
+                                }
+                              }}
+                            >
+                              <div style={{ marginBottom: "1rem" }}>
+                                <h3 style={{ fontSize: "1.1rem", fontWeight: 600, color: isSelected ? "#fff" : "#2d3748", marginBottom: "0.5rem" }}>
+                                  {product.productName}
+                                </h3>
+                                {product.description && (
+                                  <p style={{ fontSize: "0.85rem", color: isSelected ? "rgba(255, 255, 255, 0.9)" : "#718096", lineHeight: "1.5", marginBottom: "0.5rem" }}>
+                                    {product.description.length > 100 ? `${product.description.substring(0, 100)}...` : product.description}
+                                  </p>
+                                )}
+                                {isFilteredOut && (
+                                  <span style={{ fontSize: "0.75rem", color: isSelected ? "rgba(255, 255, 255, 0.8)" : "#718096", fontStyle: "italic" }}>
+                                    (Not in current filter)
+                                  </span>
                                 )}
                               </div>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "1rem", paddingTop: "1rem", borderTop: `1px solid ${isSelected ? "rgba(255, 255, 255, 0.3)" : "#e2e8f0"}` }}>
+                                <div>
+                                  <div style={{ fontSize: "0.85rem", color: isSelected ? "rgba(255, 255, 255, 0.9)" : "#718096", marginBottom: "0.25rem" }}>Current Price</div>
+                                  <div style={{ fontSize: "1.25rem", fontWeight: 700, color: isSelected ? "#fff" : "#667eea" }}>
+                                    {formatCurrency(product.price)}
+                                  </div>
+                                </div>
+                                {product.discount && product.discount > 0 && (
+                                  <div style={{ textAlign: "right" }}>
+                                    <div style={{ fontSize: "0.85rem", color: isSelected ? "rgba(255, 255, 255, 0.9)" : "#718096", marginBottom: "0.25rem" }}>Discount</div>
+                                    <div style={{ fontSize: "1rem", fontWeight: 600, color: isSelected ? "#fff" : "#c53030" }}>
+                                      {product.discount}%
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                              {isSelected && (
+                                <div style={{ marginTop: "1rem", fontSize: "0.85rem", color: "#fff", fontWeight: 500, textAlign: "center" }}>
+                                  ✓ Selected
+                                </div>
+                              )}
                             </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <button
                   type="submit"
+                  disabled={discountForm.productIds.length === 0}
                   style={{
                     padding: "0.75rem 2rem",
-                    background: "#fff",
-                    color: "#667eea",
-                    border: "2px solid #667eea",
+                    background: discountForm.productIds.length === 0 ? "#cbd5e0" : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                    color: "#fff",
+                    border: "none",
                     borderRadius: "4px",
                     fontWeight: 600,
-                    cursor: "pointer",
+                    cursor: discountForm.productIds.length === 0 ? "not-allowed" : "pointer",
                     fontSize: "1rem",
                     transition: "all 0.2s",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#667eea";
-                    e.currentTarget.style.color = "#fff";
+                    if (discountForm.productIds.length > 0) {
+                      e.currentTarget.style.boxShadow = "0 4px 8px rgba(102, 126, 234, 0.4)";
+                    }
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "#fff";
-                    e.currentTarget.style.color = "#667eea";
+                    if (discountForm.productIds.length > 0) {
+                      e.currentTarget.style.boxShadow = "none";
+                    }
                   }}
                 >
-                  Apply Discount
+                  Apply Discount to {discountForm.productIds.length} Product{discountForm.productIds.length !== 1 ? "s" : ""}
                 </button>
               </form>
+
+              {/* Category Selection Modal */}
+              {showCategoryModal && (
+                <>
+                  <style>
+                    {`
+                      .category-checkbox {
+                        width: 1.25rem;
+                        height: 1.25rem;
+                        cursor: pointer;
+                        accentColor: #667eea;
+                        background-color: #fff;
+                        border: 2px solid #e2e8f0;
+                        border-radius: 4px;
+                      }
+                      .category-checkbox:checked {
+                        background-color: #667eea;
+                        border-color: #667eea;
+                      }
+                    `}
+                  </style>
+                  <div
+                    style={{
+                      position: "fixed",
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      background: "rgba(0, 0, 0, 0.5)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      zIndex: 1000,
+                    }}
+                    onClick={() => {
+                      setShowCategoryModal(false);
+                      setSelectedCategoryIds([]);
+                    }}
+                  >
+                    <div
+                      style={{
+                        background: "#fff",
+                        borderRadius: "8px",
+                        padding: "2rem",
+                        maxWidth: "600px",
+                        width: "90%",
+                        maxHeight: "80vh",
+                        overflowY: "auto",
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                    <h3 style={{ fontSize: "1.25rem", fontWeight: 600, marginBottom: "1rem", color: "#2d3748" }}>
+                      Choose Categories to Apply Discount
+                    </h3>
+                    <div style={{ marginBottom: "1.5rem" }}>
+                      {categories.length === 0 ? (
+                        <div style={{ color: "#718096", padding: "1rem" }}>No categories available.</div>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", maxHeight: "300px", overflowY: "auto" }}>
+                          {categories.map((category) => {
+                            const isSelected = selectedCategoryIds.includes(category.categoryId);
+                            return (
+                              <label
+                                key={category.categoryId}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: "0.75rem",
+                                  padding: "0.75rem",
+                                  borderRadius: "4px",
+                                  cursor: "pointer",
+                                  background: isSelected ? "#f7fafc" : "#fff",
+                                  border: `2px solid ${isSelected ? "#667eea" : "#e2e8f0"}`,
+                                  transition: "all 0.2s",
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (!isSelected) {
+                                    e.currentTarget.style.borderColor = "#cbd5e0";
+                                  }
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (!isSelected) {
+                                    e.currentTarget.style.borderColor = "#e2e8f0";
+                                  }
+                                }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="category-checkbox"
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedCategoryIds([...selectedCategoryIds, category.categoryId]);
+                                    } else {
+                                      setSelectedCategoryIds(selectedCategoryIds.filter(id => id !== category.categoryId));
+                                    }
+                                  }}
+                                />
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ fontWeight: 600, color: "#2d3748" }}>{category.categoryName}</div>
+                                  {category.description && (
+                                    <div style={{ fontSize: "0.85rem", color: "#718096" }}>{category.description}</div>
+                                  )}
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowCategoryModal(false);
+                          setSelectedCategoryIds([]);
+                        }}
+                        style={{
+                          padding: "0.75rem 1.5rem",
+                          background: "#e2e8f0",
+                          color: "#2d3748",
+                          border: "none",
+                          borderRadius: "4px",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          fontSize: "0.9rem",
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleApplyCategoryDiscount}
+                        disabled={selectedCategoryIds.length === 0}
+                        style={{
+                          padding: "0.75rem 1.5rem",
+                          background: selectedCategoryIds.length === 0 ? "#cbd5e0" : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: "4px",
+                          fontWeight: 600,
+                          cursor: selectedCategoryIds.length === 0 ? "not-allowed" : "pointer",
+                          fontSize: "0.9rem",
+                          transition: "all 0.2s",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (selectedCategoryIds.length > 0) {
+                            e.currentTarget.style.boxShadow = "0 4px 8px rgba(102, 126, 234, 0.4)";
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (selectedCategoryIds.length > 0) {
+                            e.currentTarget.style.boxShadow = "none";
+                          }
+                        }}
+                      >
+                        Apply to Categories
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                </>
+              )}
             </div>
           )}
 
@@ -588,28 +1242,83 @@ export default function SalesManagerDashboard() {
                       style={{
                         padding: "1.5rem",
                         background: "#f7fafc",
-                        borderRadius: "4px",
+                        borderRadius: "8px",
                         border: "2px solid #e2e8f0",
                         display: "flex",
                         justifyContent: "space-between",
-                        alignItems: "center",
+                        alignItems: "flex-start",
+                        transition: "all 0.2s",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = "#667eea";
+                        e.currentTarget.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.15)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = "#e2e8f0";
+                        e.currentTarget.style.boxShadow = "none";
                       }}
                     >
-                      <div>
-                        <div style={{ fontSize: "1rem", fontWeight: 600, color: "#2d3748", marginBottom: "0.25rem" }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: "1.1rem", fontWeight: 600, color: "#2d3748", marginBottom: "0.75rem" }}>
                           Invoice #{invoice.invoiceId || invoice.id}
                         </div>
-                        <div style={{ fontSize: "0.85rem", color: "#718096" }}>
-                          Order ID: {invoice.orderId} | Date:{" "}
-                          {invoice.invoiceDate ? new Date(invoice.invoiceDate).toLocaleDateString() : "N/A"}
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem", marginBottom: "0.75rem" }}>
+                          <div>
+                            <div style={{ fontSize: "0.75rem", color: "#718096", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                              Customer
+                            </div>
+                            <div style={{ fontSize: "0.9rem", fontWeight: 600, color: "#2d3748" }}>
+                              {invoice.customerName || "N/A"}
+                            </div>
+                            {invoice.customerEmail && (
+                              <div style={{ fontSize: "0.85rem", color: "#718096", marginTop: "0.25rem" }}>
+                                {invoice.customerEmail}
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <div style={{ fontSize: "0.75rem", color: "#718096", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                              Order Date
+                            </div>
+                            <div style={{ fontSize: "0.9rem", fontWeight: 600, color: "#2d3748" }}>
+                              {invoice.orderDate ? new Date(invoice.orderDate).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "N/A"}
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: "0.75rem", color: "#718096", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                              Invoice Date
+                            </div>
+                            <div style={{ fontSize: "0.9rem", fontWeight: 600, color: "#2d3748" }}>
+                              {invoice.invoiceDate ? new Date(invoice.invoiceDate).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }) : "N/A"}
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: "0.75rem", color: "#718096", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                              Order ID
+                            </div>
+                            <div style={{ fontSize: "0.85rem", color: "#4a5568", fontFamily: "monospace" }}>
+                              {invoice.orderId ? invoice.orderId.substring(0, 8) + "..." : "N/A"}
+                            </div>
+                          </div>
                         </div>
                         {invoice.totalAmount && (
-                          <div style={{ fontSize: "0.9rem", fontWeight: 600, color: "#667eea", marginTop: "0.5rem" }}>
-                            Total: {formatCurrency(invoice.totalAmount)}
+                          <div style={{ 
+                            display: "inline-block",
+                            padding: "0.5rem 1rem",
+                            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                            borderRadius: "6px",
+                            marginTop: "0.5rem"
+                          }}>
+                            <div style={{ fontSize: "0.75rem", color: "rgba(255, 255, 255, 0.9)", marginBottom: "0.25rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                              Total Amount
+                            </div>
+                            <div style={{ fontSize: "1.25rem", fontWeight: 700, color: "#fff" }}>
+                              {formatCurrency(invoice.totalAmount)}
+                            </div>
                           </div>
                         )}
                       </div>
-                      <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <div style={{ display: "flex", gap: "0.5rem", marginLeft: "1rem" }}>
                         <button
                           onClick={() => handlePrintInvoice(invoice)}
                           style={{
@@ -617,11 +1326,20 @@ export default function SalesManagerDashboard() {
                             background: "#fff",
                             color: "#667eea",
                             border: "2px solid #667eea",
-                            borderRadius: "4px",
+                            borderRadius: "6px",
                             fontWeight: 600,
                             cursor: "pointer",
                             fontSize: "0.85rem",
                             transition: "all 0.2s",
+                            whiteSpace: "nowrap",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = "#667eea";
+                            e.currentTarget.style.color = "#fff";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "#fff";
+                            e.currentTarget.style.color = "#667eea";
                           }}
                         >
                           🖨️ Print
@@ -633,11 +1351,20 @@ export default function SalesManagerDashboard() {
                             background: "#fff",
                             color: "#667eea",
                             border: "2px solid #667eea",
-                            borderRadius: "4px",
+                            borderRadius: "6px",
                             fontWeight: 600,
                             cursor: "pointer",
                             fontSize: "0.85rem",
                             transition: "all 0.2s",
+                            whiteSpace: "nowrap",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = "#667eea";
+                            e.currentTarget.style.color = "#fff";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "#fff";
+                            e.currentTarget.style.color = "#667eea";
                           }}
                         >
                           📥 Download PDF
@@ -1150,6 +1877,8 @@ export default function SalesManagerDashboard() {
                 </div>
               )}
             </div>
+          )}
+            </>
           )}
         </div>
       </div>

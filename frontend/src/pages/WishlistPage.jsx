@@ -2,17 +2,22 @@ import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import wishlistApi from "../api/wishlistApi";
 import productApi from "../api/productApi";
+import cartApi from "../api/cartApi";
+import { cartStorage } from "../utils/cartStorage";
 import { useToast } from "../contexts/ToastContext";
 import { useUserRole } from "../hooks/useUserRole";
+import { useCartCount } from "../hooks/useCartCount";
 
 export default function WishlistPage() {
     const [wishlist, setWishlist] = useState(null);
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [removing, setRemoving] = useState({});
+    const [addingToCart, setAddingToCart] = useState({});
     const navigate = useNavigate();
     const { success: showSuccess, error: showError } = useToast();
     const userRole = useUserRole();
+    const { refreshCartCount } = useCartCount();
 
     // Redirect if not CUSTOMER
     useEffect(() => {
@@ -77,6 +82,39 @@ export default function WishlistPage() {
             showError(error.response?.data?.message || "Failed to remove product from wishlist.");
         } finally {
             setRemoving({ ...removing, [productId]: false });
+        }
+    };
+
+    const handleAddToCart = async (product) => {
+        const productId = product.productId;
+        const token = localStorage.getItem("access_token");
+        
+        setAddingToCart({ ...addingToCart, [productId]: true });
+        
+        try {
+            if (token) {
+                await cartApi.addToCart(productId, 1);
+                refreshCartCount();
+                showSuccess("Product added to cart successfully!");
+            } else {
+                const finalPrice = product.discount > 0 && product.price > 0
+                    ? product.price - (product.price * product.discount / 100)
+                    : product.price;
+                cartStorage.addItem(
+                    productId,
+                    product.productName,
+                    finalPrice,
+                    1
+                );
+                window.dispatchEvent(new Event("cartUpdated"));
+                refreshCartCount();
+                showSuccess("Product added to cart! Please login to checkout.");
+            }
+        } catch (err) {
+            console.error("Error adding to cart:", err);
+            showError(err.response?.data?.message || "Failed to add product to cart. Please try again.");
+        } finally {
+            setAddingToCart({ ...addingToCart, [productId]: false });
         }
     };
 
@@ -319,29 +357,88 @@ export default function WishlistPage() {
                                                     </div>
                                                 )}
                                             </div>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    handleRemoveFromWishlist(product.productId);
-                                                }}
-                                                disabled={removing[product.productId]}
-                                                style={{
-                                                    width: "100%",
-                                                    padding: "0.75rem",
-                                                    background: removing[product.productId]
-                                                        ? "#cbd5e0"
-                                                        : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                                                    color: "#fff",
-                                                    border: "none",
-                                                    borderRadius: "8px",
-                                                    fontWeight: 600,
-                                                    cursor: removing[product.productId] ? "not-allowed" : "pointer",
-                                                    fontSize: "0.95rem",
-                                                    transition: "all 0.2s",
-                                                }}
-                                            >
-                                                {removing[product.productId] ? "Removing..." : "Remove from Wishlist"}
-                                            </button>
+                                            <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        handleAddToCart(product);
+                                                    }}
+                                                    disabled={addingToCart[product.productId]}
+                                                    style={{
+                                                        flex: 1,
+                                                        padding: "0.75rem",
+                                                        background: addingToCart[product.productId]
+                                                            ? "#cbd5e0"
+                                                            : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                                        color: "#fff",
+                                                        border: addingToCart[product.productId] ? "none" : "2px solid transparent",
+                                                        borderRadius: "4px",
+                                                        fontWeight: 600,
+                                                        cursor: addingToCart[product.productId] ? "not-allowed" : "pointer",
+                                                        fontSize: "0.85rem",
+                                                        transition: "all 0.2s",
+                                                        opacity: addingToCart[product.productId] ? 0.6 : 1,
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        if (!addingToCart[product.productId]) {
+                                                            e.currentTarget.style.background = "#fff";
+                                                            e.currentTarget.style.color = "#667eea";
+                                                            e.currentTarget.style.borderColor = "#667eea";
+                                                            e.currentTarget.style.transform = "scale(1.02)";
+                                                        }
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        if (!addingToCart[product.productId]) {
+                                                            e.currentTarget.style.background = "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+                                                            e.currentTarget.style.color = "#fff";
+                                                            e.currentTarget.style.borderColor = "transparent";
+                                                            e.currentTarget.style.transform = "scale(1)";
+                                                        }
+                                                    }}
+                                                >
+                                                    {addingToCart[product.productId] ? "Adding..." : "Add to Cart"}
+                                                </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        handleRemoveFromWishlist(product.productId);
+                                                    }}
+                                                    disabled={removing[product.productId]}
+                                                    style={{
+                                                        flex: 1,
+                                                        padding: "0.75rem",
+                                                        background: removing[product.productId]
+                                                            ? "#cbd5e0"
+                                                            : "#e53e3e",
+                                                        color: "#fff",
+                                                        border: removing[product.productId] ? "none" : "2px solid transparent",
+                                                        borderRadius: "4px",
+                                                        fontWeight: 600,
+                                                        cursor: removing[product.productId] ? "not-allowed" : "pointer",
+                                                        fontSize: "0.85rem",
+                                                        transition: "all 0.2s",
+                                                        opacity: removing[product.productId] ? 0.6 : 1,
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        if (!removing[product.productId]) {
+                                                            e.currentTarget.style.background = "#fff";
+                                                            e.currentTarget.style.color = "#e53e3e";
+                                                            e.currentTarget.style.borderColor = "#e53e3e";
+                                                            e.currentTarget.style.transform = "scale(1.02)";
+                                                        }
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        if (!removing[product.productId]) {
+                                                            e.currentTarget.style.background = "#e53e3e";
+                                                            e.currentTarget.style.color = "#fff";
+                                                            e.currentTarget.style.borderColor = "transparent";
+                                                            e.currentTarget.style.transform = "scale(1)";
+                                                        }
+                                                    }}
+                                                >
+                                                    {removing[product.productId] ? "Removing..." : "Remove"}
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 );

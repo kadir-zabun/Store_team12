@@ -74,22 +74,49 @@ export default function CustomSelect({
             </button>
 
             {isOpen && (
-                <div
-                    style={{
-                        position: "absolute",
-                        top: "100%",
-                        left: 0,
-                        right: 0,
-                        marginTop: "0.25rem",
-                        background: "#fff",
-                        border: "2px solid #e2e8f0",
-                        borderRadius: "4px",
-                        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
-                        zIndex: 1000,
-                        maxHeight: "300px",
-                        overflowY: "auto",
-                    }}
-                >
+                <>
+                    <style>
+                        {`
+                            .custom-select-dropdown::-webkit-scrollbar {
+                                width: 8px;
+                            }
+                            .custom-select-dropdown::-webkit-scrollbar-track {
+                                background: #f7fafc;
+                                border-radius: 4px;
+                            }
+                            .custom-select-dropdown::-webkit-scrollbar-thumb {
+                                background: #cbd5e0;
+                                border-radius: 4px;
+                            }
+                            .custom-select-dropdown::-webkit-scrollbar-thumb:hover {
+                                background: #667eea;
+                            }
+                            .custom-select-dropdown {
+                                scrollbar-width: thin;
+                                scrollbar-color: #cbd5e0 #f7fafc;
+                            }
+                            .custom-select-dropdown:hover {
+                                scrollbar-color: #667eea #f7fafc;
+                            }
+                        `}
+                    </style>
+                    <div
+                        className="custom-select-dropdown"
+                        style={{
+                            position: "absolute",
+                            top: "100%",
+                            left: 0,
+                            right: 0,
+                            marginTop: "0.25rem",
+                            background: "#fff",
+                            border: "2px solid #e2e8f0",
+                            borderRadius: "4px",
+                            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
+                            zIndex: 1000,
+                            maxHeight: "300px",
+                            overflowY: "auto",
+                        }}
+                    >
                     {options.map((option, index) => (
                         <div
                             key={option.value}
@@ -129,7 +156,8 @@ export default function CustomSelect({
                             <span>{option.label}</span>
                         </div>
                     ))}
-                </div>
+                    </div>
+                </>
             )}
         </div>
     );

@@ -10,8 +10,11 @@ import CheckoutPage from "./pages/CheckoutPage";
 import InvoicePage from "./pages/InvoicePage";
 import OrderHistoryPage from "./pages/OrderHistoryPage";
 import ProductManagementPage from "./pages/ProductManagementPage";
+import CreateProductPage from "./pages/CreateProductPage";
+import CategoryManagementPage from "./pages/CategoryManagementPage";
 import OrderManagementPage from "./pages/OrderManagementPage";
 import ReviewManagementPage from "./pages/ReviewManagementPage";
+import ProductReviewsPage from "./pages/ProductReviewsPage";
 import LoginPage from "./pages/Login";
 import RegisterPage from "./pages/Register";
 import ForgotPasswordPage from "./pages/ForgotPassword";
@@ -19,6 +22,7 @@ import ResetPasswordPage from "./pages/ResetPassword";
 import OwnerDashboard from "./pages/OwnerDashboard";
 import ProductDetailPage from "./pages/ProductDetailPage";
 import SalesManagerDashboard from "./pages/SalesManagerDashboard";
+import EditProductPricePage from "./pages/EditProductPricePage";
 import WishlistPage from "./pages/WishlistPage";
 import DeliveryManagementPage from "./pages/DeliveryManagementPage";
 import ProductManagerInvoicePage from "./pages/ProductManagerInvoicePage";
@@ -51,12 +55,16 @@ function App() {
                             <Route path="/orders" element={<OrderHistoryPage />} />
                             <Route path="/profile" element={<ProfilePage />} />
                             <Route path="/owner/products" element={<ProductManagementPage />} />
+                            <Route path="/owner/products/create" element={<CreateProductPage />} />
+                            <Route path="/owner/categories" element={<CategoryManagementPage />} />
                             <Route path="/owner/orders" element={<OrderManagementPage />} />
                             <Route path="/owner/deliveries" element={<DeliveryManagementPage />} />
                             <Route path="/owner/invoices" element={<ProductManagerInvoicePage />} />
                             <Route path="/owner/reviews" element={<ReviewManagementPage />} />
+                            <Route path="/owner/reviews/:productId" element={<ProductReviewsPage />} />
                             <Route path="/owner-dashboard" element={<OwnerDashboard />} />
                             <Route path="/sales-manager" element={<SalesManagerDashboard />} />
+                            <Route path="/sales-manager/products/:productId" element={<EditProductPricePage />} />
                             <Route path="/wishlist" element={<WishlistPage />} />
                             <Route path="/support/chat" element={<SupportAgentChatPage />} />
                             <Route path="/my-account" element={<MyAccountPage />} />

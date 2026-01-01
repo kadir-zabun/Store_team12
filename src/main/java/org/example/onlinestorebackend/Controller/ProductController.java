@@ -111,6 +111,14 @@ public class ProductController {
         return ResponseEntity.ok(productService.updateCost(productId, cost));
     }
 
+    // Ürün güncelle (PRODUCT_MANAGER rolü) - Bu endpoint daha spesifik endpoint'lerden önce gelmeli
+    @PutMapping("/{productId}")
+    @PreAuthorize("hasRole('PRODUCT_MANAGER')")
+    public ResponseEntity<ProductResponseDto> updateProduct(@PathVariable String productId, @RequestBody Product product) {
+        ProductResponseDto updatedProduct = productService.updateProduct(productId, product);
+        return ResponseEntity.ok(updatedProduct);
+    }
+
     // Yeni ürün oluştur (PRODUCT_MANAGER rolü)
     @PostMapping
     @PreAuthorize("hasRole('PRODUCT_MANAGER')")

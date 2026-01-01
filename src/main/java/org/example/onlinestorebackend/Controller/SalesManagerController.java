@@ -1,6 +1,7 @@
 package org.example.onlinestorebackend.Controller;
 
 import lombok.RequiredArgsConstructor;
+import org.example.onlinestorebackend.Dto.InvoiceWithOrderDto;
 import org.example.onlinestorebackend.Dto.SalesMetricResponse;
 import org.example.onlinestorebackend.Dto.SetDiscountRequest;
 import org.example.onlinestorebackend.Dto.SetPriceRequest;
@@ -48,7 +49,7 @@ public class SalesManagerController {
     }
 
     @GetMapping("/invoices")
-    public ResponseEntity<List<Invoice>> getInvoices(
+    public ResponseEntity<List<InvoiceWithOrderDto>> getInvoices(
             @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
             @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to
     ) {
