@@ -212,7 +212,6 @@ export default function LoginPage() {
                         >
                             Products
                         </Link>
-                        {userRole === "CUSTOMER" && (
                         <Link
                             to="/cart"
                             style={{
@@ -234,7 +233,6 @@ export default function LoginPage() {
                         >
                             Cart
                         </Link>
-                        )}
                         {userRole === "PRODUCT_MANAGER" && (
                             <Link
                                 to="/owner-dashboard"
