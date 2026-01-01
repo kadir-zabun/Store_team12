@@ -598,8 +598,10 @@ export default function MyAccountPage() {
                                 <p style={{ color: "#4a5568", marginBottom: "1rem" }}>
                                     If you have a different question or need assistance, our support agents are here to help!
                                 </p>
-                                <Link
-                                    to="/support/chat"
+                                <button
+                                    onClick={() => {
+                                        window.dispatchEvent(new Event('openSupportChat'));
+                                    }}
                                     style={{
                                         display: "inline-block",
                                         padding: "0.75rem 1.5rem",
@@ -609,6 +611,8 @@ export default function MyAccountPage() {
                                         borderRadius: "8px",
                                         fontWeight: 600,
                                         transition: "all 0.2s",
+                                        border: "none",
+                                        cursor: "pointer",
                                     }}
                                     onMouseEnter={(e) => {
                                         e.currentTarget.style.transform = "translateY(-2px)";
@@ -620,7 +624,7 @@ export default function MyAccountPage() {
                                     }}
                                 >
                                     Contact Support Agent
-                                </Link>
+                                </button>
                             </div>
                         </div>
                     </div>

@@ -120,6 +120,34 @@ export default function CustomerChatWidget() {
         }
     };
 
+    // Listen for custom event to open chat from other components
+    useEffect(() => {
+        const handleOpenChatEvent = async () => {
+            setIsOpen(true);
+            if (!conversationId) {
+                try {
+                    const token = localStorage.getItem("access_token");
+                    const response = await supportApi.startConversation(token ? null : guestToken);
+                    const convData = response.data?.data || response.data;
+                    setConversationId(convData.conversationId);
+                    if (convData.guestToken) {
+                        setGuestToken(convData.guestToken);
+                        localStorage.setItem("guest_token", convData.guestToken);
+                    }
+                } catch (error) {
+                    console.error("Error starting conversation:", error);
+                    showError("Failed to start conversation. Please try again.");
+                }
+            }
+        };
+        
+        window.addEventListener('openSupportChat', handleOpenChatEvent);
+        
+        return () => {
+            window.removeEventListener('openSupportChat', handleOpenChatEvent);
+        };
+    }, [conversationId, guestToken, showError]);
+
     const loadMessages = async () => {
         if (!conversationId) return;
         setLoadingMessages(true);
