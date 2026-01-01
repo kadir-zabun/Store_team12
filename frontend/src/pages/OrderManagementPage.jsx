@@ -77,7 +77,15 @@ export default function OrderManagementPage() {
             
             console.log("Orders data (parsed):", ordersData);
             console.log("Orders count:", ordersData.length);
-            setOrders(Array.isArray(ordersData) ? ordersData : []);
+            
+            // Sort orders by date (newest first) - add to top
+            const sortedOrders = Array.isArray(ordersData) ? [...ordersData].sort((a, b) => {
+                const dateA = a.orderDate ? new Date(a.orderDate).getTime() : 0;
+                const dateB = b.orderDate ? new Date(b.orderDate).getTime() : 0;
+                return dateB - dateA; // Descending order (newest first)
+            }) : [];
+            
+            setOrders(sortedOrders);
         } catch (error) {
             console.error("Error loading orders:", error);
             console.error("Error response:", error.response);

@@ -161,6 +161,61 @@ public class ProductService {
         return convertToDto(savedProduct);
     }
 
+    // Ürün güncelle (PRODUCT_MANAGER için)
+    public ProductResponseDto updateProduct(String productId, Product productUpdate) {
+        Product existingProduct = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
+
+        // Update fields
+        if (productUpdate.getProductName() != null) {
+            existingProduct.setProductName(productUpdate.getProductName());
+        }
+        if (productUpdate.getDescription() != null) {
+            existingProduct.setDescription(productUpdate.getDescription());
+        }
+        if (productUpdate.getPrice() != null) {
+            existingProduct.setPrice(productUpdate.getPrice());
+        }
+        if (productUpdate.getDiscount() != null) {
+            existingProduct.setDiscount(productUpdate.getDiscount());
+        }
+        if (productUpdate.getQuantity() != null) {
+            existingProduct.setQuantity(productUpdate.getQuantity());
+            existingProduct.setInStock(productUpdate.getQuantity() > 0);
+        }
+        if (productUpdate.getModel() != null) {
+            existingProduct.setModel(productUpdate.getModel());
+        }
+        if (productUpdate.getSerialNumber() != null) {
+            existingProduct.setSerialNumber(productUpdate.getSerialNumber());
+        }
+        if (productUpdate.getWarrantyStatus() != null) {
+            existingProduct.setWarrantyStatus(productUpdate.getWarrantyStatus());
+        }
+        if (productUpdate.getDistributionInfo() != null) {
+            existingProduct.setDistributionInfo(productUpdate.getDistributionInfo());
+        }
+        if (productUpdate.getImages() != null) {
+            existingProduct.setImages(productUpdate.getImages());
+        }
+        if (productUpdate.getPopularity() != null) {
+            existingProduct.setPopularity(productUpdate.getPopularity());
+        }
+        if (productUpdate.getCategoryIds() != null && !productUpdate.getCategoryIds().isEmpty()) {
+            List<String> normalizedCategoryIds = normalizeCategoryIds(productUpdate);
+            validateCategories(normalizedCategoryIds);
+            existingProduct.setCategoryIds(normalizedCategoryIds);
+            productCategoryRelationService.syncProductCategories(existingProduct.getProductId(), normalizedCategoryIds);
+        } else if (productUpdate.getCategoryIds() != null && productUpdate.getCategoryIds().isEmpty()) {
+            // Empty array means remove all categories
+            existingProduct.setCategoryIds(Collections.emptyList());
+            productCategoryRelationService.syncProductCategories(existingProduct.getProductId(), Collections.emptyList());
+        }
+
+        Product savedProduct = productRepository.save(existingProduct);
+        return convertToDto(savedProduct);
+    }
+
     // Tüm ürünleri getir (PRODUCT_MANAGER için - owner kontrolü yok)
     public List<ProductResponseDto> getAllProductsList() {
         List<Product> products = productRepository.findAll();
@@ -300,6 +355,7 @@ public class ProductService {
                     dto.setReviewId(review.getReviewId());
                     dto.setUserId(review.getUserId());
                     dto.setApproved(review.getApproved());
+                    dto.setCreatedAt(review.getCreatedAt());
                     
                     // Review'da userId aslında username olarak saklanıyor (authentication.getName() kullanılıyor)
                     // O yüzden direkt olarak username olarak kullanabiliriz

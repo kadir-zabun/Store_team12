@@ -1,36 +1,13 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import productApi from "../api/productApi";
-import categoryApi from "../api/categoryApi";
 import { useToast } from "../contexts/ToastContext";
 import { useUserRole } from "../hooks/useUserRole";
-import CustomSelect from "../components/CustomSelect";
 
 export default function ProductManagementPage() {
     const [products, setProducts] = useState([]);
-    const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [showCreateForm, setShowCreateForm] = useState(false);
-    const [showCreateCategoryForm, setShowCreateCategoryForm] = useState(false);
     const [deleting, setDeleting] = useState({});
-    const [deletingCategory, setDeletingCategory] = useState({});
-    const [categoryForm, setCategoryForm] = useState({
-        categoryName: "",
-        description: "",
-    });
-    const [productForm, setProductForm] = useState({
-        productName: "",
-        description: "",
-        price: "",
-        discount: "",
-        quantity: "",
-        model: "",
-        serialNumber: "",
-        warrantyStatus: "",
-        distributionInfo: "",
-        categoryIds: [],
-        images: [""],
-    });
     const navigate = useNavigate();
     const { success: showSuccess, error: showError } = useToast();
     const userRole = useUserRole();
@@ -58,19 +35,15 @@ export default function ProductManagementPage() {
 
         const loadData = async () => {
             try {
-                // Load products and categories
-                const [productsRes, categoriesRes] = await Promise.all([
-                    productApi.getMyProducts(),
-                    categoryApi.getAllCategories(),
-                ]);
+                setLoading(true);
+                // Load products only
+                const productsRes = await productApi.getMyProducts();
 
                 // Backend returns {success: true, data: [...], meta: {...}}
                 // Axios wraps it in response.data, so we need response.data.data
                 const productsData = productsRes?.data?.data || productsRes?.data || productsRes || [];
-                const categoriesData = categoriesRes?.data?.data || categoriesRes?.data || categoriesRes || [];
                 
                 setProducts(Array.isArray(productsData) ? productsData : []);
-                setCategories(Array.isArray(categoriesData) ? categoriesData : []);
             } catch (error) {
                 console.error("Error loading data:", error);
                 showError(error.response?.data?.message || "Failed to load data. Please try again.");
@@ -82,50 +55,6 @@ export default function ProductManagementPage() {
         loadData();
     }, [navigate, userRole, showError]);
 
-    const handleCreateProduct = async (e) => {
-        e.preventDefault();
-        try {
-            const productData = {
-                productName: productForm.productName,
-                description: productForm.description,
-                price: parseFloat(productForm.price) || 0,
-                discount: parseFloat(productForm.discount) || 0,
-                quantity: parseInt(productForm.quantity) || 0,
-                model: productForm.model || null,
-                serialNumber: productForm.serialNumber || null,
-                warrantyStatus: productForm.warrantyStatus || null,
-                distributionInfo: productForm.distributionInfo || null,
-                categoryIds: productForm.categoryIds.filter(id => id),
-                images: productForm.images.filter(img => img),
-                inStock: (parseInt(productForm.quantity) || 0) > 0,
-                popularity: 0,
-            };
-
-            const response = await productApi.createProduct(productData);
-            showSuccess("Product created successfully!");
-            setShowCreateForm(false);
-            setProductForm({
-                productName: "",
-                description: "",
-                price: "",
-                discount: "",
-                quantity: "",
-                model: "",
-                serialNumber: "",
-                warrantyStatus: "",
-                distributionInfo: "",
-                categoryIds: [],
-                images: [""],
-            });
-
-            // Reload products
-            const productsRes = await productApi.getMyProducts();
-            setProducts(productsRes.data || []);
-        } catch (error) {
-            console.error("Error creating product:", error);
-            showError(error.response?.data?.message || "Failed to create product. Please try again.");
-        }
-    };
 
     const handleDeleteProduct = async (productId) => {
         if (!window.confirm("Are you sure you want to delete this product?")) {
@@ -145,39 +74,20 @@ export default function ProductManagementPage() {
         }
     };
 
-    const handleCreateCategory = async (e) => {
-        e.preventDefault();
-        try {
-            const categoryData = {
-                categoryName: categoryForm.categoryName,
-                description: categoryForm.description || null,
-            };
-
-            await categoryApi.createCategory(categoryData);
-            showSuccess("Category created successfully!");
-            
-            // Reload categories
-            const categoriesRes = await categoryApi.getAllCategories();
-            const categoriesData = categoriesRes?.data?.data || categoriesRes?.data || categoriesRes || [];
-            setCategories(Array.isArray(categoriesData) ? categoriesData : []);
-            
-            setCategoryForm({ categoryName: "", description: "" });
-            setShowCreateCategoryForm(false);
-        } catch (error) {
-            console.error("Error creating category:", error);
-            showError(error.response?.data?.message || "Failed to create category. Please try again.");
-        }
-    };
 
     // Check role from localStorage directly if hook hasn't loaded yet
     const storedRole = localStorage.getItem("user_role");
     const currentRole = userRole || storedRole;
 
     // Show loading while checking role or loading data
-    if (loading || (currentRole === null || currentRole === undefined)) {
+    if (currentRole === null || currentRole === undefined) {
         return (
-            <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <div style={{ color: "#fff", fontSize: "1.5rem" }}>Loading...</div>
+            <div style={{ minHeight: "calc(100vh - 80px)", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
+                    <div style={{ width: "50px", height: "50px", border: "4px solid rgba(255, 255, 255, 0.3)", borderTop: "4px solid #fff", borderRadius: "50%", animation: "spin 1s linear infinite" }}></div>
+                    <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+                    <div style={{ color: "#fff", fontSize: "1rem" }}>Loading...</div>
+                </div>
             </div>
         );
     }
@@ -201,395 +111,68 @@ export default function ProductManagementPage() {
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
                         <h1 style={{ fontSize: "2rem", fontWeight: 700, color: "#2d3748" }}>Product Management</h1>
                         <div style={{ display: "flex", gap: "1rem" }}>
-                            <button
-                                onClick={() => {
-                                    setShowCreateCategoryForm(!showCreateCategoryForm);
-                                    setShowCreateForm(false);
-                                }}
+                            <Link
+                                to="/owner/categories"
                                 style={{
                                     padding: "0.75rem 1.5rem",
-                                    background: showCreateCategoryForm ? "#667eea" : "#fff",
-                                    color: showCreateCategoryForm ? "#fff" : "#667eea",
+                                    background: "#fff",
+                                    color: "#667eea",
                                     border: "2px solid #667eea",
                                     borderRadius: "4px",
                                     fontWeight: 600,
                                     cursor: "pointer",
                                     transition: "all 0.2s",
+                                    textDecoration: "none",
+                                    display: "inline-block",
                                 }}
                                 onMouseEnter={(e) => {
-                                    if (!showCreateCategoryForm) {
-                                        e.currentTarget.style.background = "#667eea";
-                                        e.currentTarget.style.color = "#fff";
-                                    }
+                                    e.currentTarget.style.background = "#667eea";
+                                    e.currentTarget.style.color = "#fff";
                                 }}
                                 onMouseLeave={(e) => {
-                                    if (!showCreateCategoryForm) {
-                                        e.currentTarget.style.background = "#fff";
-                                        e.currentTarget.style.color = "#667eea";
-                                    }
+                                    e.currentTarget.style.background = "#fff";
+                                    e.currentTarget.style.color = "#667eea";
                                 }}
                             >
-                                {showCreateCategoryForm ? "Cancel" : "+ Create Category"}
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setShowCreateForm(!showCreateForm);
-                                    setShowCreateCategoryForm(false);
-                                }}
+                                Edit Categories
+                            </Link>
+                            <Link
+                                to="/owner/products/create"
                                 style={{
                                     padding: "0.75rem 1.5rem",
-                                    background: showCreateForm ? "#667eea" : "#fff",
-                                    color: showCreateForm ? "#fff" : "#667eea",
+                                    background: "#fff",
+                                    color: "#667eea",
                                     border: "2px solid #667eea",
                                     borderRadius: "4px",
                                     fontWeight: 600,
                                     cursor: "pointer",
                                     transition: "all 0.2s",
+                                    textDecoration: "none",
+                                    display: "inline-block",
                                 }}
                                 onMouseEnter={(e) => {
-                                    if (!showCreateForm) {
-                                        e.currentTarget.style.background = "#667eea";
-                                        e.currentTarget.style.color = "#fff";
-                                    }
+                                    e.currentTarget.style.background = "#667eea";
+                                    e.currentTarget.style.color = "#fff";
                                 }}
                                 onMouseLeave={(e) => {
-                                    if (!showCreateForm) {
-                                        e.currentTarget.style.background = "#fff";
-                                        e.currentTarget.style.color = "#667eea";
-                                    }
+                                    e.currentTarget.style.background = "#fff";
+                                    e.currentTarget.style.color = "#667eea";
                                 }}
                             >
-                                {showCreateForm ? "Cancel" : "+ Create Product"}
-                            </button>
+                                + Create Product
+                            </Link>
                         </div>
                     </div>
-
-                    {/* Create Category Form */}
-                    {showCreateCategoryForm && (
-                        <div style={{ marginBottom: "2rem", padding: "2rem", background: "#f7fafc", borderRadius: "4px", border: "2px solid #e2e8f0" }}>
-                            <h2 style={{ marginBottom: "1.5rem", color: "#2d3748", fontSize: "1.25rem" }}>Create New Category</h2>
-                            <form onSubmit={handleCreateCategory}>
-                                <div style={{ marginBottom: "1rem", width: "100%" }}>
-                                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600, color: "#4a5568", fontSize: "0.85rem" }}>Category Name *</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={categoryForm.categoryName}
-                                        onChange={(e) => setCategoryForm({ ...categoryForm, categoryName: e.target.value })}
-                                        placeholder="Enter category name"
-                                        style={{ width: "100%", padding: "0.75rem", borderRadius: "4px", border: "2px solid #e2e8f0", fontSize: "1rem", background: "#fff", color: "#2d3748", boxSizing: "border-box" }}
-                                    />
-                                </div>
-                                <div style={{ marginBottom: "1rem", width: "100%" }}>
-                                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600, color: "#4a5568", fontSize: "0.85rem" }}>Description</label>
-                                    <textarea
-                                        value={categoryForm.description}
-                                        onChange={(e) => setCategoryForm({ ...categoryForm, description: e.target.value })}
-                                        placeholder="Enter category description (optional)"
-                                        rows={4}
-                                        style={{ width: "100%", padding: "0.75rem", borderRadius: "8px", border: "2px solid #e2e8f0", fontSize: "1rem", background: "#fff", color: "#2d3748", boxSizing: "border-box", resize: "vertical" }}
-                                    />
-                                </div>
-                                <div style={{ display: "flex", gap: "1rem" }}>
-                                    <button
-                                        type="submit"
-                                        style={{
-                                            padding: "0.75rem 2rem",
-                                            background: "#fff",
-                                            color: "#667eea",
-                                            border: "2px solid #667eea",
-                                            borderRadius: "4px",
-                                            fontWeight: 600,
-                                            cursor: "pointer",
-                                            fontSize: "0.85rem",
-                                            transition: "all 0.2s",
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            e.currentTarget.style.background = "#667eea";
-                                            e.currentTarget.style.color = "#fff";
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            e.currentTarget.style.background = "#fff";
-                                            e.currentTarget.style.color = "#667eea";
-                                        }}
-                                    >
-                                        Create Category
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setShowCreateCategoryForm(false);
-                                            setCategoryForm({ categoryName: "", description: "" });
-                                        }}
-                                        style={{
-                                            padding: "0.75rem 2rem",
-                                            background: "#e2e8f0",
-                                            color: "#4a5568",
-                                            border: "none",
-                                            borderRadius: "4px",
-                                            fontWeight: 600,
-                                            cursor: "pointer",
-                                            fontSize: "0.85rem",
-                                        }}
-                                    >
-                                        Cancel
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    )}
-
-                    {/* Categories List */}
-                    <div style={{ marginBottom: "2rem", padding: "2rem", background: "#f7fafc", borderRadius: "4px", border: "2px solid #e2e8f0" }}>
-                        <h2 style={{ marginBottom: "1.5rem", color: "#2d3748", fontSize: "1.25rem" }}>Categories</h2>
-                        {categories.length === 0 ? (
-                            <div style={{ textAlign: "center", padding: "2rem", color: "#718096" }}>No categories found.</div>
-                        ) : (
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: "1rem" }}>
-                                {categories.map((category) => (
-                                    <div
-                                        key={category.categoryId}
-                                        style={{
-                                            padding: "1rem",
-                                            background: "#fff",
-                                            borderRadius: "4px",
-                                            border: "1px solid #e2e8f0",
-                                            display: "flex",
-                                            justifyContent: "space-between",
-                                            alignItems: "center",
-                                        }}
-                                    >
-                                        <div>
-                                            <div style={{ fontWeight: 600, color: "#2d3748", fontSize: "0.9rem", marginBottom: "0.25rem" }}>
-                                                {category.categoryName}
-                                            </div>
-                                            {category.description && (
-                                                <div style={{ fontSize: "0.85rem", color: "#718096" }}>
-                                                    {category.description}
-                                                </div>
-                                            )}
-                                        </div>
-                                        <button
-                                            onClick={() => handleDeleteCategory(category.categoryId)}
-                                            disabled={deletingCategory[category.categoryId]}
-                                            style={{
-                                                padding: "0.5rem 1rem",
-                                                background: "#e53e3e",
-                                                color: "#fff",
-                                                border: "none",
-                                                borderRadius: "4px",
-                                                fontSize: "0.85rem",
-                                                cursor: deletingCategory[category.categoryId] ? "not-allowed" : "pointer",
-                                                transition: "all 0.2s",
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                if (!deletingCategory[category.categoryId]) {
-                                                    e.currentTarget.style.background = "#c53030";
-                                                }
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                if (!deletingCategory[category.categoryId]) {
-                                                    e.currentTarget.style.background = "#e53e3e";
-                                                }
-                                            }}
-                                        >
-                                            {deletingCategory[category.categoryId] ? "Deleting..." : "Delete"}
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Create Product Form */}
-                    {showCreateForm && (
-                        <div style={{ marginBottom: "2rem", padding: "2rem", background: "#f7fafc", borderRadius: "4px", border: "2px solid #e2e8f0" }}>
-                            <h2 style={{ marginBottom: "1.5rem", color: "#2d3748", fontSize: "1.25rem" }}>Create New Product</h2>
-                            <form onSubmit={handleCreateProduct}>
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem", width: "100%" }}>
-                                    <div style={{ width: "100%" }}>
-                                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600, color: "#4a5568", fontSize: "0.85rem" }}>Product Name *</label>
-                                        <input
-                                            type="text"
-                                            required
-                                            value={productForm.productName}
-                                            onChange={(e) => setProductForm({ ...productForm, productName: e.target.value })}
-                                            style={{ width: "100%", padding: "0.75rem", borderRadius: "4px", border: "2px solid #e2e8f0", fontSize: "1rem", background: "#fff", color: "#2d3748", boxSizing: "border-box" }}
-                                        />
-                                    </div>
-                                    <div style={{ width: "100%" }}>
-                                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600, color: "#4a5568", fontSize: "0.85rem" }}>Price *</label>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            required
-                                            value={productForm.price}
-                                            onChange={(e) => setProductForm({ ...productForm, price: e.target.value })}
-                                            style={{ width: "100%", padding: "0.75rem", borderRadius: "4px", border: "2px solid #e2e8f0", fontSize: "1rem", background: "#fff", color: "#2d3748", boxSizing: "border-box" }}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div style={{ marginBottom: "1rem", width: "100%" }}>
-                                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600, color: "#4a5568", fontSize: "0.85rem" }}>Description *</label>
-                                    <textarea
-                                        required
-                                        value={productForm.description}
-                                        onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
-                                        rows="3"
-                                        placeholder="Enter product description"
-                                        style={{ 
-                                            width: "100%", 
-                                            padding: "0.75rem", 
-                                            borderRadius: "8px", 
-                                            border: "2px solid #e2e8f0", 
-                                            fontSize: "0.85rem", 
-                                            fontFamily: "inherit", 
-                                            background: "#fff", 
-                                            color: "#2d3748",
-                                            boxSizing: "border-box",
-                                            resize: "vertical",
-                                            minHeight: "80px"
-                                        }}
-                                    />
-                                </div>
-
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem", marginBottom: "1rem", width: "100%" }}>
-                                    <div style={{ width: "100%" }}>
-                                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600, color: "#4a5568", fontSize: "0.85rem" }}>Quantity *</label>
-                                        <input
-                                            type="number"
-                                            required
-                                            value={productForm.quantity}
-                                            onChange={(e) => setProductForm({ ...productForm, quantity: e.target.value })}
-                                            style={{ width: "100%", padding: "0.75rem", borderRadius: "4px", border: "2px solid #e2e8f0", fontSize: "1rem", background: "#fff", color: "#2d3748", boxSizing: "border-box" }}
-                                        />
-                                    </div>
-                                    <div style={{ width: "100%" }}>
-                                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600, color: "#4a5568", fontSize: "0.85rem" }}>Discount</label>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            value={productForm.discount}
-                                            onChange={(e) => setProductForm({ ...productForm, discount: e.target.value })}
-                                            style={{ width: "100%", padding: "0.75rem", borderRadius: "4px", border: "2px solid #e2e8f0", fontSize: "1rem", background: "#fff", color: "#2d3748", boxSizing: "border-box" }}
-                                        />
-                                    </div>
-                                    <div style={{ width: "100%" }}>
-                                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600, color: "#4a5568", fontSize: "0.85rem" }}>Category</label>
-                                        <CustomSelect
-                                            value={productForm.categoryIds[0] || ""}
-                                            onChange={(e) => setProductForm({ ...productForm, categoryIds: e.target.value ? [e.target.value] : [] })}
-                                            options={[
-                                                { value: "", label: "Select Category" },
-                                                ...(Array.isArray(categories) && categories.length > 0
-                                                    ? categories.map(cat => ({ value: cat.categoryId, label: cat.categoryName }))
-                                                    : [{ value: "", label: "No categories available", disabled: true }])
-                                            ]}
-                                            placeholder="Select Category"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem", width: "100%" }}>
-                                    <div style={{ width: "100%" }}>
-                                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600, color: "#4a5568", fontSize: "0.85rem" }}>Model *</label>
-                                        <input
-                                            type="text"
-                                            required
-                                            value={productForm.model}
-                                            onChange={(e) => setProductForm({ ...productForm, model: e.target.value })}
-                                            placeholder="Enter product model"
-                                            style={{ width: "100%", padding: "0.75rem", borderRadius: "4px", border: "2px solid #e2e8f0", fontSize: "1rem", background: "#fff", color: "#2d3748", boxSizing: "border-box" }}
-                                        />
-                                    </div>
-                                    <div style={{ width: "100%" }}>
-                                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600, color: "#4a5568", fontSize: "0.85rem" }}>Serial Number *</label>
-                                        <input
-                                            type="text"
-                                            required
-                                            value={productForm.serialNumber}
-                                            onChange={(e) => setProductForm({ ...productForm, serialNumber: e.target.value })}
-                                            placeholder="Enter serial number"
-                                            style={{ width: "100%", padding: "0.75rem", borderRadius: "4px", border: "2px solid #e2e8f0", fontSize: "1rem", background: "#fff", color: "#2d3748", boxSizing: "border-box" }}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem", width: "100%" }}>
-                                    <div style={{ width: "100%" }}>
-                                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600, color: "#4a5568", fontSize: "0.85rem" }}>Warranty Status *</label>
-                                        <input
-                                            type="text"
-                                            required
-                                            value={productForm.warrantyStatus}
-                                            onChange={(e) => setProductForm({ ...productForm, warrantyStatus: e.target.value })}
-                                            placeholder="Enter warranty status"
-                                            style={{ width: "100%", padding: "0.75rem", borderRadius: "4px", border: "2px solid #e2e8f0", fontSize: "1rem", background: "#fff", color: "#2d3748", boxSizing: "border-box" }}
-                                        />
-                                    </div>
-                                    <div style={{ width: "100%" }}>
-                                        <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600, color: "#4a5568", fontSize: "0.85rem" }}>Distributor Information *</label>
-                                        <input
-                                            type="text"
-                                            required
-                                            value={productForm.distributionInfo}
-                                            onChange={(e) => setProductForm({ ...productForm, distributionInfo: e.target.value })}
-                                            placeholder="Enter distributor information"
-                                            style={{ width: "100%", padding: "0.75rem", borderRadius: "4px", border: "2px solid #e2e8f0", fontSize: "1rem", background: "#fff", color: "#2d3748", boxSizing: "border-box" }}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div style={{ marginBottom: "1rem", width: "100%" }}>
-                                    <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600, color: "#4a5568", fontSize: "0.85rem" }}>Image URL</label>
-                                    <input
-                                        type="url"
-                                        value={productForm.images[0] || ""}
-                                        onChange={(e) => setProductForm({ ...productForm, images: [e.target.value] })}
-                                        placeholder="https://example.com/image.jpg"
-                                        style={{ 
-                                            width: "100%", 
-                                            padding: "0.75rem", 
-                                            borderRadius: "8px", 
-                                            border: "2px solid #e2e8f0", 
-                                            fontSize: "0.85rem", 
-                                            background: "#fff", 
-                                            color: "#2d3748",
-                                            boxSizing: "border-box"
-                                        }}
-                                    />
-                                </div>
-
-                                <button
-                                    type="submit"
-                                    style={{
-                                        padding: "0.75rem 2rem",
-                                        background: "#fff",
-                                        color: "#667eea",
-                                        border: "2px solid #667eea",
-                                        borderRadius: "4px",
-                                        fontWeight: 600,
-                                        cursor: "pointer",
-                                        fontSize: "1rem",
-                                        transition: "all 0.2s",
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.background = "#667eea";
-                                        e.currentTarget.style.color = "#fff";
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.background = "#fff";
-                                        e.currentTarget.style.color = "#667eea";
-                                    }}
-                                >
-                                    Create Product
-                                </button>
-                            </form>
-                        </div>
-                    )}
 
                     {/* Products List */}
+                    {loading ? (
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "4rem", minHeight: "400px" }}>
+                            <div style={{ width: "50px", height: "50px", border: "4px solid rgba(102, 126, 234, 0.3)", borderTop: "4px solid #667eea", borderRadius: "50%", animation: "spin 1s linear infinite" }}></div>
+                            <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+                            <div style={{ marginTop: "1rem", color: "#718096", fontSize: "1rem" }}>Loading products...</div>
+                        </div>
+                    ) : (
+                    <>
                     <div>
                         <h2 style={{ marginBottom: "1.5rem", color: "#2d3748", fontSize: "1.25rem" }}>My Products ({Array.isArray(products) ? products.length : 0})</h2>
                         {!Array.isArray(products) || products.length === 0 ? (
@@ -655,6 +238,8 @@ export default function ProductManagementPage() {
                             </div>
                         )}
                     </div>
+                    </>
+                    )}
                 </div>
             </div>
         </div>

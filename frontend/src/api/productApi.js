@@ -28,6 +28,9 @@ const productApi = {
     createProduct: (product) =>
         axiosClient.post("/api/products", product),
 
+    updateProduct: (productId, product) =>
+        axiosClient.put(`/api/products/${productId}`, product),
+
     createCategory: (category) =>
         axiosClient.post("/api/categories", category),
 

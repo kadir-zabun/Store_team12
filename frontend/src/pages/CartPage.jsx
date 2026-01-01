@@ -14,6 +14,7 @@ export default function CartPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [updating, setUpdating] = useState({});
+    const [productDetails, setProductDetails] = useState({});
     const navigate = useNavigate();
     const { refreshCartCount } = useCartCount();
     const { success: showSuccess, error: showError } = useToast();
@@ -56,6 +57,43 @@ export default function CartPage() {
             window.removeEventListener("tokenSet", tokenSetListener);
         };
     }, []);
+
+    // Load product details when cart items change
+    useEffect(() => {
+        const loadProductDetails = async () => {
+            const cartItems = cart?.items || [];
+            if (cartItems.length === 0) {
+                setProductDetails({});
+                return;
+            }
+
+            const productIds = cartItems.map(item => item.productId);
+            const details = {};
+            
+            await Promise.all(
+                productIds.map(async (productId) => {
+                    try {
+                        const response = await productApi.getProductById(productId);
+                        let productData = response.data;
+                        if (productData && productData.data) {
+                            productData = productData.data;
+                        }
+                        if (productData) {
+                            details[productId] = productData;
+                        }
+                    } catch (error) {
+                        console.error(`Error loading product ${productId}:`, error);
+                    }
+                })
+            );
+            
+            setProductDetails(details);
+        };
+
+        if (cart && cart.items && cart.items.length > 0) {
+            loadProductDetails();
+        }
+    }, [cart]);
 
     const loadCart = async () => {
         setLoading(true);
@@ -258,6 +296,26 @@ export default function CartPage() {
         return "0.00";
     };
 
+    const formatCurrency = (amount) => {
+        if (!amount && amount !== 0) return "₺0.00";
+        return new Intl.NumberFormat("tr-TR", {
+            style: "currency",
+            currency: "TRY",
+        }).format(amount);
+    };
+
+    const calculateDiscountedPrice = (price, discount) => {
+        if (!discount || discount <= 0) return price;
+        const discountAmount = price * (discount / 100);
+        return price - discountAmount;
+    };
+
+    const truncateText = (text, maxLength = 100) => {
+        if (!text) return "";
+        if (text.length <= maxLength) return text;
+        return text.substring(0, maxLength) + "...";
+    };
+
     const cartItems = cart?.items || [];
     const totalPrice = cart?.totalPrice || 0;
 
@@ -381,35 +439,128 @@ export default function CartPage() {
                     ) : (
                         <div>
                             <div style={{ marginBottom: "2rem" }}>
-                                {cartItems.map((item) => (
-                                    <div
-                                        key={item.productId}
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "1.5rem",
-                                            padding: "1.5rem",
-                                            background: "#f7fafc",
-                                            borderRadius: "12px",
-                                            marginBottom: "1rem",
-                                            border: "1px solid #e2e8f0",
-                                        }}
-                                    >
-                                        <div style={{ flex: 1 }}>
-                                            <h3
-                                                style={{
-                                                    fontSize: "1.2rem",
-                                                    fontWeight: 600,
-                                                    color: "#2d3748",
-                                                    marginBottom: "0.5rem",
-                                                }}
-                                            >
-                                                {item.productName}
-                                            </h3>
-                                            <div style={{ fontSize: "1rem", color: "#667eea", fontWeight: 600 }}>
-                                                ${formatPrice(item.price)} each
-                                            </div>
-                                        </div>
+                                {cartItems.map((item) => {
+                                    const product = productDetails[item.productId];
+                                    const hasDiscount = product?.discount && product.discount > 0;
+                                    const originalPrice = product?.price || item.price;
+                                    const discountedPrice = hasDiscount 
+                                        ? calculateDiscountedPrice(originalPrice, product.discount)
+                                        : originalPrice;
+                                    const displayPrice = item.price || discountedPrice;
+
+                                    return (
+                                        <div
+                                            key={item.productId}
+                                            style={{
+                                                display: "flex",
+                                                flexDirection: "column",
+                                                gap: "1rem",
+                                                padding: "1.5rem",
+                                                background: "#fff",
+                                                borderRadius: "12px",
+                                                marginBottom: "1rem",
+                                                border: "2px solid #e2e8f0",
+                                                transition: "all 0.2s",
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.borderColor = "#667eea";
+                                                e.currentTarget.style.boxShadow = "0 4px 12px rgba(102, 126, 234, 0.15)";
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.borderColor = "#e2e8f0";
+                                                e.currentTarget.style.boxShadow = "none";
+                                            }}
+                                        >
+                                            <div style={{ display: "flex", gap: "1.5rem", alignItems: "flex-start" }}>
+                                                <div style={{ flex: 1 }}>
+                                                    <Link
+                                                        to={`/products/${item.productId}`}
+                                                        style={{ textDecoration: "none", color: "inherit" }}
+                                                    >
+                                                        <h3
+                                                            style={{
+                                                                fontSize: "1.2rem",
+                                                                fontWeight: 600,
+                                                                color: "#2d3748",
+                                                                marginBottom: "0.5rem",
+                                                                cursor: "pointer",
+                                                            }}
+                                                        >
+                                                            {item.productName}
+                                                        </h3>
+                                                    </Link>
+                                                    
+                                                    {/* Product Description */}
+                                                    {product?.description ? (
+                                                        <p style={{ 
+                                                            fontSize: "0.9rem", 
+                                                            color: "#718096", 
+                                                            marginBottom: "0.75rem",
+                                                            lineHeight: "1.5",
+                                                        }}>
+                                                            {truncateText(product.description, 120)}
+                                                        </p>
+                                                    ) : (
+                                                        <p style={{ 
+                                                            fontSize: "0.85rem", 
+                                                            color: "#cbd5e0", 
+                                                            marginBottom: "0.75rem",
+                                                            fontStyle: "italic",
+                                                        }}>
+                                                            Loading product details...
+                                                        </p>
+                                                    )}
+
+                                                    {/* Product Details */}
+                                                    {(product?.model || product?.serialNumber || product?.warranty) && (
+                                                        <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", marginBottom: "0.75rem" }}>
+                                                            {product?.model && (
+                                                                <div style={{ fontSize: "0.85rem", color: "#4a5568" }}>
+                                                                    <span style={{ fontWeight: 600 }}>Model:</span> {product.model}
+                                                                </div>
+                                                            )}
+                                                            {product?.serialNumber && (
+                                                                <div style={{ fontSize: "0.85rem", color: "#4a5568" }}>
+                                                                    <span style={{ fontWeight: 600 }}>Serial:</span> {product.serialNumber}
+                                                                </div>
+                                                            )}
+                                                            {product?.warrantyStatus && (
+                                                                <div style={{ fontSize: "0.85rem", color: "#4a5568" }}>
+                                                                    <span style={{ fontWeight: 600 }}>Warranty:</span> {product.warrantyStatus}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Price Display */}
+                                                    <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+                                                        {hasDiscount ? (
+                                                            <>
+                                                                <div style={{ fontSize: "1.1rem", color: "#667eea", fontWeight: 700 }}>
+                                                                    ${formatPrice(displayPrice)}
+                                                                </div>
+                                                                <div style={{ fontSize: "0.95rem", color: "#718096", textDecoration: "line-through" }}>
+                                                                    ${formatPrice(originalPrice)}
+                                                                </div>
+                                                                <span style={{
+                                                                    fontSize: "0.85rem",
+                                                                    background: "#e53e3e",
+                                                                    color: "#fff",
+                                                                    padding: "0.2rem 0.5rem",
+                                                                    borderRadius: "4px",
+                                                                    fontWeight: 600,
+                                                                }}>
+                                                                    -{product.discount}%
+                                                                </span>
+                                                            </>
+                                                        ) : (
+                                                            <div style={{ fontSize: "1.1rem", color: "#667eea", fontWeight: 700 }}>
+                                                                ${formatPrice(displayPrice)}
+                                                            </div>
+                                                        )}
+                                                        <span style={{ fontSize: "0.9rem", color: "#718096" }}>each</span>
+                                                    </div>
+                                                </div>
 
                                         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                                             <button
@@ -421,23 +572,34 @@ export default function CartPage() {
                                                     display: "flex",
                                                     alignItems: "center",
                                                     justifyContent: "center",
-                                                    background: "#e2e8f0",
-                                                    border: "none",
+                                                    background: updating[item.productId] || item.quantity <= 1
+                                                        ? "#cbd5e0"
+                                                        : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                                    color: "#fff",
+                                                    border: updating[item.productId] || item.quantity <= 1
+                                                        ? "none"
+                                                        : "2px solid transparent",
                                                     borderRadius: "6px",
                                                     fontSize: "1.2rem",
                                                     fontWeight: 600,
                                                     cursor: updating[item.productId] || item.quantity <= 1 ? "not-allowed" : "pointer",
-                                                    opacity: updating[item.productId] || item.quantity <= 1 ? 0.5 : 1,
+                                                    opacity: updating[item.productId] || item.quantity <= 1 ? 0.6 : 1,
                                                     transition: "all 0.2s",
                                                 }}
                                                 onMouseEnter={(e) => {
                                                     if (!updating[item.productId] && item.quantity > 1) {
-                                                        e.currentTarget.style.background = "#cbd5e0";
+                                                        e.currentTarget.style.background = "#fff";
+                                                        e.currentTarget.style.color = "#667eea";
+                                                        e.currentTarget.style.borderColor = "#667eea";
+                                                        e.currentTarget.style.transform = "scale(1.1)";
                                                     }
                                                 }}
                                                 onMouseLeave={(e) => {
                                                     if (!updating[item.productId] && item.quantity > 1) {
-                                                        e.currentTarget.style.background = "#e2e8f0";
+                                                        e.currentTarget.style.background = "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+                                                        e.currentTarget.style.color = "#fff";
+                                                        e.currentTarget.style.borderColor = "transparent";
+                                                        e.currentTarget.style.transform = "scale(1)";
                                                     }
                                                 }}
                                             >
@@ -450,6 +612,10 @@ export default function CartPage() {
                                                     fontSize: "1.1rem",
                                                     fontWeight: 600,
                                                     color: "#2d3748",
+                                                    padding: "0.5rem",
+                                                    background: "#f7fafc",
+                                                    borderRadius: "6px",
+                                                    border: "1px solid #e2e8f0",
                                                 }}
                                             >
                                                 {updating[item.productId] ? "..." : item.quantity}
@@ -463,45 +629,61 @@ export default function CartPage() {
                                                     display: "flex",
                                                     alignItems: "center",
                                                     justifyContent: "center",
-                                                    background: "#e2e8f0",
-                                                    border: "none",
+                                                    background: updating[item.productId]
+                                                        ? "#cbd5e0"
+                                                        : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                                    color: "#fff",
+                                                    border: updating[item.productId] ? "none" : "2px solid transparent",
                                                     borderRadius: "6px",
                                                     fontSize: "1.2rem",
                                                     fontWeight: 600,
                                                     cursor: updating[item.productId] ? "not-allowed" : "pointer",
-                                                    opacity: updating[item.productId] ? 0.5 : 1,
+                                                    opacity: updating[item.productId] ? 0.6 : 1,
                                                     transition: "all 0.2s",
                                                 }}
                                                 onMouseEnter={(e) => {
                                                     if (!updating[item.productId]) {
-                                                        e.currentTarget.style.background = "#cbd5e0";
+                                                        e.currentTarget.style.background = "#fff";
+                                                        e.currentTarget.style.color = "#667eea";
+                                                        e.currentTarget.style.borderColor = "#667eea";
+                                                        e.currentTarget.style.transform = "scale(1.1)";
                                                     }
                                                 }}
                                                 onMouseLeave={(e) => {
                                                     if (!updating[item.productId]) {
-                                                        e.currentTarget.style.background = "#e2e8f0";
+                                                        e.currentTarget.style.background = "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+                                                        e.currentTarget.style.color = "#fff";
+                                                        e.currentTarget.style.borderColor = "transparent";
+                                                        e.currentTarget.style.transform = "scale(1)";
                                                     }
                                                 }}
                                             >
                                                 +
                                             </button>
                                         </div>
+                                            </div>
+                                            
+                                            {/* Subtotal */}
+                                            <div style={{ 
+                                                display: "flex", 
+                                                justifyContent: "flex-end",
+                                                alignItems: "center",
+                                                gap: "0.5rem",
+                                                paddingTop: "1rem",
+                                                borderTop: "1px solid #e2e8f0",
+                                                marginTop: "0.5rem"
+                                            }}>
+                                                <div style={{ fontSize: "0.9rem", color: "#718096" }}>Subtotal:</div>
+                                                <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "#2d3748" }}>
+                                                    ${formatPrice(item.subtotal || (displayPrice * item.quantity))}
+                                                </div>
+                                            </div>
 
-                                        <div
-                                            style={{
-                                                minWidth: "120px",
-                                                textAlign: "right",
-                                                fontSize: "1.2rem",
-                                                fontWeight: 700,
-                                                color: "#667eea",
-                                            }}
-                                        >
-                                            ${formatPrice(item.subtotal)}
-                                        </div>
-
-                                        <button
-                                            onClick={() => handleRemoveItem(item.productId)}
-                                            disabled={updating[item.productId]}
+                                            {/* Remove Button */}
+                                            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.5rem" }}>
+                                                <button
+                                                    onClick={() => handleRemoveItem(item.productId)}
+                                                    disabled={updating[item.productId]}
                                             style={{
                                                 padding: "0.5rem 1rem",
                                                 background: "#fed7d7",
@@ -530,7 +712,9 @@ export default function CartPage() {
                                             Remove
                                         </button>
                                     </div>
-                                ))}
+                                        </div>
+                                    );
+                                })}
                             </div>
 
                             <div

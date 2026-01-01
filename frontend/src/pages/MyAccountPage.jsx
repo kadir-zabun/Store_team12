@@ -71,6 +71,13 @@ export default function MyAccountPage() {
         }
     }, [activeSection]);
 
+    // Load profile when password section is active
+    useEffect(() => {
+        if (activeSection === "password" && !profile) {
+            loadProfile();
+        }
+    }, [activeSection]);
+
     const loadProfile = async () => {
         setLoadingProfile(true);
         try {
@@ -153,13 +160,14 @@ export default function MyAccountPage() {
 
     const handlePasswordReset = async (e) => {
         e.preventDefault();
-        if (!email) {
-            showError("Please enter your email address.");
+        const userEmail = profile?.email || email;
+        if (!userEmail) {
+            showError("Email address not found. Please try again.");
             return;
         }
 
         try {
-            await authApi.requestPasswordReset(email);
+            await authApi.requestPasswordReset(userEmail);
             setPasswordResetSent(true);
             showSuccess("Password reset link has been sent to your email!");
         } catch (error) {
@@ -469,7 +477,6 @@ export default function MyAccountPage() {
                                 <button
                                     onClick={() => {
                                         setPasswordResetSent(false);
-                                        setEmail("");
                                     }}
                                     style={{
                                         padding: "0.5rem 1rem",
@@ -484,35 +491,59 @@ export default function MyAccountPage() {
                                     Send Another Link
                                 </button>
                             </div>
+                        ) : loadingProfile ? (
+                            <div style={{ background: "#f7fafc", padding: "1.5rem", borderRadius: "8px", textAlign: "center", color: "#718096" }}>
+                                Loading...
+                            </div>
                         ) : (
                             <div style={{ background: "#f7fafc", padding: "1.5rem", borderRadius: "8px" }}>
                                 <p style={{ color: "#4a5568", marginBottom: "1rem" }}>
-                                    Enter your email address and we'll send you a link to reset your password.
+                                    This is your registered email address. We'll send the reset link to this email.
                                 </p>
-                                <form onSubmit={handlePasswordReset} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                                    <input
-                                        type="email"
-                                        placeholder="Email Address"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        required
+                                <div style={{ marginBottom: "1rem" }}>
+                                    <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#4a5568", marginBottom: "0.25rem" }}>
+                                        Email Address
+                                    </label>
+                                    <div
                                         style={{
                                             padding: "0.75rem",
                                             borderRadius: "8px",
                                             border: "2px solid #e2e8f0",
                                             fontSize: "0.95rem",
+                                            background: "#fff",
+                                            color: "#2d3748",
                                         }}
-                                    />
+                                    >
+                                        {profile?.email || "Loading..."}
+                                    </div>
+                                </div>
+                                <form onSubmit={handlePasswordReset} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                                     <button
                                         type="submit"
+                                        disabled={!profile?.email}
                                         style={{
                                             padding: "0.75rem",
-                                            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                            background: profile?.email
+                                                ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+                                                : "#a0aec0",
                                             color: "#fff",
                                             border: "none",
                                             borderRadius: "8px",
                                             fontWeight: 600,
-                                            cursor: "pointer",
+                                            cursor: profile?.email ? "pointer" : "not-allowed",
+                                            transition: "all 0.2s",
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            if (profile?.email) {
+                                                e.currentTarget.style.transform = "translateY(-2px)";
+                                                e.currentTarget.style.boxShadow = "0 4px 8px rgba(102, 126, 234, 0.4)";
+                                            }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            if (profile?.email) {
+                                                e.currentTarget.style.transform = "translateY(0)";
+                                                e.currentTarget.style.boxShadow = "none";
+                                            }
                                         }}
                                     >
                                         Send Reset Link

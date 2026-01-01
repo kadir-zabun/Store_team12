@@ -33,6 +33,18 @@ export default function ProductsPage() {
     };
     const [selectedCategory, setSelectedCategory] = useState(getInitialCategory);
     const [categories, setCategories] = useState([]);
+    
+    // Applied filters - these are the actual filters being used
+    const [appliedFilters, setAppliedFilters] = useState({
+        category: getInitialCategory(),
+        minPrice: "",
+        maxPrice: "",
+        inStock: false,
+    });
+
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const productsPerPage = 10;
 
     useEffect(() => {
         // Load categories
@@ -52,8 +64,10 @@ export default function ProductsPage() {
         const categoryParam = urlParams.get("category");
         if (categoryParam) {
             setSelectedCategory(categoryParam);
+            setAppliedFilters(prev => ({ ...prev, category: categoryParam }));
         } else {
             setSelectedCategory("");
+            setAppliedFilters(prev => ({ ...prev, category: "" }));
         }
     }, [location.pathname, location.search]);
 
@@ -70,8 +84,8 @@ export default function ProductsPage() {
                 let productsData = null;
                 
                 // If category is selected, use category endpoint
-                if (selectedCategory) {
-                    const response = await productApi.getProductsByCategory(selectedCategory, 0, 200);
+                if (appliedFilters.category) {
+                    const response = await productApi.getProductsByCategory(appliedFilters.category, 0, 200);
                     productsData = response.data?.data?.content || response.data?.content || response.data?.data || response.data || [];
                     if (!Array.isArray(productsData)) {
                         productsData = [];
@@ -88,7 +102,7 @@ export default function ProductsPage() {
                     console.log("Search results:", productsData);
                 }
                 // If in stock filter is active, use in stock endpoint
-                else if (filterInStock) {
+                else if (appliedFilters.inStock) {
                     const response = await productApi.getInStockProducts();
                     productsData = response.data?.data || response.data || [];
                     if (!Array.isArray(productsData)) {
@@ -117,9 +131,9 @@ export default function ProductsPage() {
                     let filteredProducts = productsData.map(formatProductForDisplay);
                     
                     // Apply price range filter based on discounted price (finalPrice)
-                    if (minPrice || maxPrice) {
-                        const min = minPrice ? parseFloat(minPrice) : 0;
-                        const max = maxPrice ? parseFloat(maxPrice) : 999999;
+                    if (appliedFilters.minPrice || appliedFilters.maxPrice) {
+                        const min = appliedFilters.minPrice ? parseFloat(appliedFilters.minPrice) : 0;
+                        const max = appliedFilters.maxPrice ? parseFloat(appliedFilters.maxPrice) : 999999;
                         
                         // Validate price range
                         if (isNaN(min) || isNaN(max) || min < 0 || max < 0 || min > max) {
@@ -136,7 +150,7 @@ export default function ProductsPage() {
                     }
                     
                     // Apply in stock filter if active
-                    if (filterInStock) {
+                    if (appliedFilters.inStock) {
                         filteredProducts = filteredProducts.filter(p => p.inStock);
                     }
                     
@@ -172,9 +186,12 @@ export default function ProductsPage() {
                     // Only update products if we're still in the same filter state
                     setProducts(filteredProducts);
                     console.log(`✅ Loaded ${filteredProducts.length} products from database`);
+                    // Reset to first page when filters change
+                    setCurrentPage(1);
                 } else {
                     console.log("ℹ️ No products found");
                     setProducts([]);
+                    setCurrentPage(1);
                 }
             } catch (error) {
                 console.error("❌ Error loading products from database:", error);
@@ -187,10 +204,9 @@ export default function ProductsPage() {
             }
         };
 
-        // Debounce for search query and price filters
+        // Debounce for search query only (filters are applied via button)
         const hasSearchQuery = searchQuery.trim().length > 0;
-        const hasPriceFilter = minPrice || maxPrice;
-        const debounceDelay = hasSearchQuery ? 500 : (hasPriceFilter ? 300 : 0);
+        const debounceDelay = hasSearchQuery ? 500 : 0;
         
         const timeoutId = setTimeout(() => {
             loadProducts();
@@ -201,7 +217,7 @@ export default function ProductsPage() {
             // Cancel any pending requests by clearing products immediately
             setProducts([]);
         };
-    }, [searchQuery, sortBy, filterInStock, minPrice, maxPrice, selectedCategory, showError]);
+    }, [searchQuery, sortBy, appliedFilters, showError]);
 
     const handleAddToCart = async (productId) => {
         if (userRole === "PRODUCT_MANAGER" || userRole === "SALES_MANAGER" || userRole === "SUPPORT_AGENT") {
@@ -303,11 +319,6 @@ export default function ProductsPage() {
                                 value={selectedCategory}
                                 onChange={(e) => {
                                     setSelectedCategory(e.target.value);
-                                    if (e.target.value) {
-                                        navigate(`/products?category=${e.target.value}`);
-                                    } else {
-                                        navigate("/products");
-                                    }
                                 }}
                                 options={[
                                     { value: "", label: "All Categories" },
@@ -320,54 +331,163 @@ export default function ProductsPage() {
 
                         {/* Price Range Filter */}
                         <div>
+                            <style>
+                                {`
+                                    .price-input::-webkit-outer-spin-button,
+                                    .price-input::-webkit-inner-spin-button {
+                                        -webkit-appearance: none;
+                                        margin: 0;
+                                    }
+                                    .price-input[type=number] {
+                                        -moz-appearance: textfield;
+                                    }
+                                    .price-input-wrapper {
+                                        position: relative;
+                                    }
+                                    .price-input-spinner {
+                                        position: absolute;
+                                        right: 0.5rem;
+                                        top: 50%;
+                                        transform: translateY(-50%);
+                                        display: flex;
+                                        flex-direction: column;
+                                        gap: 0.125rem;
+                                        pointer-events: none;
+                                    }
+                                    .price-input-spinner button {
+                                        width: 1.25rem;
+                                        height: 1rem;
+                                        border: 1px solid transparent;
+                                        border-radius: 4px;
+                                        background: #667eea;
+                                        cursor: pointer;
+                                        display: flex;
+                                        align-items: center;
+                                        justify-content: center;
+                                        padding: 0;
+                                        pointer-events: auto;
+                                        color: #fff;
+                                        font-size: 0.625rem;
+                                        transition: all 0.2s;
+                                    }
+                                    .price-input-spinner button:hover {
+                                        background: #fff;
+                                        color: #667eea;
+                                        border-color: #667eea;
+                                    }
+                                    .price-input-spinner button:active {
+                                        background: #f7fafc;
+                                        color: #667eea;
+                                        border-color: #667eea;
+                                    }
+                                `}
+                            </style>
                             <label style={{ display: "block", fontSize: "0.9rem", fontWeight: 600, color: "#4a5568", marginBottom: "0.5rem" }}>
                                 Price Range
                             </label>
                             <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                                <input
-                                    type="number"
-                                    placeholder="Min Price"
-                                    value={minPrice}
-                                    onChange={(e) => setMinPrice(e.target.value)}
-                                    style={{
-                                        width: "100%",
-                                        padding: "0.75rem",
-                                        borderRadius: "8px",
-                                        border: "2px solid #e2e8f0",
-                                        fontSize: "0.9rem",
-                                        outline: "none",
-                                        background: "#fff",
-                                        color: "#2d3748",
-                                    }}
-                                    onFocus={(e) => {
-                                        e.currentTarget.style.borderColor = "#667eea";
-                                    }}
-                                    onBlur={(e) => {
-                                        e.currentTarget.style.borderColor = "#e2e8f0";
-                                    }}
-                                />
-                                <input
-                                    type="number"
-                                    placeholder="Max Price"
-                                    value={maxPrice}
-                                    onChange={(e) => setMaxPrice(e.target.value)}
-                                    style={{
-                                        width: "100%",
-                                        padding: "0.75rem",
-                                        borderRadius: "8px",
-                                        border: "2px solid #e2e8f0",
-                                        fontSize: "0.9rem",
-                                        outline: "none",
-                                        background: "#fff",
-                                        color: "#2d3748",
-                                    }}
-                                    onFocus={(e) => {
-                                        e.currentTarget.style.borderColor = "#667eea";
-                                    }}
-                                    onBlur={(e) => {
-                                        e.currentTarget.style.borderColor = "#e2e8f0";
-                                    }}
-                                />
+                                <div className="price-input-wrapper" style={{ position: "relative" }}>
+                                    <input
+                                        type="number"
+                                        className="price-input"
+                                        placeholder="Min Price"
+                                        value={minPrice}
+                                        onChange={(e) => setMinPrice(e.target.value)}
+                                        style={{
+                                            width: "100%",
+                                            padding: "0.75rem 2.5rem 0.75rem 0.75rem",
+                                            borderRadius: "8px",
+                                            border: "2px solid #e2e8f0",
+                                            fontSize: "0.9rem",
+                                            outline: "none",
+                                            background: "#fff",
+                                            color: "#2d3748",
+                                            boxSizing: "border-box",
+                                            transition: "border-color 0.2s",
+                                        }}
+                                        onFocus={(e) => {
+                                            e.currentTarget.style.borderColor = "#667eea";
+                                        }}
+                                        onBlur={(e) => {
+                                            e.currentTarget.style.borderColor = "#e2e8f0";
+                                        }}
+                                    />
+                                    <div className="price-input-spinner">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const current = parseFloat(minPrice) || 0;
+                                                setMinPrice((current + 1).toString());
+                                            }}
+                                            aria-label="Increase"
+                                        >
+                                            ▲
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const current = parseFloat(minPrice) || 0;
+                                                if (current > 0) {
+                                                    setMinPrice((current - 1).toString());
+                                                }
+                                            }}
+                                            aria-label="Decrease"
+                                        >
+                                            ▼
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="price-input-wrapper" style={{ position: "relative" }}>
+                                    <input
+                                        type="number"
+                                        className="price-input"
+                                        placeholder="Max Price"
+                                        value={maxPrice}
+                                        onChange={(e) => setMaxPrice(e.target.value)}
+                                        style={{
+                                            width: "100%",
+                                            padding: "0.75rem 2.5rem 0.75rem 0.75rem",
+                                            borderRadius: "8px",
+                                            border: "2px solid #e2e8f0",
+                                            fontSize: "0.9rem",
+                                            outline: "none",
+                                            background: "#fff",
+                                            color: "#2d3748",
+                                            boxSizing: "border-box",
+                                            transition: "border-color 0.2s",
+                                        }}
+                                        onFocus={(e) => {
+                                            e.currentTarget.style.borderColor = "#667eea";
+                                        }}
+                                        onBlur={(e) => {
+                                            e.currentTarget.style.borderColor = "#e2e8f0";
+                                        }}
+                                    />
+                                    <div className="price-input-spinner">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const current = parseFloat(maxPrice) || 0;
+                                                setMaxPrice((current + 1).toString());
+                                            }}
+                                            aria-label="Increase"
+                                        >
+                                            ▲
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const current = parseFloat(maxPrice) || 0;
+                                                if (current > 0) {
+                                                    setMaxPrice((current - 1).toString());
+                                                }
+                                            }}
+                                            aria-label="Decrease"
+                                        >
+                                            ▼
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -417,6 +537,44 @@ export default function ProductsPage() {
                             </label>
                         </div>
 
+                        {/* Apply Filters Button */}
+                        <button
+                            onClick={() => {
+                                setAppliedFilters({
+                                    category: selectedCategory,
+                                    minPrice: minPrice,
+                                    maxPrice: maxPrice,
+                                    inStock: filterInStock,
+                                });
+                                setCurrentPage(1);
+                                if (selectedCategory) {
+                                    navigate(`/products?category=${selectedCategory}`);
+                                } else {
+                                    navigate("/products");
+                                }
+                            }}
+                            style={{
+                                width: "100%",
+                                padding: "0.75rem",
+                                background: "#667eea",
+                                color: "#fff",
+                                border: "none",
+                                borderRadius: "8px",
+                                fontSize: "0.9rem",
+                                fontWeight: 600,
+                                cursor: "pointer",
+                                transition: "all 0.2s",
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.background = "#764ba2";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.background = "#667eea";
+                            }}
+                        >
+                            Apply Filters
+                        </button>
+
                         {/* Clear Filters Button */}
                         <button
                             onClick={() => {
@@ -425,6 +583,13 @@ export default function ProductsPage() {
                                 setMaxPrice("");
                                 setFilterInStock(false);
                                 setSelectedCategory("");
+                                setAppliedFilters({
+                                    category: "",
+                                    minPrice: "",
+                                    maxPrice: "",
+                                    inStock: false,
+                                });
+                                setCurrentPage(1);
                                 navigate("/products");
                             }}
                             style={{
@@ -543,6 +708,82 @@ export default function ProductsPage() {
                                 No products found.
                             </div>
                         ) : (
+                            <>
+                            {/* Pagination Info */}
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", paddingBottom: "1rem", borderBottom: "1px solid #e2e8f0" }}>
+                                <div style={{ color: "#4a5568", fontSize: "0.9rem" }}>
+                                    {(() => {
+                                        const startIndex = (currentPage - 1) * productsPerPage + 1;
+                                        const endIndex = Math.min(currentPage * productsPerPage, products.length);
+                                        return `${startIndex}–${endIndex} of ${products.length}`;
+                                    })()}
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                    <button
+                                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                        disabled={currentPage === 1}
+                                        style={{
+                                            padding: "0.5rem",
+                                            background: currentPage === 1 ? "#e2e8f0" : "#fff",
+                                            color: currentPage === 1 ? "#a0aec0" : "#4a5568",
+                                            border: "1px solid #e2e8f0",
+                                            borderRadius: "4px",
+                                            cursor: currentPage === 1 ? "not-allowed" : "pointer",
+                                            fontSize: "1rem",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            transition: "all 0.2s",
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            if (currentPage !== 1) {
+                                                e.currentTarget.style.background = "#f7fafc";
+                                                e.currentTarget.style.borderColor = "#cbd5e0";
+                                            }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            if (currentPage !== 1) {
+                                                e.currentTarget.style.background = "#fff";
+                                                e.currentTarget.style.borderColor = "#e2e8f0";
+                                            }
+                                        }}
+                                    >
+                                        ‹
+                                    </button>
+                                    <button
+                                        onClick={() => setCurrentPage(prev => Math.min(Math.ceil(products.length / productsPerPage), prev + 1))}
+                                        disabled={currentPage >= Math.ceil(products.length / productsPerPage)}
+                                        style={{
+                                            padding: "0.5rem",
+                                            background: currentPage >= Math.ceil(products.length / productsPerPage) ? "#e2e8f0" : "#fff",
+                                            color: currentPage >= Math.ceil(products.length / productsPerPage) ? "#a0aec0" : "#4a5568",
+                                            border: "1px solid #e2e8f0",
+                                            borderRadius: "4px",
+                                            cursor: currentPage >= Math.ceil(products.length / productsPerPage) ? "not-allowed" : "pointer",
+                                            fontSize: "1rem",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            transition: "all 0.2s",
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            if (currentPage < Math.ceil(products.length / productsPerPage)) {
+                                                e.currentTarget.style.background = "#f7fafc";
+                                                e.currentTarget.style.borderColor = "#cbd5e0";
+                                            }
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            if (currentPage < Math.ceil(products.length / productsPerPage)) {
+                                                e.currentTarget.style.background = "#fff";
+                                                e.currentTarget.style.borderColor = "#e2e8f0";
+                                            }
+                                        }}
+                                    >
+                                        ›
+                                    </button>
+                                </div>
+                            </div>
+
                             <div
                                 style={{
                                     display: "grid",
@@ -550,7 +791,7 @@ export default function ProductsPage() {
                                     gap: "2rem",
                                 }}
                             >
-                                {products.map((product) => (
+                                {products.slice((currentPage - 1) * productsPerPage, currentPage * productsPerPage).map((product) => (
                                     <div
                                         key={product.productId}
                                         style={{
@@ -688,7 +929,9 @@ export default function ProductsPage() {
                                                             ? "linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
                                                             : "#cbd5e0",
                                                         color: "#fff",
-                                                        border: "none",
+                                                        border: (product.quantity || 0) > 0 && product.inStock && !addingToCart[product.productId]
+                                                            ? "2px solid transparent"
+                                                            : "none",
                                                         borderRadius: "4px",
                                                         fontWeight: 600,
                                                         cursor: (product.quantity || 0) > 0 && product.inStock && !addingToCart[product.productId] ? "pointer" : "not-allowed",
@@ -698,11 +941,17 @@ export default function ProductsPage() {
                                                     }}
                                                     onMouseEnter={(e) => {
                                                         if ((product.quantity || 0) > 0 && product.inStock && !addingToCart[product.productId]) {
+                                                            e.currentTarget.style.background = "#fff";
+                                                            e.currentTarget.style.color = "#667eea";
+                                                            e.currentTarget.style.borderColor = "#667eea";
                                                             e.currentTarget.style.transform = "scale(1.02)";
                                                         }
                                                     }}
                                                     onMouseLeave={(e) => {
                                                         if ((product.quantity || 0) > 0 && product.inStock && !addingToCart[product.productId]) {
+                                                            e.currentTarget.style.background = "linear-gradient(135deg, #667eea 0%, #764ba2 100%)";
+                                                            e.currentTarget.style.color = "#fff";
+                                                            e.currentTarget.style.borderColor = "transparent";
                                                             e.currentTarget.style.transform = "scale(1)";
                                                         }
                                                     }}
@@ -733,6 +982,7 @@ export default function ProductsPage() {
                                     </div>
                                 ))}
                             </div>
+                            </>
                         )}
                     <style>{`
                         @keyframes spin {
