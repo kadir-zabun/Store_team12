@@ -165,6 +165,28 @@ export default function CreateProductPage() {
                             .custom-select-dropdown:hover {
                                 scrollbar-color: #667eea #f7fafc;
                             }
+                            .custom-select-dropdown input[type="checkbox"] {
+                                background-color: #fff !important;
+                                border: 1px solid #cbd5e0 !important;
+                                appearance: none;
+                                -webkit-appearance: none;
+                                -moz-appearance: none;
+                            }
+                            .custom-select-dropdown input[type="checkbox"]:checked {
+                                background-color: #667eea !important;
+                                border-color: #667eea !important;
+                                position: relative;
+                            }
+                            .custom-select-dropdown input[type="checkbox"]:checked::after {
+                                content: "✓";
+                                position: absolute;
+                                color: #fff;
+                                font-size: 0.75rem;
+                                font-weight: bold;
+                                top: 50%;
+                                left: 50%;
+                                transform: translate(-50%, -50%);
+                            }
                         `}
                     </style>
 
@@ -294,7 +316,6 @@ export default function CreateProductPage() {
                                                         width: "1rem",
                                                         height: "1rem",
                                                         cursor: "pointer",
-                                                        accentColor: "#667eea",
                                                     }}
                                                 />
                                                 <span style={{ fontSize: "0.85rem", color: "#2d3748" }}>
