@@ -15,9 +15,12 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -37,8 +40,9 @@ public class ProductService {
                 .findFirst()
                 .map(order -> order.getProperty())
                 .orElse("productName");
-        
-        // Eğer price sıralaması ise, finalPrice (price - discount) üzerinden sıralama yap
+
+        // Eğer price sıralaması ise, finalPrice (price - discount) üzerinden sıralama
+        // yap
         if ("price".equals(sortProperty)) {
             // Tüm ürünleri çek, finalPrice'a göre sırala, sonra pagination yap
             List<Product> allProducts = productRepository.findAll();
@@ -46,26 +50,28 @@ public class ProductService {
                     .findFirst()
                     .map(order -> order.isDescending())
                     .orElse(false);
-            
+
             allProducts.sort((a, b) -> {
-                BigDecimal finalPriceA = a.getPrice().subtract(a.getDiscount() != null ? a.getDiscount() : BigDecimal.ZERO);
-                BigDecimal finalPriceB = b.getPrice().subtract(b.getDiscount() != null ? b.getDiscount() : BigDecimal.ZERO);
+                BigDecimal finalPriceA = a.getPrice()
+                        .subtract(a.getDiscount() != null ? a.getDiscount() : BigDecimal.ZERO);
+                BigDecimal finalPriceB = b.getPrice()
+                        .subtract(b.getDiscount() != null ? b.getDiscount() : BigDecimal.ZERO);
                 int comparison = finalPriceA.compareTo(finalPriceB);
                 return isDescending ? -comparison : comparison;
             });
-            
+
             // Pagination uygula
             int start = (int) pageable.getOffset();
             int end = Math.min(start + pageable.getPageSize(), allProducts.size());
             if (start >= end) {
                 return new PageImpl<>(Collections.emptyList(), pageable, allProducts.size());
             }
-            
+
             List<Product> pagedProducts = allProducts.subList(start, end);
             List<ProductResponseDto> dtos = pagedProducts.stream()
                     .map(this::convertToDto)
                     .collect(Collectors.toList());
-            
+
             return new PageImpl<>(dtos, pageable, allProducts.size());
         } else {
             // Diğer sıralamalar için normal pagination
@@ -124,17 +130,18 @@ public class ProductService {
         // MongoDB'de hesaplanmış alan üzerinden filtreleme yapılamadığı için
         // tüm ürünleri çekip memory'de filtreliyoruz
         List<Product> allProducts = productRepository.findAll();
-        
+
         return allProducts.stream()
                 .filter(product -> {
                     // İndirimli fiyatı hesapla: price - (price * discount / 100)
                     BigDecimal price = product.getPrice() != null ? product.getPrice() : BigDecimal.ZERO;
                     BigDecimal discount = product.getDiscount() != null ? product.getDiscount() : BigDecimal.ZERO;
-                    
+
                     // Discount yüzde olarak saklanıyor (örn: 58 = %58)
-                    BigDecimal discountAmount = price.multiply(discount).divide(BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+                    BigDecimal discountAmount = price.multiply(discount).divide(BigDecimal.valueOf(100), 2,
+                            java.math.RoundingMode.HALF_UP);
                     BigDecimal finalPrice = price.subtract(discountAmount);
-                    
+
                     // Fiyat aralığı kontrolü
                     return finalPrice.compareTo(minPrice) >= 0 && finalPrice.compareTo(maxPrice) <= 0;
                 })
@@ -209,7 +216,8 @@ public class ProductService {
         } else if (productUpdate.getCategoryIds() != null && productUpdate.getCategoryIds().isEmpty()) {
             // Empty array means remove all categories
             existingProduct.setCategoryIds(Collections.emptyList());
-            productCategoryRelationService.syncProductCategories(existingProduct.getProductId(), Collections.emptyList());
+            productCategoryRelationService.syncProductCategories(existingProduct.getProductId(),
+                    Collections.emptyList());
         }
 
         Product savedProduct = productRepository.save(existingProduct);
@@ -319,11 +327,12 @@ public class ProductService {
                     dto.setComment(review.getApproved() != null && review.getApproved() ? review.getComment() : null);
                     dto.setApproved(review.getApproved());
                     dto.setCreatedAt(review.getCreatedAt());
-                    
-                    // Review'da userId aslında username olarak saklanıyor (authentication.getName() kullanılıyor)
+
+                    // Review'da userId aslında username olarak saklanıyor (authentication.getName()
+                    // kullanılıyor)
                     // O yüzden direkt olarak username olarak kullanabiliriz
                     dto.setUsername(review.getUserId());
-                    
+
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -356,11 +365,12 @@ public class ProductService {
                     dto.setUserId(review.getUserId());
                     dto.setApproved(review.getApproved());
                     dto.setCreatedAt(review.getCreatedAt());
-                    
-                    // Review'da userId aslında username olarak saklanıyor (authentication.getName() kullanılıyor)
+
+                    // Review'da userId aslında username olarak saklanıyor (authentication.getName()
+                    // kullanılıyor)
                     // O yüzden direkt olarak username olarak kullanabiliriz
                     dto.setUsername(review.getUserId());
-                    
+
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -420,6 +430,38 @@ public class ProductService {
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
 
         product.setCost(cost);
+        return convertToDto(productRepository.save(product));
+    }
+
+    // Upload images for a product (PRODUCT_MANAGER için)
+    public ProductResponseDto uploadImages(String productId, List<MultipartFile> files) throws IOException {
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + productId));
+
+        List<String> currentImages = product.getImages();
+        if (currentImages == null) {
+            currentImages = new ArrayList<>();
+        }
+
+        for (MultipartFile file : files) {
+            if (file.isEmpty()) {
+                continue;
+            }
+
+            // Convert file to Base64 data URL
+            String contentType = file.getContentType();
+            if (contentType == null) {
+                contentType = "image/png";
+            }
+
+            byte[] bytes = file.getBytes();
+            String base64 = Base64.getEncoder().encodeToString(bytes);
+            String dataUrl = "data:" + contentType + ";base64," + base64;
+
+            currentImages.add(dataUrl);
+        }
+
+        product.setImages(currentImages);
         return convertToDto(productRepository.save(product));
     }
 }

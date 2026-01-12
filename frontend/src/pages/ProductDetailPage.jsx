@@ -17,6 +17,7 @@ export default function ProductDetailPage() {
     const [addingToWishlist, setAddingToWishlist] = useState(false);
     const [isInWishlist, setIsInWishlist] = useState(false);
     const [quantity, setQuantity] = useState(1);
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const { cartCount, refreshCartCount } = useCartCount();
     const { success: showSuccess, error: showError } = useToast();
     const userRole = useUserRole();
@@ -92,7 +93,7 @@ export default function ProductDetailPage() {
         if (!product) return;
 
         const stock = product.quantity || 0;
-        
+
         // Stock kontrolü - quantity 0 veya daha az ise eklenemez
         if (stock <= 0) {
             showError("This product is out of stock and cannot be added to cart.");
@@ -113,7 +114,7 @@ export default function ProductDetailPage() {
             const existingItem = guestCart.items.find(item => item.productId === productId);
             const currentQuantity = existingItem ? existingItem.quantity : 0;
             const newQuantity = currentQuantity + quantity;
-            
+
             if (newQuantity > stock) {
                 showError(`Only ${stock} items available in stock. You already have ${currentQuantity} in your cart.`);
                 return;
@@ -242,23 +243,147 @@ export default function ProductDetailPage() {
 
                 <div style={{ background: "rgba(255, 255, 255, 0.95)", padding: "3rem", borderRadius: "20px", boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)" }}>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3rem", marginBottom: "3rem" }}>
-                        {/* Product Image */}
+                        {/* Product Image Carousel */}
                         <div>
                             {product.images && product.images.length > 0 ? (
-                                <img
-                                    src={product.images[0]}
-                                    alt={product.productName}
-                                    style={{
-                                        width: "100%",
-                                        height: "500px",
-                                        objectFit: "cover",
-                                        borderRadius: "16px",
-                                        boxShadow: "0 10px 30px rgba(0, 0, 0, 0.2)",
-                                    }}
-                                    onError={(e) => {
-                                        e.target.src = "https://via.placeholder.com/500x500?text=No+Image";
-                                    }}
-                                />
+                                <div style={{ position: "relative" }}>
+                                    {/* Main Image */}
+                                    <img
+                                        src={product.images[currentImageIndex]}
+                                        alt={`${product.productName} - Image ${currentImageIndex + 1}`}
+                                        style={{
+                                            width: "100%",
+                                            height: "500px",
+                                            objectFit: "cover",
+                                            borderRadius: "16px",
+                                            boxShadow: "0 10px 30px rgba(0, 0, 0, 0.2)",
+                                        }}
+                                        onError={(e) => {
+                                            e.target.src = "https://via.placeholder.com/500x500?text=No+Image";
+                                        }}
+                                    />
+
+                                    {/* Navigation Arrows - Only show if more than 1 image */}
+                                    {product.images.length > 1 && (
+                                        <>
+                                            <button
+                                                onClick={() => setCurrentImageIndex((prev) => (prev === 0 ? product.images.length - 1 : prev - 1))}
+                                                style={{
+                                                    position: "absolute",
+                                                    left: "10px",
+                                                    top: "50%",
+                                                    transform: "translateY(-50%)",
+                                                    width: "40px",
+                                                    height: "40px",
+                                                    borderRadius: "50%",
+                                                    background: "rgba(255, 255, 255, 0.9)",
+                                                    border: "none",
+                                                    cursor: "pointer",
+                                                    fontSize: "1.2rem",
+                                                    fontWeight: "bold",
+                                                    color: "#2d3748",
+                                                    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.2)",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                    transition: "all 0.2s",
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.background = "#667eea";
+                                                    e.currentTarget.style.color = "#fff";
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.9)";
+                                                    e.currentTarget.style.color = "#2d3748";
+                                                }}
+                                            >
+                                                ←
+                                            </button>
+                                            <button
+                                                onClick={() => setCurrentImageIndex((prev) => (prev === product.images.length - 1 ? 0 : prev + 1))}
+                                                style={{
+                                                    position: "absolute",
+                                                    right: "10px",
+                                                    top: "50%",
+                                                    transform: "translateY(-50%)",
+                                                    width: "40px",
+                                                    height: "40px",
+                                                    borderRadius: "50%",
+                                                    background: "rgba(255, 255, 255, 0.9)",
+                                                    border: "none",
+                                                    cursor: "pointer",
+                                                    fontSize: "1.2rem",
+                                                    fontWeight: "bold",
+                                                    color: "#2d3748",
+                                                    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.2)",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                    transition: "all 0.2s",
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    e.currentTarget.style.background = "#667eea";
+                                                    e.currentTarget.style.color = "#fff";
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    e.currentTarget.style.background = "rgba(255, 255, 255, 0.9)";
+                                                    e.currentTarget.style.color = "#2d3748";
+                                                }}
+                                            >
+                                                →
+                                            </button>
+
+                                            {/* Image Counter */}
+                                            <div style={{
+                                                position: "absolute",
+                                                bottom: "15px",
+                                                left: "50%",
+                                                transform: "translateX(-50%)",
+                                                background: "rgba(0, 0, 0, 0.6)",
+                                                color: "#fff",
+                                                padding: "0.25rem 0.75rem",
+                                                borderRadius: "20px",
+                                                fontSize: "0.85rem",
+                                                fontWeight: 600,
+                                            }}>
+                                                {currentImageIndex + 1} / {product.images.length}
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {/* Thumbnails - Only show if more than 1 image */}
+                                    {product.images.length > 1 && (
+                                        <div style={{
+                                            display: "flex",
+                                            gap: "0.5rem",
+                                            marginTop: "1rem",
+                                            justifyContent: "center",
+                                            flexWrap: "wrap"
+                                        }}>
+                                            {product.images.map((img, index) => (
+                                                <img
+                                                    key={index}
+                                                    src={img}
+                                                    alt={`Thumbnail ${index + 1}`}
+                                                    onClick={() => setCurrentImageIndex(index)}
+                                                    style={{
+                                                        width: "60px",
+                                                        height: "60px",
+                                                        objectFit: "cover",
+                                                        borderRadius: "8px",
+                                                        cursor: "pointer",
+                                                        border: currentImageIndex === index ? "3px solid #667eea" : "2px solid #e2e8f0",
+                                                        opacity: currentImageIndex === index ? 1 : 0.7,
+                                                        transition: "all 0.2s",
+                                                    }}
+                                                    onError={(e) => {
+                                                        e.target.src = "https://via.placeholder.com/60x60?text=?";
+                                                    }}
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             ) : (
                                 <div style={{
                                     width: "100%",
@@ -326,19 +451,19 @@ export default function ProductDetailPage() {
                                         <span style={{ color: "#718096", fontWeight: 600, fontSize: "0.95rem" }}>Product Name:</span>
                                         <span style={{ color: "#2d3748", fontWeight: 600, fontSize: "1rem" }}>{product.productName || "N/A"}</span>
                                     </div>
-                                    
+
                                     {/* Model */}
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "0.75rem", borderBottom: "1px solid #e2e8f0" }}>
                                         <span style={{ color: "#718096", fontWeight: 600, fontSize: "0.95rem" }}>Model:</span>
                                         <span style={{ color: "#2d3748", fontWeight: 600, fontSize: "1rem" }}>{product.model || "N/A"}</span>
                                     </div>
-                                    
+
                                     {/* Serial Number */}
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "0.75rem", borderBottom: "1px solid #e2e8f0" }}>
                                         <span style={{ color: "#718096", fontWeight: 600, fontSize: "0.95rem" }}>Serial Number:</span>
                                         <span style={{ color: "#2d3748", fontWeight: 600, fontSize: "1rem" }}>{product.serialNumber || "N/A"}</span>
                                     </div>
-                                    
+
                                     {/* Description */}
                                     <div style={{ paddingBottom: "0.75rem", borderBottom: "1px solid #e2e8f0" }}>
                                         <span style={{ color: "#718096", fontWeight: 600, fontSize: "0.95rem", display: "block", marginBottom: "0.5rem" }}>Description:</span>
@@ -346,13 +471,13 @@ export default function ProductDetailPage() {
                                             {product.description || "N/A"}
                                         </p>
                                     </div>
-                                    
+
                                     {/* Quantity in Stock */}
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "0.75rem", borderBottom: "1px solid #e2e8f0" }}>
                                         <span style={{ color: "#718096", fontWeight: 600, fontSize: "0.95rem" }}>Quantity in Stock:</span>
                                         <span style={{ color: "#2d3748", fontWeight: 600, fontSize: "1rem" }}>{product.quantity || 0}</span>
                                     </div>
-                                    
+
                                     {/* Price */}
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "0.75rem", borderBottom: "1px solid #e2e8f0" }}>
                                         <span style={{ color: "#718096", fontWeight: 600, fontSize: "0.95rem" }}>Price:</span>
@@ -360,13 +485,13 @@ export default function ProductDetailPage() {
                                             ${product.price?.toFixed(2) || "0.00"}
                                         </span>
                                     </div>
-                                    
+
                                     {/* Warranty Status */}
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "0.75rem", borderBottom: "1px solid #e2e8f0" }}>
                                         <span style={{ color: "#718096", fontWeight: 600, fontSize: "0.95rem" }}>Warranty Status:</span>
                                         <span style={{ color: "#2d3748", fontWeight: 600, fontSize: "1rem" }}>{product.warrantyStatus || "N/A"}</span>
                                     </div>
-                                    
+
                                     {/* Distributor Information */}
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                         <span style={{ color: "#718096", fontWeight: 600, fontSize: "0.95rem" }}>Distributor Information:</span>
@@ -493,7 +618,7 @@ export default function ProductDetailPage() {
                                                 e.currentTarget.style.color = isInWishlist ? "#e53e3e" : "#f5576c";
                                                 e.currentTarget.style.borderColor = isInWishlist ? "#e53e3e" : "#f5576c";
                                                 e.currentTarget.style.transform = "translateY(-2px)";
-                                                e.currentTarget.style.boxShadow = isInWishlist 
+                                                e.currentTarget.style.boxShadow = isInWishlist
                                                     ? "0 4px 8px rgba(229, 62, 62, 0.4)"
                                                     : "0 4px 8px rgba(245, 87, 108, 0.4)";
                                             }
@@ -544,47 +669,47 @@ export default function ProductDetailPage() {
                                 {reviews.map((review, index) => {
                                     console.log("Review:", review, "Username:", review.username);
                                     return (
-                                    <div
-                                        key={review.reviewId || index}
-                                        style={{
-                                            padding: "1.5rem",
-                                            background: "#f7fafc",
-                                            borderRadius: "12px",
-                                            border: "1px solid #e2e8f0",
-                                        }}
-                                    >
-                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
-                                            <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                                                {review.username ? (
-                                                    <div style={{ fontSize: "1rem", fontWeight: 600, color: "#2d3748" }}>
-                                                        {review.username}
+                                        <div
+                                            key={review.reviewId || index}
+                                            style={{
+                                                padding: "1.5rem",
+                                                background: "#f7fafc",
+                                                borderRadius: "12px",
+                                                border: "1px solid #e2e8f0",
+                                            }}
+                                        >
+                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
+                                                <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                                                    {review.username ? (
+                                                        <div style={{ fontSize: "1rem", fontWeight: 600, color: "#2d3748" }}>
+                                                            {review.username}
+                                                        </div>
+                                                    ) : (
+                                                        <div style={{ fontSize: "0.9rem", color: "#718096", fontStyle: "italic" }}>
+                                                            Anonymous
+                                                        </div>
+                                                    )}
+                                                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                                        <span style={{ fontSize: "1.1rem", fontWeight: 600, color: "#d69e2e" }}>
+                                                            {"⭐".repeat(review.rating || 0)}
+                                                        </span>
+                                                        <span style={{ fontSize: "0.9rem", color: "#718096" }}>
+                                                            {review.rating}/10
+                                                        </span>
                                                     </div>
-                                                ) : (
-                                                    <div style={{ fontSize: "0.9rem", color: "#718096", fontStyle: "italic" }}>
-                                                        Anonymous
-                                                    </div>
-                                                )}
-                                                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                                    <span style={{ fontSize: "1.1rem", fontWeight: 600, color: "#d69e2e" }}>
-                                                        {"⭐".repeat(review.rating || 0)}
-                                                    </span>
-                                                    <span style={{ fontSize: "0.9rem", color: "#718096" }}>
-                                                        {review.rating}/10
-                                                    </span>
                                                 </div>
+                                                {review.createdAt && (
+                                                    <span style={{ fontSize: "0.9rem", color: "#718096" }}>
+                                                        {new Date(review.createdAt).toLocaleDateString()}
+                                                    </span>
+                                                )}
                                             </div>
-                                            {review.createdAt && (
-                                                <span style={{ fontSize: "0.9rem", color: "#718096" }}>
-                                                    {new Date(review.createdAt).toLocaleDateString()}
-                                                </span>
+                                            {review.comment && (
+                                                <p style={{ color: "#2d3748", lineHeight: "1.6", marginTop: "0.5rem" }}>
+                                                    {review.comment}
+                                                </p>
                                             )}
                                         </div>
-                                        {review.comment && (
-                                            <p style={{ color: "#2d3748", lineHeight: "1.6", marginTop: "0.5rem" }}>
-                                                {review.comment}
-                                            </p>
-                                        )}
-                                    </div>
                                     );
                                 })}
                             </div>

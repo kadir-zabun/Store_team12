@@ -70,6 +70,19 @@ const productApi = {
     // Get approved reviews for a product (public endpoint)
     getApprovedReviewsForProduct: (productId) =>
         axiosClient.get(`/api/products/${productId}/reviews`),
+
+    // Upload images for a product (PRODUCT_MANAGER only)
+    uploadProductImages: (productId, files) => {
+        const formData = new FormData();
+        files.forEach((file) => {
+            formData.append("files", file);
+        });
+        return axiosClient.post(`/api/products/${productId}/images`, formData, {
+            headers: {
+                "Content-Type": "multipart/form-data",
+            },
+        });
+    },
 };
 
 export default productApi;

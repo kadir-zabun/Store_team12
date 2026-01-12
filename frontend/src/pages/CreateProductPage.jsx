@@ -9,6 +9,8 @@ export default function CreateProductPage() {
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
+    const [selectedFiles, setSelectedFiles] = useState([]);
+    const [previewUrls, setPreviewUrls] = useState([]);
     const [productForm, setProductForm] = useState({
         productName: "",
         description: "",
@@ -20,7 +22,6 @@ export default function CreateProductPage() {
         warrantyStatus: "",
         distributionInfo: "",
         categoryIds: [],
-        images: [""],
     });
     const navigate = useNavigate();
     const { success: showSuccess, error: showError } = useToast();
@@ -61,6 +62,22 @@ export default function CreateProductPage() {
         loadCategories();
     }, [navigate, userRole, showError]);
 
+    const handleFileChange = (e) => {
+        const files = Array.from(e.target.files);
+        setSelectedFiles(files);
+
+        // Generate preview URLs
+        const urls = files.map((file) => URL.createObjectURL(file));
+        setPreviewUrls(urls);
+    };
+
+    const removeImage = (index) => {
+        const newFiles = selectedFiles.filter((_, i) => i !== index);
+        const newUrls = previewUrls.filter((_, i) => i !== index);
+        setSelectedFiles(newFiles);
+        setPreviewUrls(newUrls);
+    };
+
     const handleCreateProduct = async (e) => {
         e.preventDefault();
         setSubmitting(true);
@@ -76,12 +93,21 @@ export default function CreateProductPage() {
                 warrantyStatus: productForm.warrantyStatus || null,
                 distributionInfo: productForm.distributionInfo || null,
                 categoryIds: productForm.categoryIds.filter(id => id),
-                images: productForm.images.filter(img => img),
+                images: [],
                 inStock: (parseInt(productForm.quantity) || 0) > 0,
                 popularity: 0,
             };
 
-            await productApi.createProduct(productData);
+            // First create the product
+            const response = await productApi.createProduct(productData);
+            const createdProduct = response.data?.data || response.data;
+            const productId = createdProduct.productId;
+
+            // Then upload images if any are selected
+            if (selectedFiles.length > 0 && productId) {
+                await productApi.uploadProductImages(productId, selectedFiles);
+            }
+
             showSuccess("Product created successfully!");
             navigate("/owner/products");
         } catch (error) {
@@ -223,14 +249,14 @@ export default function CreateProductPage() {
                                 onChange={(e) => setProductForm({ ...productForm, description: e.target.value })}
                                 rows="3"
                                 placeholder="Enter product description"
-                                style={{ 
-                                    width: "100%", 
-                                    padding: "0.75rem", 
-                                    borderRadius: "8px", 
-                                    border: "2px solid #e2e8f0", 
-                                    fontSize: "0.85rem", 
-                                    fontFamily: "inherit", 
-                                    background: "#fff", 
+                                style={{
+                                    width: "100%",
+                                    padding: "0.75rem",
+                                    borderRadius: "8px",
+                                    border: "2px solid #e2e8f0",
+                                    fontSize: "0.85rem",
+                                    fontFamily: "inherit",
+                                    background: "#fff",
                                     color: "#2d3748",
                                     boxSizing: "border-box",
                                     resize: "vertical",
@@ -270,7 +296,7 @@ export default function CreateProductPage() {
                                     padding: "0.75rem",
                                     background: "#fff",
                                 }}
-                                className="custom-select-dropdown"
+                                    className="custom-select-dropdown"
                                 >
                                     {categories.length === 0 ? (
                                         <div style={{ color: "#718096", fontSize: "0.85rem", padding: "0.5rem" }}>
@@ -384,23 +410,70 @@ export default function CreateProductPage() {
                         </div>
 
                         <div style={{ marginBottom: "1rem", width: "100%" }}>
-                            <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600, color: "#4a5568", fontSize: "0.85rem" }}>Image URL</label>
+                            <label style={{ display: "block", marginBottom: "0.5rem", fontWeight: 600, color: "#4a5568", fontSize: "0.85rem" }}>Product Images</label>
                             <input
-                                type="url"
-                                value={productForm.images[0] || ""}
-                                onChange={(e) => setProductForm({ ...productForm, images: [e.target.value] })}
-                                placeholder="https://example.com/image.jpg"
-                                style={{ 
-                                    width: "100%", 
-                                    padding: "0.75rem", 
-                                    borderRadius: "8px", 
-                                    border: "2px solid #e2e8f0", 
-                                    fontSize: "0.85rem", 
-                                    background: "#fff", 
+                                type="file"
+                                accept="image/*"
+                                onChange={handleFileChange}
+                                style={{
+                                    width: "100%",
+                                    padding: "0.75rem",
+                                    borderRadius: "8px",
+                                    border: "2px solid #e2e8f0",
+                                    fontSize: "0.85rem",
+                                    background: "#fff",
                                     color: "#2d3748",
-                                    boxSizing: "border-box"
+                                    boxSizing: "border-box",
+                                    cursor: "pointer"
                                 }}
                             />
+                            {previewUrls.length > 0 && (
+                                <div style={{ marginTop: "1rem", display: "flex", flexWrap: "wrap", gap: "0.75rem" }}>
+                                    {previewUrls.map((url, index) => (
+                                        <div key={index} style={{ position: "relative" }}>
+                                            <img
+                                                src={url}
+                                                alt={`Preview ${index + 1}`}
+                                                style={{
+                                                    width: "100px",
+                                                    height: "100px",
+                                                    objectFit: "cover",
+                                                    borderRadius: "8px",
+                                                    border: "2px solid #e2e8f0"
+                                                }}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => removeImage(index)}
+                                                style={{
+                                                    position: "absolute",
+                                                    top: "-8px",
+                                                    right: "-8px",
+                                                    width: "24px",
+                                                    height: "24px",
+                                                    borderRadius: "50%",
+                                                    background: "#e53e3e",
+                                                    color: "#fff",
+                                                    border: "none",
+                                                    cursor: "pointer",
+                                                    fontSize: "0.75rem",
+                                                    fontWeight: "bold",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center"
+                                                }}
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            {selectedFiles.length > 0 && (
+                                <div style={{ marginTop: "0.5rem", fontSize: "0.75rem", color: "#667eea" }}>
+                                    {selectedFiles.length} image{selectedFiles.length > 1 ? "s" : ""} selected
+                                </div>
+                            )}
                         </div>
 
                         <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>

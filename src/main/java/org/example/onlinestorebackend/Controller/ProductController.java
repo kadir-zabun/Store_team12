@@ -9,10 +9,13 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -99,7 +102,7 @@ public class ProductController {
     @PutMapping("/{productId}/stock")
     @PreAuthorize("hasRole('PRODUCT_MANAGER')")
     public ResponseEntity<ProductResponseDto> updateStock(@PathVariable String productId,
-                                                         @RequestParam Integer quantity) {
+            @RequestParam Integer quantity) {
         return ResponseEntity.ok(productService.updateStock(productId, quantity));
     }
 
@@ -107,14 +110,16 @@ public class ProductController {
     @PutMapping("/{productId}/cost")
     @PreAuthorize("hasRole('PRODUCT_MANAGER')")
     public ResponseEntity<ProductResponseDto> updateCost(@PathVariable String productId,
-                                                        @RequestParam BigDecimal cost) {
+            @RequestParam BigDecimal cost) {
         return ResponseEntity.ok(productService.updateCost(productId, cost));
     }
 
-    // Ürün güncelle (PRODUCT_MANAGER rolü) - Bu endpoint daha spesifik endpoint'lerden önce gelmeli
+    // Ürün güncelle (PRODUCT_MANAGER rolü) - Bu endpoint daha spesifik
+    // endpoint'lerden önce gelmeli
     @PutMapping("/{productId}")
     @PreAuthorize("hasRole('PRODUCT_MANAGER')")
-    public ResponseEntity<ProductResponseDto> updateProduct(@PathVariable String productId, @RequestBody Product product) {
+    public ResponseEntity<ProductResponseDto> updateProduct(@PathVariable String productId,
+            @RequestBody Product product) {
         ProductResponseDto updatedProduct = productService.updateProduct(productId, product);
         return ResponseEntity.ok(updatedProduct);
     }
@@ -148,8 +153,7 @@ public class ProductController {
     @PreAuthorize("hasRole('PRODUCT_MANAGER')")
     public ResponseEntity<List<org.example.onlinestorebackend.Dto.ReviewDto>> getProductReviewsForOwner(
             @PathVariable String productId) {
-        List<org.example.onlinestorebackend.Dto.ReviewDto> reviews =
-                productService.getProductReviews(productId);
+        List<org.example.onlinestorebackend.Dto.ReviewDto> reviews = productService.getProductReviews(productId);
         return ResponseEntity.ok(reviews);
     }
 
@@ -186,8 +190,18 @@ public class ProductController {
     @GetMapping("/{productId}/reviews")
     public ResponseEntity<List<org.example.onlinestorebackend.Dto.ReviewDto>> getProductReviews(
             @PathVariable String productId) {
-        List<org.example.onlinestorebackend.Dto.ReviewDto> reviews = 
-                productService.getApprovedReviewsForProduct(productId);
+        List<org.example.onlinestorebackend.Dto.ReviewDto> reviews = productService
+                .getApprovedReviewsForProduct(productId);
         return ResponseEntity.ok(reviews);
+    }
+
+    // Upload images for a product (PRODUCT_MANAGER için)
+    @PostMapping(value = "/{productId}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('PRODUCT_MANAGER')")
+    public ResponseEntity<ProductResponseDto> uploadProductImages(
+            @PathVariable String productId,
+            @RequestParam("files") List<MultipartFile> files) throws IOException {
+        ProductResponseDto updatedProduct = productService.uploadImages(productId, files);
+        return ResponseEntity.ok(updatedProduct);
     }
 }
