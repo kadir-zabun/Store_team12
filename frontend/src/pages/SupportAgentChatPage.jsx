@@ -255,11 +255,11 @@ export default function SupportAgentChatPage() {
     const handleDownloadAttachment = async (attachmentId) => {
         try {
             const response = await supportApi.getAttachment(attachmentId);
-            const blob = new Blob([response.data]);
+            const blob = new Blob([response.data], { type: 'application/pdf' });
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement("a");
             link.href = url;
-            link.download = `attachment_${attachmentId}`;
+            link.download = `attachment_${attachmentId}.pdf`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);

@@ -361,18 +361,18 @@ export default function OrderHistoryPage() {
                                                         </div>
                                                         {refundStats.approvedQty > 0 && (
                                                             <span style={{ padding: "0.4rem 0.8rem", background: "#2f855a", color: "#fff", borderRadius: "8px", fontWeight: 600, fontSize: "0.85rem" }}>
-                                                                    Refund Accepted{` (${refundStats.approvedQty})`}
-                                                                </span>
+                                                                Refund Accepted{` (${refundStats.approvedQty})`}
+                                                            </span>
                                                         )}
                                                         {refundStats.pendingQty > 0 && (
                                                             <span style={{ padding: "0.4rem 0.8rem", background: "#d69e2e", color: "#fff", borderRadius: "8px", fontWeight: 600, fontSize: "0.85rem" }}>
-                                                                    Refund Pending{` (${refundStats.pendingQty})`}
-                                                                </span>
+                                                                Refund Pending{` (${refundStats.pendingQty})`}
+                                                            </span>
                                                         )}
                                                         {refundStats.rejectedQty > 0 && (
                                                             <span style={{ padding: "0.4rem 0.8rem", background: "#e53e3e", color: "#fff", borderRadius: "8px", fontWeight: 600, fontSize: "0.85rem" }}>
-                                                                    Refund Rejected{` (${refundStats.rejectedQty})`}
-                                                                </span>
+                                                                Refund Rejected{` (${refundStats.rejectedQty})`}
+                                                            </span>
                                                         )}
                                                         {canRefund && (
                                                             <button
@@ -496,6 +496,48 @@ export default function OrderHistoryPage() {
                                         >
                                             View PDF
                                         </button>
+                                        <button
+                                            onClick={async () => {
+                                                try {
+                                                    const orderId = order.orderId || order.id;
+                                                    if (!orderId) {
+                                                        showError("Order ID is missing.");
+                                                        return;
+                                                    }
+                                                    const response = await paymentApi.getInvoicePdf(orderId);
+                                                    const blob = new Blob([response.data], { type: 'application/pdf' });
+                                                    const url = window.URL.createObjectURL(blob);
+                                                    const link = document.createElement('a');
+                                                    link.href = url;
+                                                    link.download = `invoice_${orderId}.pdf`;
+                                                    document.body.appendChild(link);
+                                                    link.click();
+                                                    document.body.removeChild(link);
+                                                    setTimeout(() => window.URL.revokeObjectURL(url), 100);
+                                                } catch (error) {
+                                                    showError("Failed to download PDF. Please try again.");
+                                                }
+                                            }}
+                                            style={{
+                                                padding: "0.5rem 1rem",
+                                                background: "#2f855a",
+                                                color: "#fff",
+                                                border: "none",
+                                                borderRadius: "8px",
+                                                fontWeight: 600,
+                                                fontSize: "0.9rem",
+                                                cursor: "pointer",
+                                                transition: "all 0.3s",
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.background = "#276749";
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.background = "#2f855a";
+                                            }}
+                                        >
+                                            Download PDF
+                                        </button>
                                     </div>
                                 </div>
 
@@ -539,12 +581,12 @@ export default function OrderHistoryPage() {
                                                                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                                                                     <span style={{ fontWeight: 600, color: "#2d3748" }}>Your Rating:</span>
                                                                     <span style={{ fontSize: "1.2rem", fontWeight: 700, color: "#667eea" }}>
-                                                                    {existingReview.rating}/10
-                                                                </span>
+                                                                        {existingReview.rating}/10
+                                                                    </span>
                                                                 </div>
                                                                 <span style={{ fontSize: "0.85rem", color: "#2f855a", fontWeight: 500 }}>
-                                                                ✓ Reviewed
-                                                            </span>
+                                                                    ✓ Reviewed
+                                                                </span>
                                                             </div>
                                                             {existingReview.comment && (
                                                                 <div style={{ marginTop: "0.75rem" }}>
@@ -563,10 +605,10 @@ export default function OrderHistoryPage() {
                                                                     </div>
                                                                     <div style={{ marginTop: "0.5rem", fontSize: "0.85rem", color: "#718096" }}>
                                                                         Status: {existingReview.approved ? (
-                                                                        <span style={{ color: "#2f855a", fontWeight: 600 }}>✓ Approved (Visible)</span>
-                                                                    ) : (
-                                                                        <span style={{ color: "#d69e2e", fontWeight: 600 }}>⏳ Pending Approval</span>
-                                                                    )}
+                                                                            <span style={{ color: "#2f855a", fontWeight: 600 }}>✓ Approved (Visible)</span>
+                                                                        ) : (
+                                                                            <span style={{ color: "#d69e2e", fontWeight: 600 }}>⏳ Pending Approval</span>
+                                                                        )}
                                                                     </div>
                                                                 </div>
                                                             )}
@@ -591,8 +633,8 @@ export default function OrderHistoryPage() {
 
                                                     {/* Show review form when editing or writing new review */}
                                                     {reviewingProduct &&
-                                                    reviewingProduct.orderId === (order.orderId || order.id) &&
-                                                    reviewingProduct.productId === item.productId ? (
+                                                        reviewingProduct.orderId === (order.orderId || order.id) &&
+                                                        reviewingProduct.productId === item.productId ? (
                                                         <div
                                                             style={{
                                                                 padding: "1.5rem",
