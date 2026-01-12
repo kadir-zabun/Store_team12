@@ -26,6 +26,12 @@ export default function SupportAgentChatPage() {
     const dropdownRef = useRef(null);
     const [showDropdown, setShowDropdown] = useState(false);
     const [queuePollingInterval, setQueuePollingInterval] = useState(null);
+    const statusFilterRef = useRef(statusFilter); // Ref to track latest filter value
+
+    // Keep ref in sync with state
+    useEffect(() => {
+        statusFilterRef.current = statusFilter;
+    }, [statusFilter]);
 
     useEffect(() => {
         const token = localStorage.getItem("access_token");
@@ -124,7 +130,7 @@ export default function SupportAgentChatPage() {
     const loadQueue = async (silent = false) => {
         if (!silent) setLoadingQueue(true);
         try {
-            const response = await supportApi.getQueue(statusFilter || null);
+            const response = await supportApi.getQueue(statusFilterRef.current || null);
             const conversationsData = response.data?.data || response.data || [];
 
             // Check if our selected conversation status changed in the list
@@ -295,7 +301,7 @@ export default function SupportAgentChatPage() {
     }
 
     return (
-        <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%)", display: "flex", flexDirection: "column", color: "#2d3748" }}>
+        <div style={{ height: "100vh", background: "linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%)", display: "flex", flexDirection: "column", color: "#2d3748", overflow: "hidden" }}>
 
 
             <div style={{ flex: 1, display: "flex", padding: "2rem", gap: "1.5rem", overflow: "hidden" }}>
@@ -656,7 +662,7 @@ export default function SupportAgentChatPage() {
                                             <div>
                                                 <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#a0aec0", textTransform: "uppercase", marginBottom: "0.5rem" }}>Deliveries</div>
                                                 {customerContext.deliveries && customerContext.deliveries.length > 0 ? (
-                                                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                                                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", maxHeight: "200px", overflowY: "auto" }}>
                                                         {customerContext.deliveries.map((delivery) => (
                                                             <div key={delivery.deliveryId} style={{ padding: "0.5rem", border: "1px solid #e2e8f0", borderRadius: "6px", fontSize: "0.85rem", background: "#f8f9fa" }}>
                                                                 <div style={{ marginBottom: "0.2rem" }}>
