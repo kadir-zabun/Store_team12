@@ -11,11 +11,11 @@ export default function MyAccountPage() {
     const userRole = useUserRole();
     const { success: showSuccess, error: showError } = useToast();
     const [activeSection, setActiveSection] = useState("account");
-    
+
     // User profile state
     const [profile, setProfile] = useState(null);
     const [loadingProfile, setLoadingProfile] = useState(true);
-    
+
     // Addresses state
     const [addresses, setAddresses] = useState([]);
     const [newAddress, setNewAddress] = useState({
@@ -26,11 +26,11 @@ export default function MyAccountPage() {
         phone: "",
     });
     const [showAddAddress, setShowAddAddress] = useState(false);
-    
+
     // Cards state
     const [savedCard, setSavedCard] = useState(null);
     const [loadingCard, setLoadingCard] = useState(true);
-    
+
     // Password change state
     const [email, setEmail] = useState("");
     const [passwordResetSent, setPasswordResetSent] = useState(false);
@@ -83,13 +83,13 @@ export default function MyAccountPage() {
         try {
             const token = localStorage.getItem("access_token");
             if (!token) return;
-            
+
             const payloadBase64 = token.split(".")[1];
             const normalized = payloadBase64.replace(/-/g, "+").replace(/_/g, "/");
             const payloadJson = atob(normalized);
             const payload = JSON.parse(payloadJson);
             const username = payload.sub || payload.username;
-            
+
             if (username) {
                 const response = await userApi.getMyProfile();
                 const profileData = response.data?.data || response.data;
@@ -143,7 +143,7 @@ export default function MyAccountPage() {
             showError("Please fill in all address fields.");
             return;
         }
-        
+
         const addressId = Date.now().toString();
         const updatedAddresses = [...addresses, { ...newAddress, id: addressId }];
         saveAddresses(updatedAddresses);
@@ -206,52 +206,34 @@ export default function MyAccountPage() {
                                 <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                                     <div>
                                         <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#4a5568", marginBottom: "0.25rem" }}>
+                                            ID
+                                        </label>
+                                        <div style={{ fontSize: "1rem", color: "#2d3748" }}>{profile.id || "N/A"}</div>
+                                    </div>
+                                    <div>
+                                        <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#4a5568", marginBottom: "0.25rem" }}>
                                             Name
                                         </label>
                                         <div style={{ fontSize: "1rem", color: "#2d3748" }}>{profile.name || "N/A"}</div>
                                     </div>
                                     <div>
                                         <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#4a5568", marginBottom: "0.25rem" }}>
-                                            Email
+                                            Tax ID
+                                        </label>
+                                        <div style={{ fontSize: "1rem", color: "#2d3748" }}>{profile.taxId || "N/A"}</div>
+                                    </div>
+                                    <div>
+                                        <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#4a5568", marginBottom: "0.25rem" }}>
+                                            Email Address
                                         </label>
                                         <div style={{ fontSize: "1rem", color: "#2d3748" }}>{profile.email || "N/A"}</div>
                                     </div>
                                     <div>
                                         <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#4a5568", marginBottom: "0.25rem" }}>
-                                            Username
+                                            Home Address
                                         </label>
-                                        <div style={{ fontSize: "1rem", color: "#2d3748" }}>
-                                            {(() => {
-                                                try {
-                                                    const token = localStorage.getItem("access_token");
-                                                    if (token) {
-                                                        const payloadBase64 = token.split(".")[1];
-                                                        const normalized = payloadBase64.replace(/-/g, "+").replace(/_/g, "/");
-                                                        const payloadJson = atob(normalized);
-                                                        const payload = JSON.parse(payloadJson);
-                                                        return payload.sub || payload.username || "N/A";
-                                                    }
-                                                } catch (e) {}
-                                                return "N/A";
-                                            })()}
-                                        </div>
+                                        <div style={{ fontSize: "1rem", color: "#2d3748" }}>{profile.homeAddress || "N/A"}</div>
                                     </div>
-                                    {profile.taxId && (
-                                        <div>
-                                            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#4a5568", marginBottom: "0.25rem" }}>
-                                                Tax ID
-                                            </label>
-                                            <div style={{ fontSize: "1rem", color: "#2d3748" }}>{profile.taxId}</div>
-                                        </div>
-                                    )}
-                                    {profile.homeAddress && (
-                                        <div>
-                                            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#4a5568", marginBottom: "0.25rem" }}>
-                                                Home Address
-                                            </label>
-                                            <div style={{ fontSize: "1rem", color: "#2d3748" }}>{profile.homeAddress}</div>
-                                        </div>
-                                    )}
                                 </div>
                             </div>
                         ) : (
