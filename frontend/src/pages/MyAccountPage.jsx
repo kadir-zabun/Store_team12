@@ -206,12 +206,6 @@ export default function MyAccountPage() {
                                 <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                                     <div>
                                         <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#4a5568", marginBottom: "0.25rem" }}>
-                                            ID
-                                        </label>
-                                        <div style={{ fontSize: "1rem", color: "#2d3748" }}>{profile.id || "N/A"}</div>
-                                    </div>
-                                    <div>
-                                        <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#4a5568", marginBottom: "0.25rem" }}>
                                             Name
                                         </label>
                                         <div style={{ fontSize: "1rem", color: "#2d3748" }}>{profile.name || "N/A"}</div>
@@ -227,12 +221,6 @@ export default function MyAccountPage() {
                                             Email Address
                                         </label>
                                         <div style={{ fontSize: "1rem", color: "#2d3748" }}>{profile.email || "N/A"}</div>
-                                    </div>
-                                    <div>
-                                        <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "#4a5568", marginBottom: "0.25rem" }}>
-                                            Home Address
-                                        </label>
-                                        <div style={{ fontSize: "1rem", color: "#2d3748" }}>{profile.homeAddress || "N/A"}</div>
                                     </div>
                                 </div>
                             </div>
