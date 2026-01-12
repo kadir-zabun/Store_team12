@@ -234,60 +234,60 @@ export default function Layout() {
                                 Support Queue
                             </Link>
                         )}
-                        {userRole !== "PRODUCT_MANAGER" && localStorage.getItem("user_role") !== "PRODUCT_MANAGER" && 
-                         userRole !== "SUPPORT_AGENT" && localStorage.getItem("user_role") !== "SUPPORT_AGENT" &&
-                         userRole !== "SALES_MANAGER" && localStorage.getItem("user_role") !== "SALES_MANAGER" && (
-                            <Link
-                                to="/cart"
-                                style={{
-                                    color: isActivePath("/cart") ? "#667eea" : "#4a5568",
-                                    textDecoration: isActivePath("/cart") ? "underline" : "none",
-                                    textDecorationThickness: isActivePath("/cart") ? "2px" : "0",
-                                    textUnderlineOffset: isActivePath("/cart") ? "4px" : "0",
-                                    padding: "0.5rem 1rem",
-                                    borderRadius: "4px",
-                                    fontWeight: isActivePath("/cart") ? 600 : 500,
-                                    transition: "all 0.2s",
-                                    position: "relative",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "0.5rem",
-                                }}
-                                onMouseEnter={(e) => {
-                                    if (!isActivePath("/cart")) {
-                                        e.currentTarget.style.background = "#f7fafc";
-                                        e.currentTarget.style.color = "#667eea";
-                                    }
-                                }}
-                                onMouseLeave={(e) => {
-                                    if (!isActivePath("/cart")) {
-                                        e.currentTarget.style.background = "transparent";
-                                        e.currentTarget.style.color = "#4a5568";
-                                    }
-                                }}
-                            >
-                                <span>Cart</span>
-                                {cartCount > 0 && (
-                                    <span
-                                        style={{
-                                            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                                            color: "#fff",
-                                            borderRadius: "50%",
-                                            minWidth: "20px",
-                                            height: "20px",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            fontSize: "0.75rem",
-                                            fontWeight: 700,
-                                            padding: "0 0.25rem",
-                                        }}
-                                    >
-                                        {cartCount > 99 ? "99+" : cartCount}
-                                    </span>
-                                )}
-                            </Link>
-                        )}
+                        {userRole !== "PRODUCT_MANAGER" && localStorage.getItem("user_role") !== "PRODUCT_MANAGER" &&
+                            userRole !== "SUPPORT_AGENT" && localStorage.getItem("user_role") !== "SUPPORT_AGENT" &&
+                            userRole !== "SALES_MANAGER" && localStorage.getItem("user_role") !== "SALES_MANAGER" && (
+                                <Link
+                                    to="/cart"
+                                    style={{
+                                        color: isActivePath("/cart") ? "#667eea" : "#4a5568",
+                                        textDecoration: isActivePath("/cart") ? "underline" : "none",
+                                        textDecorationThickness: isActivePath("/cart") ? "2px" : "0",
+                                        textUnderlineOffset: isActivePath("/cart") ? "4px" : "0",
+                                        padding: "0.5rem 1rem",
+                                        borderRadius: "4px",
+                                        fontWeight: isActivePath("/cart") ? 600 : 500,
+                                        transition: "all 0.2s",
+                                        position: "relative",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "0.5rem",
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        if (!isActivePath("/cart")) {
+                                            e.currentTarget.style.background = "#f7fafc";
+                                            e.currentTarget.style.color = "#667eea";
+                                        }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        if (!isActivePath("/cart")) {
+                                            e.currentTarget.style.background = "transparent";
+                                            e.currentTarget.style.color = "#4a5568";
+                                        }
+                                    }}
+                                >
+                                    <span>Cart</span>
+                                    {cartCount > 0 && (
+                                        <span
+                                            style={{
+                                                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                                color: "#fff",
+                                                borderRadius: "50%",
+                                                minWidth: "20px",
+                                                height: "20px",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                fontSize: "0.75rem",
+                                                fontWeight: 700,
+                                                padding: "0 0.25rem",
+                                            }}
+                                        >
+                                            {cartCount > 99 ? "99+" : cartCount}
+                                        </span>
+                                    )}
+                                </Link>
+                            )}
                         {userRole === "CUSTOMER" && (
                             <Link
                                 to="/wishlist"
@@ -624,6 +624,33 @@ export default function Layout() {
                                                 >
                                                     <span>⭐</span>
                                                     <span>My Reviews</span>
+                                                </Link>
+                                                <Link
+                                                    to="/orders"
+                                                    onClick={() => setShowDropdown(false)}
+                                                    style={{
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: "0.8rem",
+                                                        padding: "0.75rem 1rem",
+                                                        color: "#4a5568",
+                                                        textDecoration: "none",
+                                                        fontSize: "0.9rem",
+                                                        borderBottom: "1px solid #f1f5f9",
+                                                        background: "transparent",
+                                                        transition: "all 0.2s",
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        e.currentTarget.style.background = "#667eea";
+                                                        e.currentTarget.style.color = "#fff";
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.currentTarget.style.background = "transparent";
+                                                        e.currentTarget.style.color = "#4a5568";
+                                                    }}
+                                                >
+                                                    <span>📦</span>
+                                                    <span>Order History</span>
                                                 </Link>
                                                 <Link
                                                     to="/my-account"
