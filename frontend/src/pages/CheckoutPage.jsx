@@ -81,7 +81,7 @@ export default function CheckoutPage() {
             try {
                 const response = await cartApi.getCart();
                 const apiResponse = response.data;
-                
+
                 // Handle both wrapped and direct response formats
                 let cartData = null;
                 if (apiResponse && apiResponse.data) {
@@ -89,15 +89,15 @@ export default function CheckoutPage() {
                 } else if (apiResponse) {
                     cartData = apiResponse;
                 }
-                
+
                 // Ensure cart has items array
                 if (cartData && (!cartData.items || !Array.isArray(cartData.items))) {
                     cartData.items = [];
                 }
-                
+
                 console.log("Cart data loaded:", cartData);
                 console.log("Cart items:", cartData?.items);
-                
+
                 setCart(cartData);
 
                 // Get userId from JWT token
@@ -108,7 +108,7 @@ export default function CheckoutPage() {
                     const payloadJson = atob(normalized);
                     const payload = JSON.parse(payloadJson);
                     const username = payload.sub || payload.name || payload.username;
-                    
+
                     if (username) {
                         setUserName(username);
                         // Get actual userId from username (backend uses userId for orders)
@@ -117,7 +117,7 @@ export default function CheckoutPage() {
                             const userId = userIdResponse.data || userIdResponse.data?.data;
                             console.log("Got userId from API:", userId);
                             setUserId(userId || username); // Fallback to username if userId not found
-                            
+
                             // Load saved card information
                             try {
                                 const cardResponse = await userApi.getMyCard();
@@ -161,17 +161,17 @@ export default function CheckoutPage() {
         console.log("cart:", cart);
         console.log("cart.items:", cart?.items);
         console.log("cart.items length:", cart?.items?.length);
-        
+
         if (!userId) {
             showError("User information is missing. Please try logging in again.");
             return;
         }
-        
+
         if (!cart) {
             showError("Cart is not loaded. Please refresh the page.");
             return;
         }
-        
+
         if (!Array.isArray(cart.items) || cart.items.length === 0) {
             showError("Cart is empty. Please add items to your cart first.");
             return;
@@ -191,38 +191,42 @@ export default function CheckoutPage() {
         try {
             console.log("Creating order from cart for userId:", userId);
             console.log("UserId type:", typeof userId);
-            
+
             // Ensure userId is a string and not empty
             if (!userId) {
                 throw new Error("User ID is missing. Please try logging in again.");
             }
-            
+
             const userIdString = String(userId).trim();
             if (!userIdString) {
                 throw new Error("Invalid user ID. Please try logging in again.");
             }
-            
+
             console.log("Using userId as string:", userIdString);
             console.log("Full URL will be: /api/orders/from-cart");
             console.log("Backend will use JWT to get userId");
-            
+
+            // Format shipping address from form fields
+            const formattedAddress = `${shippingInfo.fullName}, ${shippingInfo.address}, ${shippingInfo.city} ${shippingInfo.zipCode}, Tel: ${shippingInfo.phone}`;
+
             // Create order from cart (backend uses JWT to get userId)
-            const orderResponse = await orderApi.createOrderFromCart();
-            
+            const orderResponse = await orderApi.createOrderFromCart(formattedAddress);
+
+
             // Log full response for debugging
             console.log("Full orderResponse:", orderResponse);
             console.log("orderResponse.data:", orderResponse.data);
             console.log("orderResponse.data type:", typeof orderResponse.data);
-            
+
             // Backend returns Order directly in response.data (ResponseEntity<Order>)
             // Handle both direct response and wrapped response
             let order = orderResponse.data;
-            
+
             // If response.data is wrapped (has data property), unwrap it
             if (order && order.data && typeof order.data === 'object') {
                 order = order.data;
             }
-            
+
             console.log("Order object:", order);
             console.log("Order keys:", order ? Object.keys(order) : "null");
             console.log("order.orderId:", order?.orderId);
@@ -238,21 +242,21 @@ export default function CheckoutPage() {
             // MongoDB uses _id, but Spring Data maps it to orderId field in Java
             // Jackson serializes it as orderId in JSON
             let orderId = order.orderId || order.id || order._id;
-            
+
             // If orderId is still not found, check if it's nested
             if (!orderId && order.order && (order.order.orderId || order.order.id || order.order._id)) {
                 orderId = order.order.orderId || order.order.id || order.order._id;
                 order = order.order; // Use nested order object
             }
-            
+
             console.log("Extracted orderId:", orderId);
-            
+
             // If orderId is still missing, try to get the most recent order for this user
             // This is a fallback in case the response structure is unexpected
             if (!orderId) {
                 console.warn("Order ID not found in response. Order object:", JSON.stringify(order, null, 2));
                 console.warn("Attempting to fetch most recent order as fallback...");
-                
+
                 try {
                     // Get user's orders and use the most recent one
                     const ordersResponse = await orderApi.getOrdersByCustomer(userIdString);
@@ -273,7 +277,7 @@ export default function CheckoutPage() {
                     console.error("Fallback failed:", fallbackError);
                 }
             }
-            
+
             if (!orderId) {
                 console.error("Order ID not found even after fallback. Order object:", JSON.stringify(order, null, 2));
                 throw new Error("Order creation failed - no order ID returned. Order was created but ID is missing.");
@@ -301,7 +305,7 @@ export default function CheckoutPage() {
             const paymentResponse = await paymentApi.mockPayment(paymentData);
             // Backend returns payment response directly (not wrapped)
             const invoice = paymentResponse.data || paymentResponse;
-            
+
             console.log("Payment processed, invoice:", invoice);
 
             // Save address if not already saved
@@ -313,7 +317,7 @@ export default function CheckoutPage() {
                     addr.zipCode === shippingInfo.zipCode &&
                     addr.phone === shippingInfo.phone
             );
-            
+
             if (!addressExists) {
                 const addressId = Date.now().toString();
                 const newAddress = {
@@ -344,14 +348,14 @@ export default function CheckoutPage() {
             console.error("Error placing order:", error);
             console.error("Error response:", error.response);
             console.error("Error response data:", error.response?.data);
-            
+
             // Extract error message as string - ensure it's always a string
             let errorMessage = "Failed to place order. Please try again.";
-            
+
             try {
                 if (error.response?.data) {
                     const errorData = error.response.data;
-                    
+
                     // If it's already a string, use it
                     if (typeof errorData === 'string') {
                         errorMessage = errorData;
@@ -377,12 +381,12 @@ export default function CheckoutPage() {
                 console.error("Error parsing error message:", e);
                 errorMessage = "Failed to place order. Please try again.";
             }
-            
+
             // Ensure errorMessage is always a string
             if (typeof errorMessage !== 'string') {
                 errorMessage = String(errorMessage);
             }
-            
+
             console.log("Showing error message:", errorMessage);
             showError(errorMessage);
         } finally {
@@ -395,14 +399,14 @@ export default function CheckoutPage() {
             <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", padding: "2rem" }}>
                 <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
                     <div style={{ marginBottom: "1.5rem" }}>
-                        <Link 
-                            to="/cart" 
-                            style={{ 
-                                display: "inline-flex", 
-                                alignItems: "center", 
-                                gap: "0.5rem", 
-                                color: "#fff", 
-                                textDecoration: "none", 
+                        <Link
+                            to="/cart"
+                            style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "0.5rem",
+                                color: "#fff",
+                                textDecoration: "none",
                                 fontSize: "1rem",
                                 fontWeight: 500,
                                 padding: "0.5rem 1rem",
@@ -426,14 +430,14 @@ export default function CheckoutPage() {
             <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", padding: "2rem" }}>
                 <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
                     <div style={{ marginBottom: "1.5rem" }}>
-                        <Link 
-                            to="/cart" 
-                            style={{ 
-                                display: "inline-flex", 
-                                alignItems: "center", 
-                                gap: "0.5rem", 
-                                color: "#fff", 
-                                textDecoration: "none", 
+                        <Link
+                            to="/cart"
+                            style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "0.5rem",
+                                color: "#fff",
+                                textDecoration: "none",
                                 fontSize: "1rem",
                                 fontWeight: 500,
                                 padding: "0.5rem 1rem",
@@ -475,7 +479,21 @@ export default function CheckoutPage() {
     const formatExpiryDate = (value) => {
         const v = value.replace(/\s+/g, "").replace(/[^0-9]/gi, "");
         if (v.length >= 2) {
+            const month = parseInt(v.substring(0, 2), 10);
+            // Validate month: must be between 01 and 12
+            if (month < 1 || month > 12) {
+                // If invalid month, don't update the value
+                return paymentInfo.expiryDate;
+            }
             return v.substring(0, 2) + "/" + v.substring(2, 4);
+        }
+        // For single digit, allow 0 and 1 as they can lead to valid months (01-12)
+        if (v.length === 1 && parseInt(v, 10) > 1) {
+            // If first digit is > 1, prepend 0 to make it 0X format
+            const month = parseInt(v, 10);
+            if (month >= 2 && month <= 9) {
+                return "0" + v + "/";
+            }
         }
         return v;
     };
@@ -484,14 +502,14 @@ export default function CheckoutPage() {
         <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", padding: "2rem" }}>
             <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
                 <div style={{ marginBottom: "1.5rem" }}>
-                    <Link 
-                        to="/cart" 
-                        style={{ 
-                            display: "inline-flex", 
-                            alignItems: "center", 
-                            gap: "0.5rem", 
-                            color: "#fff", 
-                            textDecoration: "none", 
+                    <Link
+                        to="/cart"
+                        style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "0.5rem",
+                            color: "#fff",
+                            textDecoration: "none",
                             fontSize: "1rem",
                             fontWeight: 500,
                             padding: "0.5rem 1rem",
@@ -679,9 +697,9 @@ export default function CheckoutPage() {
                                 cart.items.map((item) => (
                                     <div key={item.productId} style={{ display: "flex", justifyContent: "space-between", padding: "1rem 0", borderBottom: "1px solid #e2e8f0", gap: "1rem" }}>
                                         <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ 
-                                                fontWeight: 600, 
-                                                marginBottom: "0.25rem", 
+                                            <div style={{
+                                                fontWeight: 600,
+                                                marginBottom: "0.25rem",
                                                 color: "#2d3748",
                                                 fontSize: "0.95rem",
                                                 wordWrap: "break-word",

@@ -59,7 +59,7 @@ export default function OrderManagementPage() {
             const response = await orderApi.getAllOrders(statusFilter || null);
             console.log("Orders response:", response);
             console.log("Orders response.data:", response.data);
-            
+
             // Handle both wrapped and direct response formats
             // Backend uses RestResponseAdvice which wraps responses in ApiResponse
             let ordersData = [];
@@ -74,17 +74,17 @@ export default function OrderManagementPage() {
                     ordersData = [];
                 }
             }
-            
+
             console.log("Orders data (parsed):", ordersData);
             console.log("Orders count:", ordersData.length);
-            
+
             // Sort orders by date (newest first) - add to top
             const sortedOrders = Array.isArray(ordersData) ? [...ordersData].sort((a, b) => {
                 const dateA = a.orderDate ? new Date(a.orderDate).getTime() : 0;
                 const dateB = b.orderDate ? new Date(b.orderDate).getTime() : 0;
                 return dateB - dateA; // Descending order (newest first)
             }) : [];
-            
+
             setOrders(sortedOrders);
         } catch (error) {
             console.error("Error loading orders:", error);
@@ -217,6 +217,24 @@ export default function OrderManagementPage() {
                                         </div>
                                     </div>
 
+                                    {/* Shipping Address */}
+                                    {order.shippingAddress && (
+                                        <div style={{
+                                            marginBottom: "1rem",
+                                            padding: "0.75rem",
+                                            background: "#fff",
+                                            borderRadius: "4px",
+                                            border: "2px solid #e2e8f0"
+                                        }}>
+                                            <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "#4a5568", marginBottom: "0.25rem" }}>
+                                                📍 Shipping Address:
+                                            </div>
+                                            <div style={{ fontSize: "0.9rem", color: "#2d3748" }}>
+                                                {order.shippingAddress}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     <div style={{ marginBottom: "1rem" }}>
                                         <h3 style={{ fontSize: "0.85rem", fontWeight: 600, color: "#4a5568", marginBottom: "0.5rem" }}>Items:</h3>
                                         <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
@@ -227,7 +245,7 @@ export default function OrderManagementPage() {
                                                     const quantity = item.quantity || 0;
                                                     const price = item.priceAtPurchase || item.price || 0;
                                                     const subtotal = price * quantity;
-                                                    
+
                                                     return (
                                                         <div
                                                             key={index}

@@ -161,7 +161,7 @@ class OrderServiceTest {
         when(cartRepository.save(any(Cart.class))).thenReturn(cart);
 
         // When
-        Order result = orderService.createOrderFromCart(customerId);
+        Order result = orderService.createOrderFromCart(customerId, null);
 
         // Then
         assertNotNull(result);
@@ -181,7 +181,7 @@ class OrderServiceTest {
 
         // When & Then
         InvalidRequestException exception = assertThrows(InvalidRequestException.class, () -> {
-            orderService.createOrderFromCart(customerId);
+            orderService.createOrderFromCart(customerId, null);
         });
 
         assertTrue(exception.getMessage().contains("Cart is empty"));
@@ -259,4 +259,3 @@ class OrderServiceTest {
         verify(orderRepository).findByCustomerId(customerId);
     }
 }
-

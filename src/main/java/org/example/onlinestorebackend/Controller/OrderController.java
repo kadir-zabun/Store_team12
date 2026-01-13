@@ -35,11 +35,13 @@ public class OrderController {
     @PostMapping("/from-cart")
     @PreAuthorize("hasRole('CUSTOMER')")
     public ResponseEntity<Order> createOrderFromCart(
+            @RequestBody(required = false) java.util.Map<String, String> requestBody,
             @AuthenticationPrincipal UserDetails userDetails) {
         // Convert username from JWT to userId
         String username = userDetails.getUsername();
         String userId = orderService.getUserIdByUsername(username);
-        Order order = orderService.createOrderFromCart(userId);
+        String shippingAddress = requestBody != null ? requestBody.get("shippingAddress") : null;
+        Order order = orderService.createOrderFromCart(userId, shippingAddress);
         return ResponseEntity.status(HttpStatus.CREATED).body(order);
     }
 
@@ -89,7 +91,8 @@ public class OrderController {
         return ResponseEntity.ok(orders);
     }
 
-    // Get orders for product owner (only their products' orders) - Only PRODUCT_OWNER
+    // Get orders for product owner (only their products' orders) - Only
+    // PRODUCT_OWNER
     @GetMapping
     @PreAuthorize("hasRole('PRODUCT_MANAGER')")
     public ResponseEntity<List<Order>> getOrdersForOwner(
@@ -104,11 +107,8 @@ public class OrderController {
     @PreAuthorize("hasRole('PRODUCT_MANAGER')")
     public ResponseEntity<Order> updateOrderStatus(
             @PathVariable String orderId,
-            @Valid @RequestBody UpdateOrderStatusRequest request
-    ) {
+            @Valid @RequestBody UpdateOrderStatusRequest request) {
         Order order = orderService.updateOrderStatus(orderId, request.getStatus());
         return ResponseEntity.ok(order);
     }
 }
-
-

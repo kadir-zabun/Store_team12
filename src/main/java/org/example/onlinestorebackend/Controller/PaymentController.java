@@ -55,7 +55,7 @@ public class PaymentController {
             }
         } else if (request.getUserId() != null) {
             // orderId yoksa sepete göre yeni order yarat
-            order = orderService.createOrderFromCart(request.getUserId());
+            order = orderService.createOrderFromCart(request.getUserId(), request.getShippingAddress());
             request.setOrderId(order.getOrderId());
         }
 
@@ -110,19 +110,17 @@ public class PaymentController {
                 User user = userOpt.get();
                 if (user.getEmail() != null && !user.getEmail().isBlank()) {
                     try {
-                        PaymentRequestDto.ItemDto[] itemsArray =
-                                request.getItems() != null
-                                        ? request.getItems().toArray(new PaymentRequestDto.ItemDto[0])
-                                        : new PaymentRequestDto.ItemDto[0];
+                        PaymentRequestDto.ItemDto[] itemsArray = request.getItems() != null
+                                ? request.getItems().toArray(new PaymentRequestDto.ItemDto[0])
+                                : new PaymentRequestDto.ItemDto[0];
 
                         pdfBytes = invoiceService.generateInvoicePdf(
-                                invoiceId, order, user, total, now, itemsArray
-                        );
+                                invoiceId, order, user, total, now, itemsArray);
 
                         // PDF'yi Invoice entity'ye kaydet
                         invoiceEntity.setPdfBytes(pdfBytes);
                         System.out.println("PDF generated successfully, size: " + pdfBytes.length + " bytes");
-                        
+
                         mailService.sendInvoiceEmailWithPdf(user.getEmail(), invoiceId, total, now, pdfBytes);
                         System.out.println("Invoice email sent to: " + user.getEmail());
                     } catch (Exception e) {
@@ -141,16 +139,15 @@ public class PaymentController {
                 } else {
                     // Email yoksa bile PDF'yi generate edip kaydet
                     try {
-                        PaymentRequestDto.ItemDto[] itemsArray =
-                                request.getItems() != null
-                                        ? request.getItems().toArray(new PaymentRequestDto.ItemDto[0])
-                                        : new PaymentRequestDto.ItemDto[0];
+                        PaymentRequestDto.ItemDto[] itemsArray = request.getItems() != null
+                                ? request.getItems().toArray(new PaymentRequestDto.ItemDto[0])
+                                : new PaymentRequestDto.ItemDto[0];
 
                         pdfBytes = invoiceService.generateInvoicePdf(
-                                invoiceId, order, userOpt.get(), total, now, itemsArray
-                        );
+                                invoiceId, order, userOpt.get(), total, now, itemsArray);
                         invoiceEntity.setPdfBytes(pdfBytes);
-                        System.out.println("PDF generated and saved to invoice (no email sent), size: " + pdfBytes.length + " bytes");
+                        System.out.println("PDF generated and saved to invoice (no email sent), size: "
+                                + pdfBytes.length + " bytes");
                     } catch (Exception e) {
                         System.err.println("ERROR: Failed to generate PDF for invoice");
                         e.printStackTrace();
@@ -158,7 +155,7 @@ public class PaymentController {
                 }
             }
         }
-        
+
         // Invoice'ı kaydet (PDF ile birlikte)
         invoiceRepository.save(invoiceEntity);
 
@@ -167,34 +164,33 @@ public class PaymentController {
                 invoiceId,
                 now,
                 total,
-                request.getItems()
-        );
+                request.getItems());
 
         return ResponseEntity.ok(invoice);
     }
 
     @GetMapping("/invoice/{orderId}/pdf")
     public ResponseEntity<byte[]> getInvoicePdf(@PathVariable String orderId,
-                                                @AuthenticationPrincipal UserDetails userDetails) {
+            @AuthenticationPrincipal UserDetails userDetails) {
         try {
             Order order = orderService.getOrderById(orderId);
-            
+
             String username = userDetails != null ? userDetails.getUsername() : null;
             if (username == null) {
                 return ResponseEntity.status(401).build();
             }
-            
+
             String userId = orderService.getUserIdByUsername(username);
-            
+
             if (order.getCustomerId() == null || !order.getCustomerId().equals(userId)) {
                 return ResponseEntity.status(403).build();
             }
-            
+
             Invoice invoice = invoiceRepository.findByOrderId(orderId);
             byte[] pdfBytes = null;
             String invoiceId = orderId;
             LocalDateTime invoiceDate = order.getOrderDate();
-            
+
             if (invoice != null) {
                 invoiceId = invoice.getInvoiceId();
                 invoiceDate = invoice.getInvoiceDate() != null ? invoice.getInvoiceDate() : order.getOrderDate();
@@ -202,16 +198,16 @@ public class PaymentController {
                     pdfBytes = invoice.getPdfBytes();
                 }
             }
-            
+
             if (pdfBytes == null || pdfBytes.length == 0) {
                 Optional<User> userOpt = userRepository.findByUserId(userId);
                 if (userOpt.isEmpty()) {
                     return ResponseEntity.status(404).build();
                 }
-                
+
                 User user = userOpt.get();
                 BigDecimal totalAmount = BigDecimal.valueOf(order.getTotalPrice() != null ? order.getTotalPrice() : 0);
-                
+
                 PaymentRequestDto.ItemDto[] itemsArray = new PaymentRequestDto.ItemDto[0];
                 if (order.getItems() != null && !order.getItems().isEmpty()) {
                     itemsArray = order.getItems().stream()
@@ -220,20 +216,20 @@ public class PaymentController {
                                 PaymentRequestDto.ItemDto dto = new PaymentRequestDto.ItemDto();
                                 dto.setProductId(item.getProductId());
                                 dto.setQuantity(item.getQuantity() != null ? item.getQuantity() : 0);
-                                dto.setPrice(item.getPriceAtPurchase() != null ? item.getPriceAtPurchase() : BigDecimal.ZERO);
+                                dto.setPrice(item.getPriceAtPurchase() != null ? item.getPriceAtPurchase()
+                                        : BigDecimal.ZERO);
                                 return dto;
                             })
                             .toArray(PaymentRequestDto.ItemDto[]::new);
                 }
-                
+
                 pdfBytes = invoiceService.generateInvoicePdf(
-                        invoiceId, order, user, totalAmount, invoiceDate, itemsArray
-                );
-                
+                        invoiceId, order, user, totalAmount, invoiceDate, itemsArray);
+
                 if (pdfBytes == null || pdfBytes.length == 0) {
                     return ResponseEntity.status(500).build();
                 }
-                
+
                 if (invoice == null) {
                     invoice = new Invoice();
                     invoice.setInvoiceId(invoiceId);
@@ -243,16 +239,16 @@ public class PaymentController {
                 invoice.setPdfBytes(pdfBytes);
                 invoiceRepository.save(invoice);
             }
-            
+
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_PDF);
             headers.setContentDispositionFormData("inline", "invoice_" + invoiceId + ".pdf");
             headers.setContentLength(pdfBytes.length);
-            
+
             return ResponseEntity.ok()
                     .headers(headers)
                     .body(pdfBytes);
-                    
+
         } catch (ResourceNotFoundException e) {
             return ResponseEntity.status(404).build();
         } catch (Exception e) {

@@ -54,7 +54,8 @@ public class OrderService {
 
         for (CreateOrderRequest.OrderItemRequest itemRequest : request.getItems()) {
             Product product = productRepository.findById(itemRequest.getProductId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + itemRequest.getProductId()));
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Product not found with id: " + itemRequest.getProductId()));
 
             validateStock(product, itemRequest.getQuantity());
             decreaseStock(product, itemRequest.getQuantity());
@@ -106,7 +107,8 @@ public class OrderService {
             delivery.setCustomerId(savedOrder.getCustomerId());
             delivery.setProductId(item.getProductId());
             delivery.setQuantity(item.getQuantity());
-            delivery.setTotalPrice(item.getPriceAtPurchase().multiply(BigDecimal.valueOf(item.getQuantity())).doubleValue());
+            delivery.setTotalPrice(
+                    item.getPriceAtPurchase().multiply(BigDecimal.valueOf(item.getQuantity())).doubleValue());
             delivery.setDeliveryAddress(deliveryAddress);
             delivery.setCompleted(false);
             deliveryRepository.save(delivery);
@@ -116,7 +118,7 @@ public class OrderService {
     }
 
     @Transactional
-    public Order createOrderFromCart(String customerId) {
+    public Order createOrderFromCart(String customerId, String shippingAddress) {
         Cart cart = cartRepository.findByUserId(customerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cart not found for user: " + customerId));
 
@@ -124,17 +126,21 @@ public class OrderService {
             throw new InvalidRequestException("Cart is empty, cannot create order");
         }
 
-        // Müşteri adresini çek (teslimat kaydında kullanılacak)
-        User customer = userRepository.findByUserId(customerId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + customerId));
-        String deliveryAddress = customer.getHomeAddress();
+        // Use provided shippingAddress or fallback to user's homeAddress
+        String deliveryAddress = shippingAddress;
+        if (deliveryAddress == null || deliveryAddress.trim().isEmpty()) {
+            User customer = userRepository.findByUserId(customerId)
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found: " + customerId));
+            deliveryAddress = customer.getHomeAddress();
+        }
 
         List<OrderItem> orderItems = new ArrayList<>();
         BigDecimal totalPrice = BigDecimal.ZERO;
 
         for (CartItem cartItem : cart.getItems()) {
             Product product = productRepository.findById(cartItem.getProductId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + cartItem.getProductId()));
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Product not found with id: " + cartItem.getProductId()));
 
             validateStock(product, cartItem.getQuantity());
             decreaseStock(product, cartItem.getQuantity());
@@ -147,8 +153,8 @@ public class OrderService {
             BigDecimal unitCost = product.getCost() != null
                     ? product.getCost()
                     : (cartItem.getPrice() != null
-                    ? cartItem.getPrice().multiply(BigDecimal.valueOf(0.5)).setScale(2, RoundingMode.HALF_UP)
-                    : BigDecimal.ZERO);
+                            ? cartItem.getPrice().multiply(BigDecimal.valueOf(0.5)).setScale(2, RoundingMode.HALF_UP)
+                            : BigDecimal.ZERO);
             orderItem.setCostAtPurchase(unitCost);
             // Set product image URL (first image if available)
             if (product.getImages() != null && !product.getImages().isEmpty()) {
@@ -171,6 +177,7 @@ public class OrderService {
         order.setOrderDate(LocalDateTime.now());
         order.setStatus("PROCESSING");
         order.setTotalPrice(totalPrice.doubleValue());
+        order.setShippingAddress(deliveryAddress);
 
         Order savedOrder = orderRepository.save(order);
 
@@ -181,7 +188,8 @@ public class OrderService {
             delivery.setCustomerId(customerId);
             delivery.setProductId(item.getProductId());
             delivery.setQuantity(item.getQuantity());
-            delivery.setTotalPrice(item.getPriceAtPurchase().multiply(BigDecimal.valueOf(item.getQuantity())).doubleValue());
+            delivery.setTotalPrice(
+                    item.getPriceAtPurchase().multiply(BigDecimal.valueOf(item.getQuantity())).doubleValue());
             delivery.setDeliveryAddress(deliveryAddress);
             delivery.setCompleted(false);
             deliveryRepository.save(delivery);
@@ -276,7 +284,8 @@ public class OrderService {
             for (OrderItem item : order.getItems()) {
                 Product product = productRepository.findById(item.getProductId())
                         .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + item.getProductId()));
-                int newQty = (product.getQuantity() != null ? product.getQuantity() : 0) + (item.getQuantity() != null ? item.getQuantity() : 0);
+                int newQty = (product.getQuantity() != null ? product.getQuantity() : 0)
+                        + (item.getQuantity() != null ? item.getQuantity() : 0);
                 product.setQuantity(newQty);
                 product.setInStock(newQty > 0);
                 productRepository.save(product);
@@ -312,5 +321,3 @@ public class OrderService {
         productRepository.save(product);
     }
 }
-
-

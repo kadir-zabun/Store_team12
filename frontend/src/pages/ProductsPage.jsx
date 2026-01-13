@@ -33,7 +33,7 @@ export default function ProductsPage() {
     };
     const [selectedCategory, setSelectedCategory] = useState(getInitialCategory);
     const [categories, setCategories] = useState([]);
-    
+
     // Applied filters - these are the actual filters being used
     const [appliedFilters, setAppliedFilters] = useState({
         category: getInitialCategory(),
@@ -58,7 +58,7 @@ export default function ProductsPage() {
             }
         };
         loadCategories();
-        
+
         // Check URL for category parameter and update state immediately
         const urlParams = new URLSearchParams(location.search);
         const categoryParam = urlParams.get("category");
@@ -72,20 +72,28 @@ export default function ProductsPage() {
     }, [location.pathname, location.search]);
 
     useEffect(() => {
+        // Use a flag to track if this effect is still current
+        let isCurrent = true;
+
         const loadProducts = async () => {
             // Immediately clear products and set loading when filters change
             setProducts([]);
             setLoading(true);
             setIsFiltering(true);
-            
+
+            // Capture current search state to compare later
+            const currentSearchQuery = searchQuery.trim();
+            const currentAppliedFilters = { ...appliedFilters };
+            const currentSortBy = sortBy;
+
             try {
-                console.log("📥 Fetching products from database...");
-                
+                console.log("📥 Fetching products from database...", { currentSearchQuery, currentAppliedFilters });
+
                 let productsData = null;
-                
+
                 // If category is selected, use category endpoint
-                if (appliedFilters.category) {
-                    const response = await productApi.getProductsByCategory(appliedFilters.category, 0, 200);
+                if (currentAppliedFilters.category) {
+                    const response = await productApi.getProductsByCategory(currentAppliedFilters.category, 0, 200);
                     productsData = response.data?.data?.content || response.data?.content || response.data?.data || response.data || [];
                     if (!Array.isArray(productsData)) {
                         productsData = [];
@@ -93,16 +101,16 @@ export default function ProductsPage() {
                     console.log("Category products:", productsData);
                 }
                 // If search query exists, use search endpoint
-                else if (searchQuery.trim()) {
-                    const response = await productApi.searchProducts(searchQuery.trim());
+                else if (currentSearchQuery) {
+                    const response = await productApi.searchProducts(currentSearchQuery);
                     productsData = response.data?.data || response.data || [];
                     if (!Array.isArray(productsData)) {
                         productsData = [];
                     }
-                    console.log("Search results:", productsData);
+                    console.log("Search results for:", currentSearchQuery, productsData);
                 }
                 // If in stock filter is active, use in stock endpoint
-                else if (appliedFilters.inStock) {
+                else if (currentAppliedFilters.inStock) {
                     const response = await productApi.getInStockProducts();
                     productsData = response.data?.data || response.data || [];
                     if (!Array.isArray(productsData)) {
@@ -113,7 +121,7 @@ export default function ProductsPage() {
                 else {
                     const response = await productApi.getAllProducts(0, 200);
                     const apiResponse = response.data;
-                    
+
                     if (apiResponse && apiResponse.data) {
                         if (apiResponse.data.content) {
                             productsData = apiResponse.data.content;
@@ -126,15 +134,21 @@ export default function ProductsPage() {
                         productsData = apiResponse;
                     }
                 }
-                
+
+                // Check if this effect is still current before updating state
+                if (!isCurrent) {
+                    console.log("⚠️ Discarding stale response for:", currentSearchQuery);
+                    return;
+                }
+
                 if (productsData && productsData.length > 0) {
                     let filteredProducts = productsData.map(formatProductForDisplay);
-                    
+
                     // Apply price range filter based on discounted price (finalPrice)
-                    if (appliedFilters.minPrice || appliedFilters.maxPrice) {
-                        const min = appliedFilters.minPrice ? parseFloat(appliedFilters.minPrice) : 0;
-                        const max = appliedFilters.maxPrice ? parseFloat(appliedFilters.maxPrice) : 999999;
-                        
+                    if (currentAppliedFilters.minPrice || currentAppliedFilters.maxPrice) {
+                        const min = currentAppliedFilters.minPrice ? parseFloat(currentAppliedFilters.minPrice) : 0;
+                        const max = currentAppliedFilters.maxPrice ? parseFloat(currentAppliedFilters.maxPrice) : 999999;
+
                         // Validate price range
                         if (isNaN(min) || isNaN(max) || min < 0 || max < 0 || min > max) {
                             setProducts([]);
@@ -142,22 +156,22 @@ export default function ProductsPage() {
                             setIsFiltering(false);
                             return;
                         }
-                        
+
                         filteredProducts = filteredProducts.filter(p => {
                             const finalPrice = p.finalPrice || p.price || 0;
                             return finalPrice >= min && finalPrice <= max;
                         });
                     }
-                    
+
                     // Apply in stock filter if active
-                    if (appliedFilters.inStock) {
+                    if (currentAppliedFilters.inStock) {
                         filteredProducts = filteredProducts.filter(p => p.inStock);
                     }
-                    
+
                     // Sort products based on selected sort option
                     filteredProducts.sort((a, b) => {
                         let aVal, bVal;
-                        switch (sortBy) {
+                        switch (currentSortBy) {
                             case "lowest-price":
                                 aVal = a.finalPrice || a.price || 0;
                                 bVal = b.finalPrice || b.price || 0;
@@ -182,40 +196,53 @@ export default function ProductsPage() {
                                 return aVal - bVal;
                         }
                     });
-                    
-                    // Only update products if we're still in the same filter state
+
+                    // Final check before updating products
+                    if (!isCurrent) {
+                        console.log("⚠️ Discarding stale filtered results for:", currentSearchQuery);
+                        return;
+                    }
+
                     setProducts(filteredProducts);
                     console.log(`✅ Loaded ${filteredProducts.length} products from database`);
                     // Reset to first page when filters change
                     setCurrentPage(1);
                 } else {
                     console.log("ℹ️ No products found");
-                    setProducts([]);
-                    setCurrentPage(1);
+                    if (isCurrent) {
+                        setProducts([]);
+                        setCurrentPage(1);
+                    }
                 }
             } catch (error) {
+                // Only handle errors if this effect is still current
+                if (!isCurrent) {
+                    return;
+                }
                 console.error("❌ Error loading products from database:", error);
                 const errorMessage = getErrorMessage(error, "Failed to load products. Please refresh the page.");
                 showError(errorMessage);
                 setProducts([]);
             } finally {
-                setLoading(false);
-                setIsFiltering(false);
+                if (isCurrent) {
+                    setLoading(false);
+                    setIsFiltering(false);
+                }
             }
         };
 
         // Debounce for search query only (filters are applied via button)
         const hasSearchQuery = searchQuery.trim().length > 0;
         const debounceDelay = hasSearchQuery ? 500 : 0;
-        
+
         const timeoutId = setTimeout(() => {
             loadProducts();
         }, debounceDelay);
 
         return () => {
+            // Mark this effect as stale
+            isCurrent = false;
             clearTimeout(timeoutId);
-            // Cancel any pending requests by clearing products immediately
-            setProducts([]);
         };
     }, [searchQuery, sortBy, appliedFilters, showError]);
 
@@ -227,7 +254,7 @@ export default function ProductsPage() {
 
         const token = localStorage.getItem("access_token");
         const product = products.find(p => p.productId === productId);
-        
+
         if (!product) {
             showError("Product not found");
             return;
@@ -244,7 +271,7 @@ export default function ProductsPage() {
             const existingItem = guestCart.items.find(item => item.productId === productId);
             const currentQuantity = existingItem ? existingItem.quantity : 0;
             const newQuantity = currentQuantity + 1;
-            
+
             if (newQuantity > stock) {
                 showError(`Only ${stock} items available in stock. You already have ${currentQuantity} in your cart.`);
                 return;
@@ -252,7 +279,7 @@ export default function ProductsPage() {
         }
 
         setAddingToCart({ ...addingToCart, [productId]: true });
-        
+
         try {
             if (token) {
                 await cartApi.addToCart(productId, 1);
@@ -308,7 +335,7 @@ export default function ProductsPage() {
                     <h2 style={{ fontSize: "1.1rem", fontWeight: 700, color: "#2d3748", marginBottom: "1.5rem", paddingBottom: "1rem", borderBottom: "1px solid #e2e8f0" }}>
                         Filters
                     </h2>
-                    
+
                     <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
                         {/* Category Filter */}
                         <div>
@@ -493,11 +520,11 @@ export default function ProductsPage() {
 
                         {/* In Stock Filter */}
                         <div>
-                            <label 
-                                style={{ 
-                                    display: "flex", 
-                                    alignItems: "center", 
-                                    gap: "0.75rem", 
+                            <label
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "0.75rem",
                                     cursor: "pointer",
                                     userSelect: "none",
                                 }}
@@ -690,25 +717,25 @@ export default function ProductsPage() {
                     </div>
 
                     {loading ? (
-                            <div style={{ textAlign: "center", padding: "3rem", display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
-                                <div
-                                    style={{
-                                        width: "50px",
-                                        height: "50px",
-                                        border: "4px solid #e2e8f0",
-                                        borderTop: "4px solid #667eea",
-                                        borderRadius: "50%",
-                                        animation: "spin 1s linear infinite",
-                                    }}
-                                />
-                                <div style={{ color: "#a0aec0", fontSize: "1.1rem" }}>Loading products...</div>
-                            </div>
-                        ) : products.length === 0 ? (
-                            <div style={{ textAlign: "center", padding: "3rem", color: "#a0aec0", fontSize: "1.1rem" }}>
-                                No products found.
-                            </div>
-                        ) : (
-                            <>
+                        <div style={{ textAlign: "center", padding: "3rem", display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
+                            <div
+                                style={{
+                                    width: "50px",
+                                    height: "50px",
+                                    border: "4px solid #e2e8f0",
+                                    borderTop: "4px solid #667eea",
+                                    borderRadius: "50%",
+                                    animation: "spin 1s linear infinite",
+                                }}
+                            />
+                            <div style={{ color: "#a0aec0", fontSize: "1.1rem" }}>Loading products...</div>
+                        </div>
+                    ) : products.length === 0 ? (
+                        <div style={{ textAlign: "center", padding: "3rem", color: "#a0aec0", fontSize: "1.1rem" }}>
+                            No products found.
+                        </div>
+                    ) : (
+                        <>
                             {/* Pagination Info */}
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", paddingBottom: "1rem", borderBottom: "1px solid #e2e8f0" }}>
                                 <div style={{ color: "#4a5568", fontSize: "0.9rem" }}>
@@ -817,7 +844,7 @@ export default function ProductsPage() {
                                                 const imageUrl = product.images && Array.isArray(product.images) && product.images.length > 0 && product.images[0]
                                                     ? product.images[0]
                                                     : "https://via.placeholder.com/300x250?text=No+Image";
-                                                
+
                                                 return (
                                                     <img
                                                         src={imageUrl}
@@ -982,8 +1009,8 @@ export default function ProductsPage() {
                                     </div>
                                 ))}
                             </div>
-                            </>
-                        )}
+                        </>
+                    )}
                     <style>{`
                         @keyframes spin {
                             0% { transform: rotate(0deg); }

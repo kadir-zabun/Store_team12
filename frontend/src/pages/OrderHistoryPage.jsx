@@ -91,7 +91,17 @@ export default function OrderHistoryPage() {
 
                         console.log("Orders data (parsed):", ordersData);
                         console.log("Orders count:", ordersData.length);
-                        setOrders(Array.isArray(ordersData) ? ordersData : []);
+
+                        // Sort orders by date descending (newest first)
+                        const sortedOrders = Array.isArray(ordersData)
+                            ? ordersData.sort((a, b) => {
+                                const dateA = a.orderDate ? new Date(a.orderDate).getTime() : 0;
+                                const dateB = b.orderDate ? new Date(b.orderDate).getTime() : 0;
+                                return dateB - dateA;
+                            })
+                            : [];
+                        setOrders(sortedOrders);
+
 
                         // Get delivered orders using userId as customerId
                         console.log("Fetching delivered orders for customerId:", customerId);
@@ -309,7 +319,26 @@ export default function OrderHistoryPage() {
                                     </div>
                                 </div>
 
+                                {/* Shipping Address */}
+                                {order.shippingAddress && (
+                                    <div style={{
+                                        marginBottom: "1rem",
+                                        padding: "0.75rem",
+                                        background: "#f7fafc",
+                                        borderRadius: "8px",
+                                        border: "1px solid #e2e8f0"
+                                    }}>
+                                        <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "#4a5568", marginBottom: "0.25rem" }}>
+                                            📍 Shipping Address:
+                                        </div>
+                                        <div style={{ fontSize: "0.9rem", color: "#2d3748" }}>
+                                            {order.shippingAddress}
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div style={{ marginBottom: "1rem" }}>
+
                                     <h3 style={{ fontSize: "1rem", fontWeight: 600, color: "#4a5568", marginBottom: "0.75rem" }}>Items:</h3>
                                     <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
                                         {order.items && order.items.map((item, index) => {
@@ -439,7 +468,15 @@ export default function OrderHistoryPage() {
                                                         // Reload orders
                                                         const ordersResponse = await orderApi.getOrdersByCustomer(userId);
                                                         const ordersData = ordersResponse.data?.data || ordersResponse.data || [];
-                                                        setOrders(Array.isArray(ordersData) ? ordersData : []);
+                                                        // Sort by date (newest first)
+                                                        const sortedOrders = Array.isArray(ordersData)
+                                                            ? ordersData.sort((a, b) => {
+                                                                const dateA = a.orderDate ? new Date(a.orderDate).getTime() : 0;
+                                                                const dateB = b.orderDate ? new Date(b.orderDate).getTime() : 0;
+                                                                return dateB - dateA;
+                                                            })
+                                                            : [];
+                                                        setOrders(sortedOrders);
                                                     } catch (error) {
                                                         showError(error.response?.data?.message || "Failed to cancel order. Please try again.");
                                                     }

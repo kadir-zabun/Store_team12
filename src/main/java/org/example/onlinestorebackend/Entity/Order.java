@@ -25,4 +25,6 @@ public class Order {
     private Double totalPrice;
 
     private LocalDateTime orderDate;
+
+    private String shippingAddress;
 }

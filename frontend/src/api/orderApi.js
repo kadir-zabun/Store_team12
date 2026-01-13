@@ -4,10 +4,11 @@ const orderApi = {
     createOrder: (orderData) =>
         axiosClient.post("/api/orders", orderData),
 
-    createOrderFromCart: () => {
-        // Backend now uses JWT to get userId, no need to pass customerId
-        return axiosClient.post(`/api/orders/from-cart`);
+    createOrderFromCart: (shippingAddress = null) => {
+        // Backend uses JWT to get userId, optionally pass shippingAddress
+        return axiosClient.post("/api/orders/from-cart", shippingAddress ? { shippingAddress } : {});
     },
+
 
     getOrderById: (orderId) =>
         axiosClient.get(`/api/orders/${orderId}`),

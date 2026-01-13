@@ -22,6 +22,7 @@ public class PaymentRequestDto {
     private String expiryDate;
     private String cvv;
     private Boolean saveCard;
+    private String shippingAddress;
 
     @Data
     public static class ItemDto {
